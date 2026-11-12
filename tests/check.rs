@@ -350,3 +350,109 @@ fn play_with_no_passage_reports_inside_the_line() {
     let width = src.lines().nth(d.line - 1).unwrap().chars().count();
     assert!(d.col <= width + 1);
 }
+
+// ---- Names inside expressions ----
+
+#[test]
+fn names_in_expressions_must_resolve() {
+    assert_broken(
+        "open when stair_clear",
+        "open when stair_cleer",
+        "`stair_cleer` is not declared",
+    );
+    assert_broken(
+        "[if me.knows.secret but",
+        "[if me.knows.secrt but",
+        "`secrt` is not a declared clue",
+    );
+    assert_broken(
+        "when me.is(ann)",
+        "when me.is(anne)",
+        "`anne` is not declared",
+    );
+    assert_broken("{ann.name}", "{anne.name}", "`anne` is not declared");
+    assert_broken(
+        "when not stair_clear\n",
+        "when nott(stair_clear)\n",
+        "`nott` is not a function",
+    );
+}
+
+#[test]
+fn a_misspelling_gets_a_suggestion() {
+    assert_broken(
+        "open when stair_clear",
+        "open when stair_cleer",
+        "did you mean `stair_clear`?",
+    );
+    assert_broken(
+        "[if me.knows.secret but",
+        "[if me.knows.secrt but",
+        "did you mean `secret`?",
+    );
+}
+
+#[test]
+fn the_error_points_at_the_name() {
+    let src = BASE.replacen("when me.is(ann)", "when me.is(anne)", 1);
+    let d = check(&src)
+        .diags
+        .into_iter()
+        .find(|d| d.severity == Severity::Error)
+        .unwrap();
+    let at: String = src
+        .lines()
+        .nth(d.line - 1)
+        .unwrap()
+        .chars()
+        .skip(d.col - 1)
+        .collect();
+    assert!(at.starts_with("anne"), "column {} points at `{at}`", d.col);
+}
+
+#[test]
+fn lets_are_in_scope_in_their_passage_and_its_sub_nibs() {
+    // `ready` is declared in `hall`; `hall:look` is a sub-Nib, so it may use it.
+    let src = BASE
+        .replacen(
+            "learn secret\n--",
+            "learn secret\nlet ready: me.knows.secret\n--",
+            1,
+        )
+        .replacen("You look.", "[if ready]\nYou look.", 1);
+    assert_eq!(errors(&src), vec![]);
+    // A passage that is not a sub-Nib of `hall` may not.
+    let src = format!("{src}\n:: elsewhere\n[if ready]\nNo.\n");
+    let errs = errors(&src);
+    assert!(
+        errs.iter()
+            .any(|(_, m)| m.contains("`ready` is not declared")),
+        "{errs:#?}"
+    );
+}
+
+#[test]
+fn a_bare_word_after_a_comparison_is_a_value() {
+    let src = BASE.replacen("when me.knows.secret\n", "when me.mood == cheerful\n", 1);
+    assert_eq!(errors(&src), vec![]);
+}
+
+#[test]
+fn link_parameters_are_in_scope_in_the_target() {
+    let src = BASE
+        .replacen(
+            "~ examine ~ when me.knows.secret",
+            "~ examine ~ with {thing: key}",
+            1,
+        )
+        .replacen("You look.", "You look at {thing.name}.", 1);
+    assert_eq!(errors(&src), vec![]);
+    let src = src.replacen("{thing.name}", "{thng.name}", 1);
+    assert!(
+        errors(&src)
+            .iter()
+            .any(|(_, m)| m.contains("did you mean `thing`?")),
+        "{:#?}",
+        errors(&src)
+    );
+}

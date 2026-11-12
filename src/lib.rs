@@ -7,6 +7,7 @@ pub mod check;
 pub mod diag;
 pub mod expr;
 pub mod json;
+pub mod resolve;
 pub mod twee;
 
 pub use check::{check, Report, Stats, VERSION};

@@ -1217,6 +1217,7 @@ set mirror.open: no
 Chill and gust: frost runs across {mirror.name} until it shows nothing at all.
 
 :: sanctum:thunderclap [act]
+let next: hask.rhyme.next
 interrupt hask when next in [flame, frost]
 --
 Hush, gust, spark: you gather a silence, throw it, and let it go all at once. The crack slaps every candle flat.
