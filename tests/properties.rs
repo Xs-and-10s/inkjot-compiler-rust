@@ -6,6 +6,7 @@
 //! that does. When it finds one it shrinks it to the smallest failing case and
 //! saves it under `proptest-regressions/`, so it is retried on every run.
 
+use inkjot::expr::{Arg, Expr};
 use inkjot::{check, expr, render, Severity};
 use proptest::prelude::*;
 
@@ -130,6 +131,62 @@ fn expression() -> impl Strategy<Value = String> {
     })
 }
 
+/// An expression *tree*, built directly instead of parsed from text.
+///
+/// The round-trip property needs trees the parser never chose the shape of,
+/// so the printer has to cope with every nesting, not only the ones that
+/// arise from text someone would write.
+fn tree() -> impl Strategy<Value = Expr> {
+    use proptest::collection::vec;
+    use proptest::sample::select;
+
+    let leaf = prop_oneof![
+        select(vec!["me", "here", "door", "x", "a_b", "lounge@0"]).prop_map(Expr::name),
+        (0..1000u32).prop_map(|n| Expr::Num(n.to_string())),
+        (0..100u32, 0..100u32).prop_map(|(a, b)| Expr::Num(format!("{a}.{b}"))),
+        "[a-z ]{0,6}".prop_map(Expr::Str),
+    ];
+    // Up to 6 levels deep and about 64 nodes: deep enough that operators nest
+    // inside each other on both sides, which is where brackets matter.
+    leaf.prop_recursive(6, 64, 3, |inner| {
+        let boxed = || inner.clone().prop_map(Box::new);
+        // After a dot any word is a member, keywords included.
+        let member = select(vec!["knows", "open", "in", "and", "any", "now"]);
+        let key = proptest::option::of(select(vec!["in", "max", "toward"]));
+        let arg = (key, inner.clone()).prop_map(|(key, value)| Arg {
+            key: key.map(str::to_string),
+            value,
+        });
+        let binary = select(vec![
+            "or", "and", "==", "!=", ">=", "<=", ">", "<", "in", "+", "-", "*", "/", "mod",
+        ]);
+        let range_op = select(vec!["..", "..=", "..<"]);
+        prop_oneof![
+            (boxed(), member).prop_map(|(t, m)| Expr::Member(t, m.to_string())),
+            (boxed(), vec(arg, 0..3)).prop_map(|(t, args)| Expr::Call(t, args)),
+            (boxed(), boxed()).prop_map(|(t, i)| Expr::Index(t, i)),
+            vec(inner.clone(), 0..4).prop_map(Expr::List),
+            (select(vec!["not", "-"]), boxed()).prop_map(|(op, e)| Expr::Unary(op, e)),
+            (binary, boxed(), boxed()).prop_map(|(op, a, b)| Expr::Binary(op, a, b)),
+            (range_op.clone(), boxed(), boxed()).prop_map(|(op, lo, hi)| Expr::Range {
+                lo: Some(lo),
+                hi: Some(hi),
+                op
+            }),
+            (range_op, boxed()).prop_map(|(op, hi)| Expr::Range {
+                lo: None,
+                hi: Some(hi),
+                op
+            }),
+            boxed().prop_map(|lo| Expr::Range {
+                lo: Some(lo),
+                hi: None,
+                op: ".."
+            }),
+        ]
+    })
+}
+
 // ------------------------------------------------------------------ properties
 
 /// Every diagnostic must point inside the file it is about.
@@ -240,5 +297,30 @@ fn upon_and_on_agree() {
             check(src).stats.expressions,
             check(&with_upon).stats.expressions
         );
+    }
+}
+
+proptest! {
+    // These are cheap, so run many more cases than the default 256. A printer
+    // bug only shows on particular nestings (the same operator on the right
+    // of itself, say), and 256 shallow trees can miss it.
+    #![proptest_config(ProptestConfig::with_cases(4000))]
+
+    /// Property 1, the round trip: print any tree, parse the text, and get an
+    /// equal tree back. This pins the printer and the parser to each other:
+    /// a missing bracket in one or a precedence slip in the other breaks it.
+    #[test]
+    fn printing_then_parsing_gives_the_same_tree(tree in tree()) {
+        let text = tree.to_string();
+        let reparsed = expr::parse(&text);
+        prop_assert_eq!(reparsed.as_ref(), Ok(&tree), "printed as: {}", text);
+    }
+
+    /// Printing is stable: text that came from the printer prints as itself.
+    #[test]
+    fn printing_is_stable(src in expression()) {
+        let once = expr::parse(&src).unwrap().to_string();
+        let twice = expr::parse(&once).unwrap().to_string();
+        prop_assert_eq!(once, twice);
     }
 }

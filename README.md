@@ -49,10 +49,22 @@ bad usage.
 - Events: `on [before|after] event … when … ~ then …`, with `upon` as a synonym.
 - Expressions, wherever they appear: after `when`, in `[if …]`, in `let` and
   `expect`. `but` is a synonym for `and`.
+- Names inside expressions. Each must be a builtin (`me`, `here`, `clock`), a
+  declared id, a tag, or a `let` in scope. `me.knows.x` wants a clue and
+  `me.holds.x` an item. A misspelling gets a suggestion:
+
+  ```
+  error: `stair_cleer` is not declared: …; did you mean `stair_clear`?
+  ```
+
+  A `let` is in scope in its own passage and in that passage's sub-Nibs. A
+  Link's `with {…}` parameters are in scope in the passage it leads to.
 
 ## What it does not cover yet
 
-- Names inside expressions (`me.knows.secret`) are parsed, not resolved.
+- A bare word on the right of `==`, `!=` or `in` is taken as a value
+  (`me.treat == hold`), so a misspelling there is not caught.
+- Member names after the first (`door.opn`) are not checked.
 - Free tags on declarations (`~ evidence`, `~ wide`) are accepted as written.
 - v0.6 features (the duel: `encounter`, `pattern`, `spell`; and `retell`) are
   skipped and counted in one notice. They are not checked.
@@ -77,7 +89,8 @@ Three kinds of test, all run by `cargo test`:
 - **Property tests** in `tests/properties.rs`, using
   [proptest](https://github.com/proptest-rs/proptest). A property is a claim
   about every input: `check` never panics, every reported position lies inside
-  the file, `but` means `and`. proptest generates inputs looking for a
+  the file, printing an expression and parsing it back gives the same tree.
+  proptest generates inputs looking for a
   counterexample, shrinks any it finds, and saves it in
   `tests/properties.proptest-regressions` so it is retried on every run.
 
@@ -108,7 +121,8 @@ When a property finds a bug, fix it and add a plain test for it in
 | Path | Role |
 |---|---|
 | `src/twee.rs` | Splits a file into passages |
-| `src/expr.rs` | The expression parser |
+| `src/expr.rs` | The expression parser and printer |
+| `src/resolve.rs` | Name resolution inside expressions |
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | Just enough JSON to read `StoryData` |

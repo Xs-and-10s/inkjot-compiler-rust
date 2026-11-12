@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::diag::{Diag, Severity};
+use crate::resolve::{self, Lookup, Problem, Want};
 use crate::twee::{self, Line, Passage};
 use crate::{expr, json};
 
@@ -39,6 +40,7 @@ const DECLS: &[&str] = &[
     "objective",
     "table",
     "scenario",
+    "map",
 ];
 
 /// Declarations that may appear only once per id.
@@ -69,7 +71,6 @@ const SETTINGS: &[&str] = &[
     "start",
     "default",
     "route",
-    "map",
     "rewind",
     "checkpoint",
     "expect",
@@ -127,6 +128,17 @@ const EVENTS: &[&str] = &[
 
 /// Acts every Inklink has, whether or not its config tunes them.
 const BUILTIN_ACTS: &[&str] = &["walk", "dash", "slip", "observe", "take"];
+
+/// Tags the engine gives things itself.
+const BUILTIN_TAGS: &[&str] = &[
+    "linker",
+    "living",
+    "character",
+    "npc",
+    "item",
+    "clue",
+    "place",
+];
 
 /// Link targets that are not passages.
 const BUILTIN_TARGETS: &[&str] = &["here", "rewind"];
@@ -287,6 +299,47 @@ fn is_duration(s: &str) -> bool {
     digits.len() < s.len() && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
 }
 
+/// The target of a Link line: the `b` in `> [[a->b]]`.
+fn link_target(line: &str) -> Option<&str> {
+    let open = line.find("[[")?;
+    let inner = &line[open + 2..open + line[open..].find("]]")?];
+    let target = match (inner.rfind("->"), inner.rfind('|')) {
+        (Some(i), _) => &inner[i + 2..],
+        (None, Some(i)) => &inner[i + 1..],
+        (None, None) => inner,
+    };
+    Some(target.trim())
+}
+
+/// The candidate nearest to `name`, if one is a plausible misspelling of it.
+fn closest(name: &str, candidates: Vec<String>) -> Option<String> {
+    let limit = (name.chars().count() / 3).clamp(1, 2);
+    candidates
+        .into_iter()
+        .map(|c| (edit_distance(name, &c), c))
+        .filter(|(d, _)| *d <= limit)
+        // Sort by distance, then by name, so the answer never depends on hash order.
+        .min()
+        .map(|(_, c)| c)
+}
+
+/// How many single-character edits turn `a` into `b` (Levenshtein distance).
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    // `row[j]` is the distance between the part of `a` seen so far and `b[..j]`.
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let substitute = diagonal + usize::from(ca != *cb);
+            diagonal = row[j + 1];
+            row[j + 1] = substitute.min(row[j] + 1).min(row[j + 1] + 1);
+        }
+    }
+    row[b.len()]
+}
+
 // ---------------------------------------------------------------- the checker
 
 #[derive(Default)]
@@ -295,6 +348,15 @@ struct Checker {
     passages: HashSet<String>,
     /// id → the kinds it is declared as (`clue` and `act` may share a name).
     decls: HashMap<String, HashSet<&'static str>>,
+    /// Free words on declarations (`~ evidence`), plus the built-in ones.
+    tags: HashSet<String>,
+    /// passage → the names it introduces: `let`s, input variables, and the
+    /// `with {…}` parameters of Links that lead to it.
+    scopes: HashMap<String, HashSet<String>>,
+    /// `let`s in the config, visible everywhere.
+    globals: HashSet<String>,
+    /// The names in scope in the passage being checked right now.
+    locals: HashSet<String>,
     stretch: BTreeMap<String, usize>,
     stats: Stats,
 }
@@ -337,13 +399,48 @@ impl Checker {
         }
     }
 
+    /// Parse an expression and resolve the names in it.
     fn expr(&mut self, text: &str, line: usize, col: usize) {
         let lead = text.len() - text.trim_start().len();
         let body = text.trim();
+        let col = col + cols(&text[..lead]);
         self.stats.expressions += 1;
-        if let Err((off, msg)) = expr::parse(body) {
-            let off = off.min(body.len());
-            self.err(line, col + cols(&text[..lead]) + cols(&body[..off]), msg);
+        match expr::parse(body) {
+            Ok(e) => self.resolve(&e, body, line, col),
+            Err((off, msg)) => {
+                let off = off.min(body.len());
+                self.err(line, col + cols(&body[..off]), msg);
+            }
+        }
+    }
+
+    /// Report every name in `e` that refers to nothing.
+    fn resolve(&mut self, e: &expr::Expr, src: &str, line: usize, col: usize) {
+        for Problem { at, name, want } in resolve::unresolved(e, self) {
+            let (what, candidates) = match want {
+                Want::Value => (
+                    "is not declared: it is not a builtin, a declared id, a tag, or a `let` in scope".to_string(),
+                    self.decls.keys().chain(&self.locals).chain(&self.globals).cloned().collect(),
+                ),
+                Want::Function => (
+                    format!("is not a function; the functions are: {}", resolve::FUNCTIONS.join(", ")),
+                    resolve::FUNCTIONS.iter().map(|f| f.to_string()).collect(),
+                ),
+                Want::Kind(kind) => (
+                    format!("is not a declared {kind}"),
+                    self.decls.iter().filter(|(_, ks)| ks.contains(kind)).map(|(n, _)| n.clone()).collect(),
+                ),
+            };
+            let hint = match closest(&name, candidates) {
+                Some(near) => format!("; did you mean `{near}`?"),
+                None => String::new(),
+            };
+            let at = at.min(src.len());
+            self.err(
+                line,
+                col + cols(&src[..at]),
+                format!("`{name}` {what}{hint}"),
+            );
         }
     }
 
@@ -352,6 +449,9 @@ impl Checker {
     fn collect(&mut self, passages: &[Passage]) {
         for act in BUILTIN_ACTS {
             self.decls.entry(act.to_string()).or_default().insert("act");
+        }
+        for tag in BUILTIN_TAGS {
+            self.tags.insert(tag.to_string());
         }
         for p in passages {
             // A nameless passage is already reported by the Twee reader.
@@ -373,10 +473,17 @@ impl Checker {
         for p in passages {
             let mut scratch = Vec::new();
             let (stmts, _) = gather(p, &mut scratch);
+            self.collect_scope(p, &stmts);
             for s in stmts {
                 let Some(kind) = DECLS.iter().copied().find(|k| *k == s.kw) else {
                     continue;
                 };
+                // A one-word clause on a declaration is a tag: `~ evidence`.
+                for c in &s.clauses[1..] {
+                    if is_ident(&c.text) {
+                        self.tags.insert(c.text.clone());
+                    }
+                }
                 let head = &s.clauses[0];
                 let name = first_word(head.text[s.kw.len()..].trim_start());
                 if !is_ident(name) {
@@ -391,6 +498,57 @@ impl Checker {
                         format!("{kind} `{name}` is declared twice"),
                     );
                 }
+            }
+        }
+    }
+
+    /// Record the names a passage introduces, and the parameters its Links
+    /// hand to the passages they lead to.
+    fn collect_scope(&mut self, p: &Passage, stmts: &[Stmt]) {
+        let mut names: HashSet<String> = HashSet::new();
+        for s in stmts.iter().filter(|s| s.kw == "let") {
+            names.insert(first_word(s.clauses[0].text[3..].trim_start()).to_string());
+        }
+        let mut target: Option<String> = None;
+        for l in &p.lines {
+            let t = l.text.trim();
+            // `{choose input for: mouth_words, …}` introduces `mouth_words`.
+            if let Some(i) = t.find(" input for: ") {
+                names.insert(first_word(&t[i + 12..]).to_string());
+            }
+            if t.starts_with('>') {
+                target = link_target(t).map(str::to_string);
+            } else if !t.starts_with('~') {
+                target = None;
+            }
+            // `~ with {target: roland}` gives the Link's target a `target`.
+            if let (Some(target), Some(i)) = (&target, t.find("with {")) {
+                let params = t[i + 6..].split('}').next().unwrap_or("");
+                let scope = self.scopes.entry(target.clone()).or_default();
+                for param in params.split(',') {
+                    scope.insert(first_word(param.trim()).to_string());
+                }
+            }
+        }
+        if p.has_tag("config") {
+            self.globals.extend(names);
+        } else {
+            self.scopes.entry(p.name.clone()).or_default().extend(names);
+        }
+    }
+
+    /// The names in scope in `passage`: its own, and those of every passage
+    /// it is a sub-Nib of (`orrery:crank` sees the `let`s of `orrery`).
+    fn scope_of(&self, passage: &str) -> HashSet<String> {
+        let mut names = HashSet::new();
+        let mut name = passage;
+        loop {
+            if let Some(scope) = self.scopes.get(name) {
+                names.extend(scope.iter().cloned());
+            }
+            match name.rsplit_once(':') {
+                Some((parent, _)) => name = parent,
+                None => return names,
             }
         }
     }
@@ -429,6 +587,7 @@ impl Checker {
                 *self.stretch.entry(format!("[{t}]")).or_default() += 1;
             }
         }
+        self.locals = self.scope_of(&p.name);
         let mut diags = std::mem::take(&mut self.diags);
         let (stmts, body) = gather(p, &mut diags);
         self.diags = diags;
@@ -699,6 +858,14 @@ impl Checker {
         let value_col = rest_col + cols(&rest[..rest.len() - value.len()]);
         match kind {
             "way" => self.places(value, " - ", head.line, value_col),
+            // A map names a region and lays its places out in rows: `~ a | b | c`.
+            "map" => {
+                for c in &s.clauses[1..] {
+                    if c.text.contains('|') {
+                        self.places(&c.text, "|", c.line, c.col);
+                    }
+                }
+            }
             "combo" => {
                 for act in value.split(',') {
                     self.need(act.trim(), &["act", "combo"], "act", head.line, value_col);
@@ -774,13 +941,6 @@ impl Checker {
                 }
             }
             "route" => self.places(value, " - ", line, vcol),
-            "map" => {
-                for c in &s.clauses[1..] {
-                    if c.text.contains('|') {
-                        self.places(&c.text, "|", c.line, c.col);
-                    }
-                }
-            }
             "default" => {
                 if let Some(list) = rest.strip_prefix("moves") {
                     self.moves(list, line, rest_col + 5);
@@ -1101,12 +1261,14 @@ impl Checker {
             _ if second == "input" => {}
             _ => {
                 self.stats.expressions += 1;
-                if let Err((_, why)) = expr::parse(c) {
-                    self.err(
+                let col = col + cols(&content[..content.len() - content.trim_start().len()]);
+                match expr::parse(c) {
+                    Ok(e) => self.resolve(&e, c, line, col),
+                    Err((_, why)) => self.err(
                         line,
                         col,
                         format!("`{{{c}}}` is not a known insert, and it does not read as an expression ({why})"),
-                    );
+                    ),
                 }
             }
         }
@@ -1224,4 +1386,19 @@ fn gather<'a>(p: &'a Passage, diags: &mut Vec<Diag>) -> (Vec<Stmt>, &'a [Line]) 
         }
     }
     (stmts, body)
+}
+
+impl Lookup for Checker {
+    fn is_known(&self, name: &str) -> bool {
+        resolve::BUILTINS.contains(&name)
+            || self.decls.contains_key(name)
+            || self.tags.contains(name)
+            || self.locals.contains(name)
+            || self.globals.contains(name)
+            || self.passages.contains(name)
+    }
+
+    fn is_kind(&self, name: &str, kind: &str) -> bool {
+        self.has(name, &[kind])
+    }
 }

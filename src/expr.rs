@@ -3,11 +3,14 @@
 //! Precedence, loosest first: `or`; `and` / `but`; `not`; comparisons and `in`;
 //! ranges; `+ -`; `* / mod`; then member access, calls and indexing.
 
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Num(String),
     Str(String),
-    Name(String),
+    /// A bare name, and where it starts in the source text.
+    Name(String, At),
     Member(Box<Expr>, String),
     Call(Box<Expr>, Vec<Arg>),
     Index(Box<Expr>, Box<Expr>),
@@ -19,6 +22,127 @@ pub enum Expr {
         hi: Option<Box<Expr>>,
         op: &'static str,
     },
+}
+
+/// A byte offset into the source text.
+///
+/// Two `At`s always compare equal. That keeps positions out of the meaning of
+/// an expression: `a and b` parsed from two different places is the same tree,
+/// and a printed-then-reparsed expression equals the original.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct At(pub usize);
+
+impl PartialEq for At {
+    fn eq(&self, _: &At) -> bool {
+        true
+    }
+}
+
+impl Expr {
+    /// A bare name with no position, for building trees by hand.
+    pub fn name(name: impl Into<String>) -> Expr {
+        Expr::Name(name.into(), At::default())
+    }
+
+    /// How tightly this expression binds; a higher number binds tighter.
+    /// The printer uses it to decide where brackets are needed.
+    fn precedence(&self) -> u8 {
+        match self {
+            Expr::Binary(op, ..) => match *op {
+                "or" => 1,
+                "and" => 2,
+                "==" | "!=" | ">=" | "<=" | ">" | "<" | "in" => 4,
+                "+" | "-" => 6,
+                _ => 7, // * / mod
+            },
+            Expr::Unary("not", _) => 3,
+            Expr::Range { .. } => 5,
+            Expr::Unary(..) => 8, // unary minus
+            _ => 9,               // names, literals, calls, members, indexing, lists
+        }
+    }
+
+    /// Write `self`, in brackets if it binds more loosely than `min`.
+    fn fmt_at(&self, f: &mut fmt::Formatter<'_>, min: u8) -> fmt::Result {
+        if self.precedence() < min {
+            write!(f, "({self})")
+        } else {
+            write!(f, "{self}")
+        }
+    }
+}
+
+/// Print an expression as Inkjot source, with only the brackets it needs.
+///
+/// The contract, checked by a property test: parsing the printed text gives
+/// back an equal tree.
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mine = self.precedence();
+        match self {
+            Expr::Num(n) => write!(f, "{n}"),
+            Expr::Str(s) => write!(f, "\"{s}\""),
+            Expr::Name(n, _) => write!(f, "{n}"),
+            Expr::Member(target, member) => {
+                target.fmt_at(f, 9)?;
+                write!(f, ".{member}")
+            }
+            Expr::Call(target, args) => {
+                target.fmt_at(f, 9)?;
+                write!(f, "(")?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    if let Some(key) = &arg.key {
+                        write!(f, "{key}: ")?;
+                    }
+                    write!(f, "{}", arg.value)?;
+                }
+                write!(f, ")")
+            }
+            Expr::Index(target, index) => {
+                target.fmt_at(f, 9)?;
+                write!(f, "[{index}]")
+            }
+            Expr::List(items) => {
+                write!(f, "[")?;
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{item}")?;
+                }
+                write!(f, "]")
+            }
+            Expr::Unary(op, operand) => {
+                if *op == "not" {
+                    write!(f, "not ")?;
+                } else {
+                    write!(f, "{op}")?;
+                }
+                operand.fmt_at(f, mine)
+            }
+            // Binary operators group to the left: `a - b - c` is `(a - b) - c`.
+            // So the left side may bind as loosely as this operator, but the
+            // right side must bind tighter or it needs brackets.
+            Expr::Binary(op, lhs, rhs) => {
+                lhs.fmt_at(f, mine)?;
+                write!(f, " {op} ")?;
+                rhs.fmt_at(f, mine + 1)
+            }
+            Expr::Range { lo, hi, op } => {
+                if let Some(lo) = lo {
+                    lo.fmt_at(f, mine + 1)?;
+                }
+                write!(f, "{op}")?;
+                if let Some(hi) = hi {
+                    hi.fmt_at(f, mine + 1)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -363,7 +487,7 @@ impl Parser {
                     return Err((at, format!("`{s}` needs something before it")));
                 }
                 self.pos += 1;
-                Ok(Expr::Name(s))
+                Ok(Expr::Name(s, At(at)))
             }
             Some(Tok::Op("(")) => {
                 self.pos += 1;
