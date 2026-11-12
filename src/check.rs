@@ -354,10 +354,11 @@ impl Checker {
             self.decls.entry(act.to_string()).or_default().insert("act");
         }
         for p in passages {
-            if !self.passages.insert(p.name.clone()) {
+            // A nameless passage is already reported by the Twee reader.
+            if !self.passages.insert(p.name.clone()) && !p.name.is_empty() {
                 self.err(
                     p.line,
-                    4,
+                    p.col,
                     format!("there are two passages named `{}`", p.name),
                 );
             }
@@ -415,7 +416,7 @@ impl Checker {
             if !self.passages.contains(parent) {
                 self.err(
                     p.line,
-                    4,
+                    p.col,
                     format!(
                         "`{}` is a sub-Nib of `{parent}`, but there is no passage `{parent}`",
                         p.name
@@ -872,7 +873,10 @@ impl Checker {
             "burn" | "light" => self.need(arg(1), &["fuse"], "fuse", line, col + cols(verb) + 1),
             "roll" => self.need(arg(1), &["table"], "table", line, col + 5),
             "wake" => self.need(arg(1), &["npc", "character"], "NPC", line, col + 5),
-            "play" => self.need_passage(arg(1), "the passage", line, col + 5),
+            "play" => match arg(1) {
+                "" => self.err(line, col, "`play` needs a passage name"),
+                name => self.need_passage(name, "the passage", line, word_col(1)),
+            },
             "set" => {
                 if !core.contains(':') {
                     self.err(line, col, "`set` is written `set name: value`");
@@ -1110,7 +1114,10 @@ impl Checker {
 
     /// A `[modifier]` line; several may be combined with `;`.
     fn modifier(&mut self, text: &str, line: usize, col: usize, if_seen: &mut bool) {
-        let inner = &text[1..text.len() - 1];
+        // `strip_prefix`/`strip_suffix` cannot panic the way slicing by index can.
+        let Some(inner) = text.strip_prefix('[').and_then(|t| t.strip_suffix(']')) else {
+            return self.err(line, col, "this modifier is missing its closing `]`");
+        };
         let mut at = 0;
         for part in inner.split(';') {
             let lead = part.len() - part.trim_start().len();

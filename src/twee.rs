@@ -15,6 +15,8 @@ pub struct Passage {
     pub tags: Vec<String>,
     /// Line of the `::` header.
     pub line: usize,
+    /// 1-based character column where the name starts on that line.
+    pub col: usize,
     pub lines: Vec<Line>,
 }
 
@@ -31,10 +33,14 @@ pub fn parse(src: &str, diags: &mut Vec<Diag>) -> Vec<Passage> {
         let text = raw.trim_end_matches('\r');
         if let Some(rest) = text.strip_prefix("::") {
             let (name, tags) = parse_header(rest, no, diags);
+            // Point at the name itself; with no name, at the end of the line.
+            let lead = rest.len() - rest.trim_start().len();
+            let col = (3 + rest[..lead].chars().count()).min(text.chars().count() + 1);
             passages.push(Passage {
                 name,
                 tags,
                 line: no,
+                col,
                 lines: Vec::new(),
             });
         } else if let Some(p) = passages.last_mut() {

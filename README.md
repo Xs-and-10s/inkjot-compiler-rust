@@ -60,12 +60,38 @@ bad usage.
 
 ## Building
 
-No dependencies beyond the Rust standard library.
+The compiler has no dependencies beyond the Rust standard library.
 
 ```
 cargo build --release
 cargo test
 ```
+
+## Testing
+
+Three kinds of test, all run by `cargo test`:
+
+- **Unit tests** beside the code (`src/expr.rs`).
+- **End-to-end tests** in `tests/check.rs`. They break a small valid file one
+  edit at a time and assert the one error each edit must cause.
+- **Property tests** in `tests/properties.rs`, using
+  [proptest](https://github.com/proptest-rs/proptest). A property is a claim
+  about every input: `check` never panics, every reported position lies inside
+  the file, `but` means `and`. proptest generates inputs looking for a
+  counterexample, shrinks any it finds, and saves it in
+  `tests/properties.proptest-regressions` so it is retried on every run.
+
+proptest is a dev-dependency: it is built for `cargo test` only and is not part
+of the `inkjot` binary.
+
+To search harder than the default 256 cases per property:
+
+```
+PROPTEST_CASES=5000 cargo test --test properties
+```
+
+When a property finds a bug, fix it and add a plain test for it in
+`tests/check.rs`, so the reason is written down next to the fix.
 
 ## Examples
 

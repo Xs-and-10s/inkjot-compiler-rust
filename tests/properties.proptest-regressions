@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc fc00c2cdf20549104e903bf634f52acdf0c88e6d0041df0ef215d83b7f599cd5 # shrinks to recipe = (1, [Truncate { at: 0.22636351434082955 }, Truncate { at: 0.22157531062853247 }])

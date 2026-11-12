@@ -19,3 +19,7 @@ path = "src/main.rs"
 [profile.release]
 opt-level = 2
 codegen-units = 16
+
+[dev-dependencies]
+# Property-based tests only. Nothing here is compiled into the `inkjot` binary.
+proptest = { version = "1", default-features = false, features = ["std"] }
