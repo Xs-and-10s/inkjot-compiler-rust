@@ -9,13 +9,22 @@ This compiler targets **Inkjot v0.5**.
 
 ## Status
 
-Milestone 1: `inkjot check`. It reads a `.twee` file and reports what is wrong
-with it. It does not yet emit the JSON IR.
+Two commands:
+
+- `inkjot check` reads a `.twee` file and reports what is wrong with it.
+- `inkjot build` compiles a file that passes into its JSON IR.
 
 ```
 $ inkjot check examples/ex1-the-night-train.twee
 examples/ex1-the-night-train.twee: ok (74 passages, 58 declarations, 31 Links, 0 speeches, 94 expressions)
+
+$ inkjot build examples/ex1-the-night-train.twee -o night-train.json
+examples/ex1-the-night-train.twee: built night-train.json (123671 bytes)
 ```
+
+Without `-o`, `build` writes the IR to standard output. Source with errors is
+not built. [`docs/ir.md`](docs/ir.md) describes the format, and `examples/ir/`
+holds the IR of the three examples.
 
 An error shows the file, line and column, and the line itself:
 
@@ -68,7 +77,7 @@ bad usage.
 - Free tags on declarations (`~ evidence`, `~ wide`) are accepted as written.
 - v0.6 features (the duel: `encounter`, `pattern`, `spell`; and `retell`) are
   skipped and counted in one notice. They are not checked.
-- Nothing is emitted. The JSON IR is the next milestone.
+- A bare `..` with an upper bound (`1..5`) is an error: write `..=` or `..<`.
 
 ## Building
 
@@ -81,9 +90,12 @@ cargo test
 
 ## Testing
 
-Three kinds of test, all run by `cargo test`:
+Four kinds of test, all run by `cargo test`:
 
 - **Unit tests** beside the code (`src/expr.rs`).
+- **IR tests** in `tests/build.rs`, including a check that the IR under
+  `examples/ir/` is what the compiler produces now. After an intended change
+  to the IR: `UPDATE_IR=1 cargo test --test build`.
 - **End-to-end tests** in `tests/check.rs`. They break a small valid file one
   edit at a time and assert the one error each edit must cause.
 - **Property tests** in `tests/properties.rs`, using
@@ -123,9 +135,11 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/twee.rs` | Splits a file into passages |
 | `src/expr.rs` | The expression parser and printer |
 | `src/resolve.rs` | Name resolution inside expressions |
+| `src/syntax.rs` | Shared vocabulary and line-level splitting |
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
+| `src/ir.rs` | Lowering to the JSON IR |
 | `src/diag.rs` | Diagnostics and how they print |
-| `src/json.rs` | Just enough JSON to read `StoryData` |
+| `src/json.rs` | A small JSON value type, writer and reader |
 | `src/main.rs` | The `inkjot` command |
 
 ## Licence

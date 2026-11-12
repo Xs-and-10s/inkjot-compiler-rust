@@ -232,6 +232,7 @@ pub fn parse(src: &str) -> Result<Expr, ParseError> {
         toks,
         pos: 0,
         len: src.len(),
+        depth: 0,
     };
     let e = p.or()?;
     if let Some((at, tok)) = p.toks.get(p.pos) {
@@ -249,12 +250,21 @@ fn describe(t: &Tok) -> String {
     }
 }
 
+/// A range with an upper bound must say whether the bound is included.
+const BARE_RANGE: &str = "write `..=` to include the upper bound or `..<` to exclude it; a bare `..` is only for an open range, `a..`";
+
 const WORD_OPS: &[&str] = &["and", "or", "but", "not", "in", "mod"];
+
+/// How deeply brackets and prefix operators may nest. Each level is a real
+/// function call here, so without a limit ten thousand `(` would overflow
+/// the stack, and a stack overflow cannot be caught and reported.
+const MAX_DEPTH: usize = 64;
 
 struct Parser {
     toks: Vec<(usize, Tok)>,
     pos: usize,
     len: usize,
+    depth: usize,
 }
 
 impl Parser {
@@ -286,13 +296,31 @@ impl Parser {
         }
     }
 
-    fn or(&mut self) -> Result<Expr, ParseError> {
-        let mut lhs = self.and()?;
-        while self.word("or") {
-            self.pos += 1;
-            lhs = Expr::Binary("or", Box::new(lhs), Box::new(self.and()?));
+    /// Run `f` one nesting level deeper, refusing to go past `MAX_DEPTH`.
+    fn nested(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<Expr, ParseError>,
+    ) -> Result<Expr, ParseError> {
+        if self.depth >= MAX_DEPTH {
+            return Err((self.at(), "this expression is nested too deeply".into()));
         }
-        Ok(lhs)
+        self.depth += 1;
+        let result = f(self);
+        self.depth -= 1;
+        result
+    }
+
+    /// Every bracket, call argument and index re-enters here, so this is
+    /// where nesting is counted.
+    fn or(&mut self) -> Result<Expr, ParseError> {
+        self.nested(|p| {
+            let mut lhs = p.and()?;
+            while p.word("or") {
+                p.pos += 1;
+                lhs = Expr::Binary("or", Box::new(lhs), Box::new(p.and()?));
+            }
+            Ok(lhs)
+        })
     }
 
     fn and(&mut self) -> Result<Expr, ParseError> {
@@ -308,7 +336,7 @@ impl Parser {
     fn not(&mut self) -> Result<Expr, ParseError> {
         if self.word("not") {
             self.pos += 1;
-            return Ok(Expr::Unary("not", Box::new(self.not()?)));
+            return self.nested(|p| Ok(Expr::Unary("not", Box::new(p.not()?))));
         }
         self.cmp()
     }
@@ -345,8 +373,12 @@ impl Parser {
 
     fn range(&mut self) -> Result<Expr, ParseError> {
         if let Some(op) = self.range_op() {
+            let at = self.at();
             self.pos += 1;
             let hi = self.add()?;
+            if op == ".." {
+                return Err((at, BARE_RANGE.into()));
+            }
             return Ok(Expr::Range {
                 lo: None,
                 hi: Some(Box::new(hi)),
@@ -355,6 +387,7 @@ impl Parser {
         }
         let lo = self.add()?;
         if let Some(op) = self.range_op() {
+            let at = self.at();
             self.pos += 1;
             let hi = if self.starts_operand() {
                 Some(Box::new(self.add()?))
@@ -366,6 +399,9 @@ impl Parser {
                     self.at(),
                     format!("`{op}` needs an upper bound; an open range is written `a..`"),
                 ));
+            }
+            if hi.is_some() && op == ".." {
+                return Err((at, BARE_RANGE.into()));
             }
             return Ok(Expr::Range {
                 lo: Some(Box::new(lo)),
@@ -412,7 +448,7 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
         if self.eat_op("-") {
-            return Ok(Expr::Unary("-", Box::new(self.unary()?)));
+            return self.nested(|p| Ok(Expr::Unary("-", Box::new(p.unary()?))));
         }
         self.postfix()
     }
@@ -548,8 +584,41 @@ mod tests {
 
     #[test]
     fn rejects_broken_expressions() {
-        for src in ["", "me.is(rook", "a ==", "and b", "a b", "x..=", "a.(b)"] {
+        for src in [
+            "",
+            "me.is(rook",
+            "a ==",
+            "and b",
+            "a b",
+            "x..=",
+            "a.(b)",
+            "1..5",
+            "..5",
+        ] {
             assert!(parse(src).is_err(), "{src} should not parse");
         }
+    }
+}
+
+#[cfg(test)]
+mod depth_tests {
+    use super::parse;
+
+    #[test]
+    fn deep_nesting_is_an_error_not_a_crash() {
+        for src in [
+            "(".repeat(10_000),
+            "not ".repeat(10_000),
+            "-".repeat(10_000),
+            "[".repeat(10_000),
+        ] {
+            assert!(parse(&src).is_err());
+        }
+    }
+
+    #[test]
+    fn ordinary_nesting_is_fine() {
+        let src = format!("{}x{}", "(".repeat(20), ")".repeat(20));
+        assert!(parse(&src).is_ok());
     }
 }
