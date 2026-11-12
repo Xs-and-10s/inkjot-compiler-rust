@@ -6,7 +6,11 @@
 //!
 //! `docs/ir.md` describes the format.
 
-use std::collections::HashMap;
+mod clauses;
+
+use std::collections::{HashMap, HashSet};
+
+use clauses::{per_who, Fields};
 
 use crate::check::{check, Report};
 use crate::expr::{self, Expr};
@@ -15,7 +19,7 @@ use crate::syntax::*;
 use crate::twee::{self, Line, Passage};
 
 /// Version of the IR format itself, bumped when its shape changes.
-pub const IR_VERSION: &str = "1";
+pub const IR_VERSION: &str = "2";
 
 /// Compile Inkjot source to its IR. Source with errors is not compiled:
 /// the report says what to fix.
@@ -40,6 +44,8 @@ struct ActDef {
 
 struct Builder {
     acts: HashMap<String, ActDef>,
+    /// Names of declared stats and resources: `wits`, `hp`, `vults`.
+    stats: HashSet<String>,
     default_clash: String,
 }
 
@@ -217,6 +223,7 @@ impl Builder {
     fn new(passages: &[Passage]) -> Builder {
         let mut b = Builder {
             acts: HashMap::new(),
+            stats: HashSet::new(),
             default_clash: "none".to_string(),
         };
         for p in passages {
@@ -224,6 +231,10 @@ impl Builder {
             for s in &stmts {
                 let head = &s.clauses[0].text;
                 match s.kw.as_str() {
+                    "stat" | "resource" => {
+                        let name = first_word(head[s.kw.len()..].trim_start());
+                        b.stats.insert(name.to_string());
+                    }
                     "act" => {
                         let name = first_word(head[3..].trim_start()).to_string();
                         let def = b.act_def(s);
@@ -394,33 +405,7 @@ impl Builder {
                     ("else", otherwise.map_or(Value::Null, Value::str)),
                 ])
             }
-            _ if DECLS.contains(&kw) => {
-                let (id, value) = rest.split_once(':').unwrap_or((rest, ""));
-                let (value, when) = split_when(value.trim());
-                Value::obj([
-                    ("declare", Value::str(kw)),
-                    ("id", Value::str(id.trim())),
-                    ("label", quoted(value).map_or(Value::Null, Value::str)),
-                    (
-                        "value",
-                        if value.is_empty() || value.starts_with('"') {
-                            Value::Null
-                        } else {
-                            Value::str(value)
-                        },
-                    ),
-                    (
-                        "words",
-                        Value::Arr(if value.starts_with('"') {
-                            Vec::new()
-                        } else {
-                            words(value)
-                        }),
-                    ),
-                    ("when", when.unwrap_or(Value::Null)),
-                    ("clauses", tail()),
-                ])
-            }
+            _ if DECLS.contains(&kw) => self.declaration(s, kw, rest),
             _ if EFFECTS.contains(&kw) => {
                 let mut pairs = vec![("effect".to_string(), effect(head))];
                 if s.clauses.len() > 1 {
@@ -429,17 +414,111 @@ impl Builder {
                 Value::Obj(pairs)
             }
             // Settings, and conditional values such as `hp 3 when …`.
+            _ => self.setting(s, kw, rest),
+        }
+    }
+
+    /// `item cufflink: "a scorched cufflink" ~ evidence ~ in dining`
+    fn declaration(&self, s: &Stmt, kw: &str, rest: &str) -> Value {
+        let (id, value) = rest.split_once(':').unwrap_or((rest, ""));
+        let (value, when) = split_when(value.trim());
+        let mut f = Fields::new(&self.stats);
+        f.add("declare", Value::str(kw));
+        f.add("id", Value::str(id.trim()));
+        // What follows the colon depends on what is being declared.
+        match kw {
+            "fact" => f.add("value", expression(value)),
+            "stat" => f.add("range", expression(value)),
+            "fuse" => f.add("start", token(value)),
+            "way" => {
+                let (from, to) = value.split_once(" - ").unwrap_or((value, ""));
+                f.add("from", Value::str(from.trim()));
+                f.add("to", Value::str(to.trim()));
+            }
+            "combo" => f.add("acts", strings(value.split(',').map(str::trim))),
+            "relation" => f.add("between", strings(value.split(',').map(str::trim))),
+            "table" => f.add(
+                "roll",
+                expression(value.strip_prefix("roll ").unwrap_or(value)),
+            ),
+            "map" => {
+                let size: Vec<Value> = value.split(" by ").map(|n| token(n.trim())).collect();
+                f.add("size", Value::Arr(size));
+            }
+            "resource" => {
+                // `60`, or `per character` with no starting value.
+                let (amount, more) = value.split_once(' ').unwrap_or((value, ""));
+                if amount.chars().all(|c| c.is_ascii_digit()) && !amount.is_empty() {
+                    f.add("value", token(amount));
+                    f.phrase(more);
+                } else {
+                    f.phrase(value);
+                }
+            }
+            _ => f.phrase(value),
+        }
+        if let Some(when) = when {
+            f.add("when", when);
+        }
+        for c in &s.clauses[1..] {
+            f.phrase(&c.text);
+        }
+        Value::Obj(f.into_pairs())
+    }
+
+    /// `cohort: 2..=5 ~ best 3..=4`, `goal flee: ~ toward platform`, …
+    fn setting(&self, s: &Stmt, kw: &str, rest: &str) -> Value {
+        let (value, when) = split_when(rest.trim_start_matches(':').trim());
+        let mut f = Fields::new(&self.stats);
+        match kw {
+            // Named blocks: the name, then fields from the clauses.
+            "goal" | "reaction" | "checkpoint" => {
+                f.add(kw, Value::str(value.trim_end_matches(':').trim()));
+            }
+            "inquest" => f.add("inquest", Value::str(quoted(value).unwrap_or(value))),
+            "tags" => {
+                let all =
+                    std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
+                f.add("setting", Value::str("tags"));
+                f.add("tags", strings(all.filter(|t| !t.is_empty())));
+                return Value::Obj(f.into_pairs());
+            }
             _ => {
-                let (value, when) = split_when(rest.trim_start_matches(':').trim());
-                Value::obj([
-                    ("setting", Value::str(kw)),
-                    ("value", Value::str(value)),
-                    ("words", Value::Arr(words(value))),
-                    ("when", when.unwrap_or(Value::Null)),
-                    ("clauses", tail()),
-                ])
+                f.add("setting", Value::str(kw));
+                let typed = match kw {
+                    "ages" | "cohort" | "clock" if value == "none" => Value::Null,
+                    "ages" | "cohort" | "clock" => expression(value),
+                    "pov" => strings(value.split(',').map(str::trim)),
+                    "start" => per_who(value),
+                    "route" => strings(value.split(" - ").map(str::trim)),
+                    "default" => {
+                        let (what, list) = value.split_once(':').unwrap_or((value, ""));
+                        f.add("of", Value::str(what.trim()));
+                        match what.trim() {
+                            "moves" => strings(list.split(',').map(str::trim)),
+                            _ => Value::str(list.trim()),
+                        }
+                    }
+                    "moves" => {
+                        f.phrase(&format!("moves {value}"));
+                        Value::Null
+                    }
+                    // A conditional value for a stat or resource: `hp 3 when …`.
+                    _ if self.stats.contains(kw) => token(value),
+                    _ => Value::str(value),
+                };
+                if typed != Value::Null {
+                    f.add("value", typed);
+                }
             }
         }
+        if let Some(when) = when {
+            f.add("when", when);
+        }
+        for c in &s.clauses[1..] {
+            f.phrase(&c.text);
+        }
+        Value::Obj(f.into_pairs())
     }
 
     // ------------------------------------------------------------ bodies
