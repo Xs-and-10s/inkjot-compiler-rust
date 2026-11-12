@@ -1,0 +1,21 @@
+[package]
+name = "inkjot"
+version = "0.1.0"
+edition = "2021"
+description = "Compiler for Inkjot, the Twee 3 dialect behind Inklinks"
+license = "MIT"
+repository = "https://github.com/Xs-and-10s/inkjot-compiler-rust"
+
+[lib]
+name = "inkjot"
+path = "src/lib.rs"
+
+[[bin]]
+name = "inkjot"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 2
+codegen-units = 16
