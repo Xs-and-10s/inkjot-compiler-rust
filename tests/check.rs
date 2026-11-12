@@ -305,3 +305,48 @@ fn columns_point_at_the_problem() {
         d.col
     );
 }
+
+// ---- Bugs found by the property tests in `properties.rs`, pinned here. ----
+
+#[test]
+fn a_nameless_passage_reports_inside_the_line() {
+    // Found by `diagnostics_point_inside_noise`: the column was hard-coded to 4,
+    // which is past the end of a bare `::` line.
+    let src = "::\n\n::\n\n";
+    for d in check(src).diags.iter().filter(|d| d.line > 0) {
+        let width = src.lines().nth(d.line - 1).unwrap().chars().count();
+        assert!(
+            d.col <= width + 1,
+            "column {} on a line {width} wide",
+            d.col
+        );
+    }
+}
+
+#[test]
+fn a_lone_bracket_in_a_header_is_an_error_not_a_panic() {
+    // Found by `diagnostics_point_inside_the_file`: slicing `text[1..len - 1]`
+    // panicked when the header line was just `[`.
+    let src = BASE.replacen("learn secret", "[", 1);
+    let errs = errors(&src);
+    assert!(
+        errs.iter()
+            .any(|(_, m)| m.contains("missing its closing `]`")),
+        "{errs:#?}"
+    );
+}
+
+#[test]
+fn play_with_no_passage_reports_inside_the_line() {
+    // Found by `diagnostics_point_inside_the_file`: `then play` with nothing
+    // after it reported a column past the end of the line.
+    let src = BASE.replacen("~ then say bob \"Mind the step.\"", "~ then play", 1);
+    let d = check(&src)
+        .diags
+        .into_iter()
+        .find(|d| d.severity == Severity::Error)
+        .unwrap();
+    assert!(d.msg.contains("`play` needs a passage name"), "{}", d.msg);
+    let width = src.lines().nth(d.line - 1).unwrap().chars().count();
+    assert!(d.col <= width + 1);
+}
