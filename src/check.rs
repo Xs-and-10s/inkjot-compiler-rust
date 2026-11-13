@@ -224,6 +224,9 @@ impl Checker {
             let mut scratch = Vec::new();
             let (stmts, _) = gather(p, &mut scratch);
             self.collect_scope(p, &stmts);
+            for s in &stmts {
+                self.collect_entries(s);
+            }
             for s in stmts {
                 let Some(kind) = DECLS.iter().copied().find(|k| *k == s.kw) else {
                     continue;
@@ -249,6 +252,37 @@ impl Checker {
                     );
                 }
             }
+        }
+    }
+
+    /// A list entry is named where it is added: `~ holds vacuum: "the vacuum"`,
+    /// `add button: "the button" to the_list`, or a clause of `add to charges:`.
+    fn collect_entries(&mut self, s: &Stmt) {
+        let mut names: Vec<String> = Vec::new();
+        let entry = |text: &str| {
+            let text = text.trim();
+            let end = text.find([':', ' ']).unwrap_or(text.len());
+            text[..end].to_string()
+        };
+        match s.kw.as_str() {
+            "list" => {
+                for c in &s.clauses[1..] {
+                    if let Some(items) = c.text.strip_prefix("holds ") {
+                        names.extend(items.split(',').map(entry));
+                    }
+                }
+            }
+            "add" => {
+                let rest = s.clauses[0].text[3..].trim_start();
+                if !rest.starts_with("to ") {
+                    names.push(entry(rest));
+                }
+                names.extend(s.clauses[1..].iter().map(|c| entry(&c.text)));
+            }
+            _ => {}
+        }
+        for name in names.into_iter().filter(|n| is_ident(n)) {
+            self.decls.entry(name).or_default().insert("entry");
         }
     }
 
@@ -705,6 +739,36 @@ impl Checker {
                 }
             }
             "moves" => self.moves(rest, line, rest_col),
+            "given" => self.effect(value, line, vcol),
+            "do" => {
+                if value.starts_with('"') {
+                    if value.len() < 2 || !value.ends_with('"') {
+                        self.err(line, vcol, "a Link label in `do:` needs its closing quote");
+                    }
+                } else if let Some((passage, n)) = value.split_once('#') {
+                    if n.parse::<usize>().is_err() {
+                        self.err(
+                            line,
+                            vcol,
+                            "`do:` takes a Link's label in quotes, or its id such as `hall#2`",
+                        );
+                    } else {
+                        self.need_passage(passage, "the Link's passage", line, vcol);
+                    }
+                } else {
+                    self.err(
+                        line,
+                        vcol,
+                        "`do:` takes a Link's label in quotes, or its id such as `hall#2`",
+                    );
+                }
+            }
+            "as" => self.need(value, &["character"], "character", line, vcol),
+            "seed" => {
+                if value.parse::<u64>().is_err() {
+                    self.err(line, vcol, "`seed:` takes a whole number");
+                }
+            }
             "expect" => {
                 if value.is_empty() {
                     self.err(line, rest_col, "`expect:` needs an expression to check");

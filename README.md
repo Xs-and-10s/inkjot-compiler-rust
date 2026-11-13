@@ -9,10 +9,13 @@ This compiler targets **Inkjot v0.5**.
 
 ## Status
 
-Two commands:
+Four commands:
 
 - `inkjot check` reads a `.twee` file and reports what is wrong with it.
 - `inkjot build` compiles a file that passes into its JSON IR.
+- `inkjot play` plays a story in the terminal.
+- `inkjot test` runs a story's `[test]` passages: scripted playthroughs that
+  check what is shown and what is offered. See [`docs/run.md`](docs/run.md).
 
 ```
 $ inkjot check examples/ex1-the-night-train.twee
@@ -91,9 +94,12 @@ cargo test
 
 ## Testing
 
-Four kinds of test, all run by `cargo test`:
+Five kinds of test, all run by `cargo test`:
 
 - **Unit tests** beside the code (`src/expr.rs`).
+- **Story tests**: `[test]` passages in `examples/tests/`, run by
+  `tests/run.rs`, which also plays thousands of random playthroughs and checks
+  the interpreter never fails except to say a feature is not supported yet.
 - **IR tests** in `tests/build.rs`, including a check that the IR under
   `examples/ir/` is what the compiler produces now. After an intended change
   to the IR: `UPDATE_IR=1 cargo test --test build`.
@@ -140,6 +146,9 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
 | `src/ir/mod.rs` | Lowering to the JSON IR |
 | `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
+| `src/run/mod.rs` | The interpreter over the IR |
+| `src/run/value.rs` | Values while a story runs |
+| `src/run/test.rs` | `[test]` passages |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | A small JSON value type, writer and reader |
 | `src/main.rs` | The `inkjot` command |

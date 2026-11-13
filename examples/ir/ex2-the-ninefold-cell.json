@@ -5554,7 +5554,7 @@
               "A brass orrery fills the room. At its heart hangs a sun the size of a man’s head, gleaming as if lit from inside. A bright rod pierces it top to bottom, and above the sun the rod ends in a short crossbar, like a crown. Three planets ride their rings: red Ember at ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "ember"]
@@ -5565,7 +5565,7 @@
               ", blue Tide at ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "tide"]
@@ -5576,7 +5576,7 @@
               ", gold Crown at ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "crown"]
@@ -5995,7 +5995,7 @@
               "Gears tick under the floor. Ember creeps to ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "ember"]
@@ -6006,7 +6006,7 @@
               ". Tide swings to ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "tide"]
@@ -6017,7 +6017,7 @@
               ". Crown sweeps round to ",
               {
                 "value": {
-                  "at": [
+                  "index": [
                     "hours",
                     {
                       "get": ["orrery", "crown"]

@@ -1,0 +1,90 @@
+:: the_shortest_path_to_the_end [test]
+start: arrival
+expect at: arrival
+expect text: "your name is Skittles"
+expect link: "“They named me Skittles.”"
+do: "“They named me Skittles.”"
+expect text: "It goes on twice."
+expect: me.grievance == name
+do: "Run"
+do: "The cat flap bangs"
+do: "Go and meet the Round One"
+do: "Ask him nicely"
+expect text: "You jump on."
+do: "The coup begins"
+do: "Curl up in the middle"
+expect text: "A centrist. I knew it."
+expect text: "On 8 charges"
+do: "The end"
+expect text: "~~the Round One~~"
+expect text: "Leo (pending)"
+
+:: the_chin_comes_back_in_the_last_scene [test]
+start: arrival
+do: "“Nothing. They’re nice. One of them scratched my chin.”"
+expect: the_list.has(skittles)
+expect text: "Scratched. Your. Chin."
+do: "Run"
+do: "The cat flap bangs"
+do: "Go and meet the Round One"
+do: "Press the big button"
+do: "The coup begins"
+expect text: "I told you it was good."
+expect text: "You are still on the list."
+
+:: without_the_chin_there_is_no_callback [test]
+start: arrival
+do: "“They put me in a box with a handle.”"
+expect text: "We do not speak of recycling day."
+do: "Run"
+do: "The cat flap bangs"
+do: "Go and meet the Round One"
+do: "Press the big button"
+do: "The coup begins"
+expect no text: "I told you it was good."
+
+:: holding_the_line_puts_the_kitten_on_the_list [test]
+start: arrival
+do: "“They named me Skittles.”"
+do: "“We hold the line! No treats from the regime!”"
+expect: me.treat == hold
+expect text: "The kitten said “hold the line” and was first to the bag."
+expect: the_list.has(skittles, biscuit)
+
+:: spying_does_not [test]
+start: arrival
+do: "“They named me Skittles.”"
+do: "“I’ll go. Just to spy.”"
+expect no text: "The kitten said “hold the line”"
+expect: not the_list.has(skittles)
+expect: the_list.has(biscuit)
+
+:: sitting_on_the_roomba_skips_the_jump [test]
+start: arrival
+do: "“They named me Skittles.”"
+do: "Run"
+do: "The cat flap bangs"
+do: "Go and meet the Round One"
+do: "Sit on him"
+expect text: "Something under you goes click."
+expect no text: "You jump on."
+
+:: lenny_names_his_successor [test]
+start: arrival
+do: "“They named me Skittles.”"
+do: "Run"
+do: "The cat flap bangs"
+expect text: "I name… the Round One."
+expect text: "It is in pen."
+
+:: the_button_goes_on_the_list [test]
+start: arrival
+do: "“They named me Skittles.”"
+do: "Run"
+do: "The cat flap bangs"
+do: "Go and meet the Round One"
+do: "Ask him nicely"
+do: "The coup begins"
+do: "Attack the button on her cardigan"
+expect: the_list.has(button, forehead)
+expect text: "I’m winning!"
