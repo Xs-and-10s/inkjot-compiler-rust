@@ -6,8 +6,12 @@
 //! agendas and clashes are not here yet; anything the interpreter cannot do
 //! is an error naming the feature, never a silent guess.
 
+mod agenda;
+mod events;
 pub mod test;
 mod value;
+
+use events::Event;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -45,6 +49,9 @@ pub struct Story {
     /// Every way between two places: `(way, from, to)`. A two-way way is
     /// listed in both directions; a `route` adds one way per step.
     ways: Vec<(String, String, String)>,
+    /// Every `on` handler, in source order, with the NPC or character whose
+    /// margin it is in: that is who `self` means inside it.
+    handlers: Vec<(Value, Option<String>)>,
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -71,6 +78,7 @@ impl Story {
             povs: Vec::new(),
             start_for: HashMap::new(),
             ways: Vec::new(),
+            handlers: Vec::new(),
         };
         let config = ir
             .get("config")
@@ -100,6 +108,9 @@ impl Story {
     /// Record the declarations and the few settings the interpreter needs.
     fn statements(&mut self, stmts: &[Value], home: Option<&str>) {
         for s in stmts {
+            if s.get("on").is_some() {
+                self.handlers.push((s.clone(), home.map(str::to_string)));
+            }
             if f(s, "declare").as_str() == Some("way") {
                 let id = f(s, "id").as_str().unwrap_or("").to_string();
                 let (from, to) = (
@@ -175,10 +186,11 @@ impl Story {
 /// A name bound in a passage.
 #[derive(Debug, Clone)]
 enum Local {
-    /// A value fixed when the passage was entered: a Link parameter, or a roll.
+    /// A value fixed when it was bound: a `let`, a Link parameter, or
+    /// anything `set` since.
     Value(V),
-    /// A `let`: an expression, worked out again each time the name is read.
-    /// So `let aligned: orrery.ember == orrery.tide` is true the moment the
+    /// A `get`: an expression, worked out again each time the name is read.
+    /// So `get aligned: orrery.ember == orrery.tide` is true the moment the
     /// planets line up, even later in the same passage.
     Expr(Value),
 }
@@ -223,6 +235,13 @@ pub struct Run<'s> {
     aka: HashMap<String, (Vec<usize>, usize)>,
     /// Failed `expect:` checks in the story's own passages.
     pub failures: Vec<String>,
+    /// How many times each handler has fired, by its index in the story.
+    handler_counts: Vec<u32>,
+    /// How deeply handlers are nested right now.
+    firing: usize,
+    started: bool,
+    /// While an NPC works out `toward`: the kind of way it keeps to (`via wide`).
+    via: Option<String>,
 }
 
 impl<'s> Run<'s> {
@@ -248,8 +267,13 @@ impl<'s> Run<'s> {
             rng: seed.max(1),
             aka: HashMap::new(),
             failures: Vec::new(),
+            handler_counts: Vec::new(),
+            firing: 0,
+            started: false,
+            via: None,
         };
         run.init();
+        run.place_npcs();
         run
     }
 
@@ -389,6 +413,16 @@ impl<'s> Run<'s> {
             Some(p) => p.to_string(),
             None => self.story.start.clone(),
         };
+        if !self.started {
+            self.started = true;
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: "start",
+                what: "",
+                actor: &actor,
+                before: false,
+            })?;
+        }
         self.enter(&passage, HashMap::new())
     }
 
@@ -521,8 +555,33 @@ impl<'s> Run<'s> {
         self.vals.insert("attempt.clashed".into(), V::Bool(false));
         if success && f(link, "act").as_str() == Some("take") {
             if let Some(item) = f(link, "arg").as_str() {
+                if self.fire(Event {
+                    on: "take",
+                    what: item,
+                    actor: &actor,
+                    before: true,
+                })? {
+                    self.pov = pov;
+                    return self.relist();
+                }
                 self.holder.insert(item.to_string(), actor.clone());
+                self.fire(Event {
+                    on: "take",
+                    what: item,
+                    actor: &actor,
+                    before: false,
+                })?;
             }
+        }
+        // A loud act is heard: `force`, `dash`, or a Link marked `~ loud`.
+        let act = f(link, "act").as_str().unwrap_or("");
+        if self.story.has_tag(act, "loud") || f(link, "loud") == &Value::Bool(true) {
+            self.fire(Event {
+                on: "loud",
+                what: act,
+                actor: &actor,
+                before: false,
+            })?;
         }
         for effect in f(link, "effects").as_arr().unwrap_or(&[]).to_vec() {
             self.apply(&effect, &[])?;
@@ -541,6 +600,25 @@ impl<'s> Run<'s> {
                 let to = self
                     .arrival(&target)
                     .ok_or_else(|| format!("there is nowhere to arrive at `{target}`"))?;
+                // Crossing a way: `before` handlers may stop it.
+                let way = f(link, "way").as_str().unwrap_or("").to_string();
+                if !way.is_empty() {
+                    let actor = self.pov.clone();
+                    if self.fire(Event {
+                        on: "cross",
+                        what: &way,
+                        actor: &actor,
+                        before: true,
+                    })? {
+                        return self.relist();
+                    }
+                    self.fire(Event {
+                        on: "cross",
+                        what: &way,
+                        actor: &actor,
+                        before: false,
+                    })?;
+                }
                 if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
                     self.end_turn()?;
                 }
@@ -589,6 +667,13 @@ impl<'s> Run<'s> {
     }
 
     fn end_turn(&mut self) -> R<()> {
+        let actor = self.pov.clone();
+        self.fire(Event {
+            on: "turn",
+            what: "",
+            actor: &actor,
+            before: false,
+        })?;
         self.chronon += 1;
         let story = self.story;
         for id in story.ids_of("resource") {
@@ -609,7 +694,8 @@ impl<'s> Run<'s> {
                 self.burn(&id, 1.0)?;
             }
         }
-        Ok(())
+        // Then everyone you are not playing takes their move.
+        self.agendas()
     }
 
     /// Arrive at a passage: run its header, show its body, offer its Links.
@@ -622,6 +708,31 @@ impl<'s> Run<'s> {
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
+        let actor = self.pov.clone();
+        if place_of(&from) != place_of(passage) {
+            if !from.is_empty() {
+                self.fire(Event {
+                    on: "leave",
+                    what: place_of(&from),
+                    actor: &actor,
+                    before: false,
+                })?;
+            }
+            self.fire(Event {
+                on: "enter",
+                what: place_of(passage),
+                actor: &actor,
+                before: false,
+            })?;
+        }
+        if p.tags.iter().any(|t| t == "act") {
+            self.fire(Event {
+                on: "act",
+                what: passage,
+                actor: &actor,
+                before: false,
+            })?;
+        }
         // A cell, `dining@2`, is a place at a time: being there means it is stop 2.
         if let Some(n) = passage.rsplit_once('@').and_then(|(_, n)| n.parse().ok()) {
             self.chronon = n;
@@ -761,6 +872,7 @@ impl<'s> Run<'s> {
             links.push(Value::obj([
                 ("type", Value::str("link")),
                 ("id", Value::str(format!("walk:{to}"))),
+                ("way", Value::str(way.clone())),
                 ("label", Value::str(label)),
                 ("target", Value::str(to)),
                 ("kind", Value::str("walk")),
@@ -777,12 +889,11 @@ impl<'s> Run<'s> {
             let when = f(s, "when");
             if *when == Value::Null || self.eval(when)?.truthy() {
                 let value = f(s, "value");
-                let local = match value.get("roll").and_then(Value::as_str) {
-                    Some(dice) => {
-                        let sides = dice.trim_start_matches('d').parse().unwrap_or(6);
-                        Local::Value(V::Num(self.roll(sides) as f64))
-                    }
-                    None => Local::Expr(value.clone()),
+                // `get` keeps the expression; `let` works it out now, once.
+                let local = if f(s, "derived") == &Value::Bool(true) {
+                    Local::Expr(value.clone())
+                } else {
+                    Local::Value(self.eval(value)?)
                 };
                 self.locals.insert(name.to_string(), local);
             }
@@ -903,6 +1014,8 @@ impl<'s> Run<'s> {
             match f(part, "insert").as_str().unwrap_or("") {
                 "embed" => {
                     let nib = f(part, "nib").as_str().unwrap_or("").to_string();
+                    // An embedded passage brings its own `let`s with it.
+                    self.lets_of(&nib)?;
                     links.extend(self.render(&nib, quiet)?);
                 }
                 "present" => {
@@ -995,7 +1108,20 @@ impl<'s> Run<'s> {
         let pov = self.pov.clone();
         match f(e, "do").as_str().unwrap_or("") {
             "learn" => {
-                self.knows.entry(pov).or_default().insert(word(0));
+                let clue = word(0);
+                if self
+                    .knows
+                    .entry(pov.clone())
+                    .or_default()
+                    .insert(clue.clone())
+                {
+                    self.fire(Event {
+                        on: "learn",
+                        what: &clue,
+                        actor: &pov,
+                        before: false,
+                    })?;
+                }
             }
             "teach" => {
                 let who = self.who(&args[0])?;
@@ -1021,9 +1147,24 @@ impl<'s> Run<'s> {
                 self.vals.insert(key, V::Num(left.max(0.0)));
             }
             "set" => {
-                let key = self.path(f(e, "target"))?;
                 let v = self.eval(f(e, "value"))?;
-                self.vals.insert(key, v);
+                // Setting a local pins it: a `get` set to 2 is 2 from then on,
+                // and every `get` that reads it sees 2.
+                if let Some(name) = f(e, "target")
+                    .as_str()
+                    .filter(|n| self.locals.contains_key(*n))
+                {
+                    self.locals.insert(name.to_string(), Local::Value(v));
+                    return Ok(());
+                }
+                let key = self.path(f(e, "target"))?;
+                self.vals.insert(key.clone(), v);
+                self.fire(Event {
+                    on: "set",
+                    what: &key,
+                    actor: &pov,
+                    before: false,
+                })?;
             }
             "raise" | "lower" | "toggle" => {
                 self.change(f(e, "do").as_str().unwrap_or(""), &args)?
@@ -1071,9 +1212,10 @@ impl<'s> Run<'s> {
                     .insert(format!("{}.destroyed", word(0)), V::Bool(true));
             }
             "kill" | "detain" | "wake" | "wound" => {
+                // `wound 1` wounds the pov; `wound actor 1` someone else.
                 let who = match args.first() {
-                    Some(a) => self.who(a)?,
-                    None => pov,
+                    Some(a) if !matches!(a, Value::Num(_)) => self.who(a)?,
+                    _ => pov,
                 };
                 let fact = match f(e, "do").as_str() {
                     Some("kill") => "dead",
@@ -1081,23 +1223,52 @@ impl<'s> Run<'s> {
                     Some("wake") => "woken",
                     _ => "wounded",
                 };
+                let already = self
+                    .vals
+                    .get(&format!("{who}.{fact}"))
+                    .is_some_and(V::truthy);
                 self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
+                if fact == "dead" && !already {
+                    self.fire(Event {
+                        on: "death",
+                        what: "",
+                        actor: &who,
+                        before: false,
+                    })?;
+                }
             }
             "play" => {
-                let links = self.render(&word(0), false)?;
-                let _ = links;
+                self.render(&word(0), false)?;
+            }
+            // `roll standoff`: roll on a table.
+            "roll" => self.roll_table(&word(0))?,
+            // `fix actor`: it stays where it is from now on.
+            "fix" => {
+                let who = match args.first() {
+                    Some(a) => self.who(a)?,
+                    None => pov,
+                };
+                self.vals.insert(format!("{who}.fixed"), V::Bool(true));
+            }
+            // `feign sleep`: an NPC pretends; `x.asleep` believes it.
+            "feign" => {
+                let who = match self.locals.get("self") {
+                    Some(Local::Value(V::Id(id))) => id.clone(),
+                    _ => pov,
+                };
+                self.vals.insert(format!("{who}.feigning"), V::Bool(true));
             }
             "say" => {
                 let who = f(e, "who").as_str().unwrap_or("");
-                let who = if who == "self" {
-                    String::from("?")
-                } else {
-                    self.label(who)
+                // `say self "…"`: self is the one whose margin the handler is in.
+                let who = match self.name(who)? {
+                    V::Id(id) => self.label(&id),
+                    _ => self.label(who),
                 };
                 self.output
                     .push(format!("{who}: {}", f(e, "text").as_str().unwrap_or("")));
             }
-            "stop" | "nothing" | "fix" | "feign" => {}
+            "stop" | "nothing" => {}
             other => {
                 return Err(format!(
                     "the effect `{other}` is not supported by the interpreter yet"
@@ -1128,13 +1299,27 @@ impl<'s> Run<'s> {
                     .unwrap_or(1.0);
                 n = n.rem_euclid(m);
             }
-            // A relation stays inside its declared range.
-            if let V::Range { lo, hi, .. } = self.constant(self.story.field(&key, "range")) {
+            // A relation stays inside its declared range; a resource under its max.
+            let decl = key.rsplit('.').next().unwrap_or(&key);
+            if let V::Range { lo, hi, .. } = self.constant(self.story.field(decl, "range")) {
                 n = n.max(lo.unwrap_or(f64::MIN)).min(hi.unwrap_or(f64::MAX));
+            }
+            if let Some(max) = self.constant(self.story.field(decl, "max")).num() {
+                n = n.min(max);
             }
             V::Num(n)
         };
-        self.vals.insert(key, v);
+        let changed = self.vals.get(&key) != Some(&v);
+        self.vals.insert(key.clone(), v);
+        if changed && verb != "toggle" {
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: verb,
+                what: &key,
+                actor: &actor,
+                before: false,
+            })?;
+        }
         Ok(())
     }
 
@@ -1174,6 +1359,13 @@ impl<'s> Run<'s> {
         let left = before - by;
         self.vals.insert(key, V::Num(left));
         if before > 0.0 && left <= 0.0 {
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: "out",
+                what: fuse,
+                actor: &actor,
+                before: false,
+            })?;
             for effect in self
                 .story
                 .field(fuse, "then")
@@ -1201,6 +1393,13 @@ impl<'s> Run<'s> {
         match target {
             Value::Str(name) => Ok(match name.as_str() {
                 "me" => self.pov.clone(),
+                // A stat or resource of each character's own means the pov's:
+                // `raise rewinds 1`.
+                _ if matches!(self.story.kind(name), Some("stat" | "resource"))
+                    && !self.story.has_tag(name, "shared") =>
+                {
+                    format!("{}.{name}", self.pov)
+                }
                 _ => name.clone(),
             }),
             _ => {
@@ -1234,6 +1433,16 @@ impl<'s> Run<'s> {
         let named = |key: &str| f(f(e, "with"), key);
         Ok(match op.as_str() {
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
+            // `roll d6`: under a `let`, rolled once; under a `get`, on every read.
+            "roll" => {
+                let sides = x
+                    .as_str()
+                    .unwrap_or("d6")
+                    .trim_start_matches('d')
+                    .parse()
+                    .unwrap_or(6);
+                V::Num(self.roll(sides) as f64)
+            }
             "range" | "inclusive" => {
                 let bound = |i: usize, run: &mut Self| match items.get(i) {
                     Some(Value::Null) | None => Ok(None),
@@ -1288,12 +1497,15 @@ impl<'s> Run<'s> {
                 };
                 self.quantify(&items[0], check)?
             }
-            "is" => {
-                let who = self.who(&items[0])?;
-                let what = self.eval(&items[1])?;
-                let what = what.name().unwrap_or("");
-                V::Bool(who == what || self.story.has_tag(&who, what))
-            }
+            // `nobody.is(rook)` is simply false.
+            "is" => match self.eval(&items[0])? {
+                V::Id(who) | V::Str(who) => {
+                    let what = self.eval(&items[1])?;
+                    let what = what.name().unwrap_or("");
+                    V::Bool(who == what || self.tagged(&who, what))
+                }
+                _ => V::Bool(false),
+            },
             "has" => {
                 let target = self.eval(&items[0])?;
                 let target = target.name().unwrap_or("").to_string();
@@ -1360,10 +1572,9 @@ impl<'s> Run<'s> {
                 let found = self.things(&tag, place.as_deref());
                 if op == "count" {
                     V::Num(found.len() as f64)
-                } else if found.len() == 1 {
-                    V::Id(found[0].clone())
                 } else {
-                    V::Null
+                    // One of them, or nothing if there are none.
+                    found.first().map_or(V::Null, |id| V::Id(id.clone()))
                 }
             }
             "asleep" => {
@@ -1373,8 +1584,30 @@ impl<'s> Run<'s> {
                     .vals
                     .get(&format!("{who}.woken"))
                     .is_some_and(V::truthy);
-                V::Bool(V::Num(f64::from(self.chronon)).within(&during) && !woken)
+                let feigning = self
+                    .vals
+                    .get(&format!("{who}.feigning"))
+                    .is_some_and(V::truthy);
+                V::Bool((V::Num(f64::from(self.chronon)).within(&during) || feigning) && !woken)
             }
+            "nearest" => {
+                let tag = items.first().and_then(Value::as_str).unwrap_or("");
+                self.nearest(tag)?
+            }
+            "alone_with" => {
+                let a = self.who(&items[0])?;
+                match self.eval(&items[1])? {
+                    V::Id(b) | V::Str(b) => V::Bool(self.alone_with(&a, &b)),
+                    _ => V::Bool(false),
+                }
+            }
+            "last_seen" => {
+                let who = self.who(&items[0])?;
+                let tag = named("holding").as_str().unwrap_or("").to_string();
+                self.last_seen(&who, &tag)
+            }
+            // NPCs do not see acts yet: `self.saw(dash)` never holds.
+            "saw" => V::Bool(false),
             other => return Err(format!("`{other}` is not supported by the interpreter yet")),
         })
     }
@@ -1409,6 +1642,12 @@ impl<'s> Run<'s> {
             }
             None => {}
         }
+        // `d6`, `d20`: a die, rolled each time it is read.
+        if let Some(sides) = n.strip_prefix('d').and_then(|s| s.parse().ok()) {
+            if self.story.kind(n).is_none() {
+                return Ok(V::Num(self.roll(sides) as f64));
+            }
+        }
         Ok(self.global(n))
     }
 
@@ -1418,6 +1657,8 @@ impl<'s> Run<'s> {
             "me" => return V::Id(self.pov.clone()),
             "here" => return V::Id(self.here().to_string()),
             "nothing" | "nobody" => return V::Null,
+            // Nothing is hushed unless a story says so.
+            "hushed" => return self.vals.get("hushed").cloned().unwrap_or(V::Bool(false)),
             _ => {}
         }
         if let Some(v) = self.vals.get(n) {
@@ -1497,8 +1738,16 @@ impl<'s> Run<'s> {
                 }
             },
             (_, "past" | "passed") => V::Bool(false),
+            (_, "watched") => V::Bool(self.watched(&id)?),
+            (_, "offstage") => V::Bool(self.offstage(&id)?),
             // `x.here`: is x where the pov is?
             (_, "here") => V::Bool(self.location(&id) == place_of(self.here())),
+            // Not stored: a field of the thing's declaration, `knight.weight`.
+            _ if !self.vals.contains_key(&format!("{id}.{m}"))
+                && *story.field(&id, m) != Value::Null =>
+            {
+                self.constant(story.field(&id, m))
+            }
             _ => self
                 .vals
                 .get(&format!("{id}.{m}"))
@@ -1558,9 +1807,15 @@ impl<'s> Run<'s> {
         if let Some(p) = self.place.get(id) {
             return p.clone();
         }
+        // Held by someone or inside something: wherever that is. Otherwise
+        // the holder is a place, or a passage in one.
         match self.holder.get(id) {
-            Some(h) if h != id => self.location(h),
-            Some(h) => h.clone(),
+            Some(h)
+                if h != id && matches!(self.story.kind(h), Some("character" | "npc" | "item")) =>
+            {
+                self.location(h)
+            }
+            Some(h) => place_of(h).to_string(),
             None => String::new(),
         }
     }
@@ -1591,8 +1846,9 @@ impl<'s> Run<'s> {
                     "living" => {
                         matches!(d.kind.as_str(), "character" | "npc")
                             && !self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)
+                            && !self.tagged(id, "lifeless")
                     }
-                    _ => d.kind == tag || self.story.has_tag(id, tag),
+                    _ => d.kind == tag || self.tagged(id, tag),
                 };
                 tagged && place.is_none_or(|p| self.location(id) == p)
             })
@@ -1600,6 +1856,12 @@ impl<'s> Run<'s> {
             .collect();
         out.sort();
         out
+    }
+
+    /// Has `id` the tag, itself or through what it is `like`?
+    fn tagged(&self, id: &str, tag: &str) -> bool {
+        let like = self.story.field(id, "like").as_str().unwrap_or("");
+        self.story.has_tag(id, tag) || self.story.has_tag(like, tag)
     }
 
     /// A number from 1 to `sides`, from the run's seed (xorshift64).

@@ -383,18 +383,23 @@ impl Builder {
                 ("source", Value::str(source())),
             ]),
             "on" | "upon" => handler(rest, &s.clauses[1..]),
-            "let" => {
+            // `let` is worked out on arrival; `get` each time it is read.
+            "let" | "get" => {
                 let (name, value) = rest.split_once(':').unwrap_or((rest, ""));
                 let (value, when) = split_when(value.trim());
                 let value = match value.strip_prefix("roll ") {
                     Some(dice) => Value::obj([("roll", Value::str(dice.trim()))]),
                     None => expression(value),
                 };
-                Value::obj([
-                    ("let", Value::str(name.trim())),
-                    ("value", value),
-                    ("when", when.unwrap_or(Value::Null)),
-                ])
+                let mut pairs = vec![
+                    ("let".to_string(), Value::str(name.trim())),
+                    ("value".to_string(), value),
+                    ("when".to_string(), when.unwrap_or(Value::Null)),
+                ];
+                if kw == "get" {
+                    pairs.push(("derived".to_string(), Value::Bool(true)));
+                }
+                Value::Obj(pairs)
             }
             "expect" => {
                 let (scope, value) = rest.split_once(':').unwrap_or(("", rest));

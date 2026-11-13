@@ -14,13 +14,12 @@ here.
 | 2b | `inkjot build` and the JSON IR, version 1 | #4 |
 | 3 | IR version 2: declarations and settings as typed fields | #5, landed by #6 |
 | 4 | An interpreter over the IR; `[test]` passages; `inkjot test` and `inkjot play` | #7 |
+| 5 | `get` beside `let`; `on` handlers; NPC agendas | #8 |
 
 ## Next
 
-1. **On handlers and NPC agendas** in the interpreter, so Ex 1 and Ex 2 run
-   their villains and Ex 2's Host speaks. See `docs/run.md` for the full list
-   of what the interpreter does not do yet.
-2. **Several Linkers at once**: simultaneous turns and clashes, for Ex 1.
+1. **Several Linkers at once**: simultaneous turns and clashes, for Ex 1.
+2. **Checkpoints and rewinds**, so a death in Ex 2 puts the guests back.
 3. **Typed insert arguments** (`{name input …}`, `{accuse …}`).
 4. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
    facts with rules, and `i` beside `me` (see the working doc). Held until

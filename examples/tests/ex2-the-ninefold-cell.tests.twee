@@ -76,3 +76,48 @@ do: "Turn the crank"
 do: "Draw the rod"
 expect text: "It won’t come for you."
 expect: not roland.holds.lumen
+
+:: the_host_greets_the_guests [test]
+start: prologue
+expect text: "Nine rooms, two guests, one door. I made every lock myself."
+
+:: the_host_has_opinions_about_method [test]
+start: prologue
+do: "Wake as Roland, in the pit"
+do: "Look up through the grate"
+do: "Tug the bolt across the room"
+expect text: "Oh, nicely done. Nicely."
+do: "Switch to Eldric"
+do: "Tear the ring out of the pillar"
+expect text: "Must you break everything?"
+
+:: the_glyph_burns_whoever_crosses_it [test]
+start: chapel ~ as eldric
+given: set eldric.chained: no
+do: "Go to the Broken Armory"
+expect text: "Fire comes up out of the floor"
+expect: eldric.wounded
+expect at: armory
+
+:: a_broken_glyph_lets_you_pass [test]
+start: chapel ~ as eldric
+given: set eldric.chained: no
+given: set glyph.broken: yes
+do: "Go to the Broken Armory"
+expect no text: "Fire comes up out of the floor"
+expect: not eldric.wounded
+
+:: statues_hold_still_while_a_mirror_watches [test]
+start: gate ~ as roland
+do: "End the turn"
+expect: knight.in(gallery)
+expect: widow.in(gallery)
+
+:: statues_creep_when_nothing_watches [test]
+start: gate ~ as roland
+given: set gallery_mirror.open: no
+do: "End the turn"
+expect: knight.in(gate) and widow.in(gate)
+expect: gate.scale_seal
+expect: knight.fixed
+expect: not roland.dead

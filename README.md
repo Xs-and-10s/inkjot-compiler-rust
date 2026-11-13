@@ -148,6 +148,8 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
 | `src/run/mod.rs` | The interpreter over the IR |
 | `src/run/value.rs` | Values while a story runs |
+| `src/run/events.rs` | `on` handlers: what happens when something happens |
+| `src/run/agenda.rs` | NPC agendas: goals, reactions, routes |
 | `src/run/test.rs` | `[test]` passages |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | A small JSON value type, writer and reader |

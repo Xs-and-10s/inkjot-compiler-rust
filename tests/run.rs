@@ -136,3 +136,138 @@ proptest! {
         }
     }
 }
+
+/// A tiny story where `let` and `get` must disagree: a counter is raised in
+/// the header, after both are bound by the parent passage.
+const LET_AND_GET: &str = r#":: StoryTitle
+Counting
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "room"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: ann
+character ann: "Ann" ~ playable
+fact count: 0
+fact pinned: 0
+
+:: room
+let before: count
+get now: count
+get double: now * 2
+--
+> [[Count->room:count]]
+
+:: room:count [act]
+raise count 1
+--
+Before: {before}. Now: {now}. Double: {double}.
+
+:: pin [test]
+start: room
+do: "Count"
+expect text: "Before: 0. Now: 1. Double: 2."
+do: "Count"
+expect text: "Before: 1. Now: 2. Double: 4."
+"#;
+
+#[test]
+fn let_is_fixed_on_arrival_and_get_is_read_when_used() {
+    let ir = inkjot::build(LET_AND_GET).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    let outcomes = run_all(LET_AND_GET, &ir).unwrap();
+    assert!(
+        outcomes[0].passed(),
+        "{:#?}\n{}",
+        outcomes[0].failures,
+        outcomes[0].transcript.join("\n")
+    );
+}
+
+#[test]
+fn a_get_that_depends_on_itself_is_an_error() {
+    let src = LET_AND_GET.replace(
+        "get double: now * 2",
+        "get double: now * other\nget other: double + 1",
+    );
+    let report = inkjot::check(&src);
+    let msgs: Vec<&str> = report.diags.iter().map(|d| d.msg.as_str()).collect();
+    assert!(
+        msgs.iter()
+            .any(|m| m.contains("depends on itself") && m.contains("double → other → double")),
+        "{msgs:#?}"
+    );
+}
+
+/// A tiny two-room story for NPC agendas: a statue in the hall creeps toward
+/// whoever is alive and unwatching, and strikes when it gets there.
+const STATUE: &str = r#":: StoryTitle
+Statue
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: ann, bob
+start: hall for ann, study for bob
+character ann: "Ann" ~ playable
+character bob: "Bob" ~ playable
+place hall: "the hall"
+place study: "the study"
+way door: hall - study
+archetype statue: ~ lifeless
+npc angel: "the angel" ~ like statue ~ in hall
+
+:: statue [archetype]
+--
+goal stalk:
+~ toward nearest(living)
+~ weight 1
+~ when not self.watched
+
+reaction strike:
+~ when not self.watched and count(living, in: here) >= 1
+~ then kill one(living, in: here)
+
+:: hall
+The hall.
+> [[Wait->here]] ~ pass
+> [[Look away->study]] ~ become bob
+
+:: study
+The study.
+> [[Wait->here]] ~ pass
+
+:: watched [test]
+start: hall ~ as ann
+do: "Wait"
+expect: angel.in(hall)
+expect: not ann.dead
+
+:: unwatched [test]
+start: hall ~ as ann
+do: "Look away"
+expect at: study
+do: "Wait"
+expect: ann.dead
+expect: angel.in(hall)
+do: "Wait"
+expect: angel.in(study)
+"#;
+
+#[test]
+fn a_statue_moves_and_strikes_only_when_no_one_is_looking() {
+    let ir = inkjot::build(STATUE).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    for outcome in run_all(STATUE, &ir).unwrap() {
+        assert!(
+            outcome.passed(),
+            "{}: {:#?}\n{}",
+            outcome.name,
+            outcome.failures,
+            outcome.transcript.join("\n")
+        );
+    }
+}
