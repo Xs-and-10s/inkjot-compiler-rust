@@ -95,15 +95,84 @@ running the three examples.
   everything left. A Link the pov cannot afford is not offered.
 - **`[lib everywhere]`** passages add their Links to every passage.
 - **Randomness** comes from the run's seed, so the same seed and the same
-  choices always give the same story.
+  choices always give the same story. A bare `d6` or `d20` rolls a die each
+  time it is read, as in `table standoff: roll d6 + bonus`.
+
+## `on` handlers
+
+The interpreter fires these events. Every handler for an event runs, in the
+order written. Inside one, `actor` is who did it and `self` is the character
+or NPC whose margin holds the handler (so `say self "…"` is the Host).
+
+| Event | When | `what` |
+|---|---|---|
+| `start` | the run begins | — |
+| `enter`, `leave` | anyone (a pov or an NPC) changes place | the place |
+| `act` | a pov arrives at an `[act]` passage | the passage |
+| `cross` | a pov walks along a way | the way |
+| `take` | a pov takes an item | the item |
+| `learn` | a pov learns a clue they did not know | the clue |
+| `raise`, `lower`, `set` | a value changes | the value, `cleverness` or `glyph.broken` |
+| `turn` | a turn ends | — |
+| `death` | anyone dies | — (`actor` is who died) |
+| `loud` | a pov does a `loud` act, or takes a Link marked `~ loud` | the act |
+| `out` | a fuse burns down | the fuse |
+
+A `before` handler (`on before cross glyph_door`) runs first and may cancel
+a walk or a take with `~ then stop`. `once` and `at most N` count the times a
+handler actually ran. Handlers that set each other off more than eight deep
+are stopped with an error, since that is almost always a loop.
+
+## NPC agendas
+
+At the end of each turn, after the `turn` handlers, every NPC with an agenda
+(its own `[npc]` margin, and the `[archetype]` passage of what it is `like`)
+takes one move. Dead, detained and `fix`ed NPCs sit it out.
+
+1. Its margin `let`s are worked out, with `self` as the NPC and `here` as its
+   place.
+2. **It picks a goal**: the heaviest whose `when` holds and whose `toward`
+   names somewhere. A goal toward nobody (no one holds the evidence) is passed
+   over. Equal weights go to the one written first.
+3. **It plans a route**: the shortest along the ways it may use. NPCs know the
+   hidden ways but must respect `one way` and `open when`; `via wide` keeps to
+   ways tagged `wide`. Toward a person means toward where they are.
+4. **Reactions come first.** The first reaction whose `when` holds runs its
+   `then`, and that is the NPC's whole turn. `self.heading` is the next place
+   on its route, and `self.leaving` means it is heading for an `offstage`
+   place.
+5. **Otherwise it walks**: one place a turn, two at `pace dash`, or what its
+   `moves N per chronon` says (`moves none`: never). Each step fires `leave`
+   and `enter`. On arriving it runs the goal's `then`.
+
+The words agendas lean on:
+
+- `self.watched`: the pov is in the NPC's place, or something there watches,
+  as a mirror does: `archetype mirror: ~ watches here when self.open`. In solo
+  play, the character you are not looking through is unwatched.
+- `nearest(living)`: the nearest living thing the NPC can reach (by its
+  goal's `via`), other than itself and its own kind.
+- `living`: characters and NPCs not dead and not tagged `lifeless`. A tag on
+  an archetype counts for everything like it: `archetype statue: ~ lifeless`.
+- `alone_with(a, b)`: the two share a place with no other living thing.
+- `x.last_seen(holding: evidence)`: a character holding a thing with that tag,
+  preferring one in `x`'s place. Sightings are not tracked yet, so this is who
+  holds it now.
+- `x.offstage`: in a place marked `offstage`, or `offstage until` a passage
+  not yet seen.
+- `roll standoff`: roll a table and run every row the result falls in.
+- `feign sleep`: `x.asleep` holds while the NPC pretends.
 
 ## What it does not do yet
 
 It says so, by name, if a story needs one of these. It never guesses.
 
 - Several Linkers at once: simultaneous turns, clashes, echoes.
-- NPC agendas: `goal`, `reaction`, statues that move.
-- `on` handlers, including the Host's voice in Ex 2.
+- Checkpoints: a death plays its `[interlude]` (Ex 2's `again`), but
+  nothing is reset and no one is moved back.
+- NPCs seeing acts: `self.saw(dash)` never holds yet, so Vell never gives
+  chase.
+- `span` and `quiet` on handlers (reserved).
 - Inquests and rewinds.
 - The jury (`{accuse}`), and inputs (`{name input}`, `{choose input}`).
 - Anything marked v0.6: the duel, `retell`.
