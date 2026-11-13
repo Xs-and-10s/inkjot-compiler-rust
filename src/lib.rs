@@ -9,6 +9,7 @@ pub mod expr;
 pub mod ir;
 pub mod json;
 pub mod resolve;
+pub mod run;
 mod syntax;
 pub mod twee;
 

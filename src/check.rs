@@ -705,6 +705,36 @@ impl Checker {
                 }
             }
             "moves" => self.moves(rest, line, rest_col),
+            "given" => self.effect(value, line, vcol),
+            "do" => {
+                if value.starts_with('"') {
+                    if value.len() < 2 || !value.ends_with('"') {
+                        self.err(line, vcol, "a Link label in `do:` needs its closing quote");
+                    }
+                } else if let Some((passage, n)) = value.split_once('#') {
+                    if n.parse::<usize>().is_err() {
+                        self.err(
+                            line,
+                            vcol,
+                            "`do:` takes a Link's label in quotes, or its id such as `hall#2`",
+                        );
+                    } else {
+                        self.need_passage(passage, "the Link's passage", line, vcol);
+                    }
+                } else {
+                    self.err(
+                        line,
+                        vcol,
+                        "`do:` takes a Link's label in quotes, or its id such as `hall#2`",
+                    );
+                }
+            }
+            "as" => self.need(value, &["character"], "character", line, vcol),
+            "seed" => {
+                if value.parse::<u64>().is_err() {
+                    self.err(line, vcol, "`seed:` takes a whole number");
+                }
+            }
             "expect" => {
                 if value.is_empty() {
                     self.err(line, rest_col, "`expect:` needs an expression to check");

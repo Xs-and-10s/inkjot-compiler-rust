@@ -124,7 +124,7 @@ fn quoted(text: &str) -> Option<&str> {
 /// Parse and lower an expression. `check` has already accepted the source,
 /// so a failure here means this module sliced the text differently; it is
 /// recorded in the IR instead of panicking.
-fn expression(text: &str) -> Value {
+pub(crate) fn expression(text: &str) -> Value {
     match expr::parse(text.trim()) {
         Ok(e) => lower(&e),
         Err((_, why)) => Value::obj([
@@ -313,6 +313,8 @@ impl Builder {
                         }
                     }
                 }
+                // Tests are for the Inker; `inkjot test` reads them from source.
+                _ if p.has_tag("test") => {}
                 _ if p.has_tag("config") => {
                     let (stmts, _) = gather(p, &mut Vec::new());
                     config.extend(stmts.iter().map(|s| self.statement(s)));
@@ -763,7 +765,7 @@ fn parameters(text: &str) -> Value {
 /// One effect: `{"do": verb, "args": […], "when": …}`.
 ///
 /// `set` and `say` get named fields, because their arguments are not plain tokens.
-fn effect(text: &str) -> Value {
+pub(crate) fn effect(text: &str) -> Value {
     let (core, when) = split_when(text.trim());
     let verb = first_word(core);
     if STRETCH.contains(&verb) {

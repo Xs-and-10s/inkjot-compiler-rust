@@ -5,7 +5,10 @@ use crate::diag::Diag;
 use crate::twee::{Line, Passage};
 
 /// Passages whose whole content is statements, on both sides of `--`.
-pub(crate) const MARGIN_TAGS: &[&str] = &["config", "npc", "character", "place", "archetype"];
+/// Passages whose every line is a statement. A `[test]` passage is a script
+/// of statements too: `start:`, `given:`, `do:`, `expect:`.
+pub(crate) const MARGIN_TAGS: &[&str] =
+    &["config", "npc", "character", "place", "archetype", "test"];
 
 /// Statements that declare an id.
 pub(crate) const DECLS: &[&str] = &[
@@ -77,6 +80,11 @@ pub(crate) const SETTINGS: &[&str] = &[
     "observe",
     "timeout",
     "param",
+    // `[test]` passages.
+    "given",
+    "do",
+    "seed",
+    "as",
 ];
 
 /// Effects: what a header line or a `then` clause can do.
