@@ -77,3 +77,20 @@ expect text: "One more charge."
 expect: ada.rewinds == 3 and ada.wound_watch
 start: baggage@2
 expect no link: "Wind your watch at the generator"
+
+:: vell_goes_to_burn_the_notebook [test]
+start: lounge@0 ~ as rook
+expect: vell.in(lounge)
+do: "Go to the dining car"
+expect: vell.in(dining)
+expect: notebook.exists
+do: "Go to the sleeper car"
+expect: vell.in(sleeper)
+expect: not notebook.exists
+
+:: vell_silences_a_lone_holder_of_evidence [test]
+start: lounge@0 ~ as rook
+given: gain notebook
+do: "Go to the baggage car"
+expect: rook.dead
+expect: rook.knows.the_attack

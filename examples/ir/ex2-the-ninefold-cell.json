@@ -498,6 +498,11 @@
     },
     {
       "declare": "archetype",
+      "id": "statue",
+      "tags": ["lifeless"]
+    },
+    {
+      "declare": "archetype",
       "id": "mirror",
       "tags": ["fixed"],
       "facts": {"open": true},

@@ -6,6 +6,7 @@
 //! agendas and clashes are not here yet; anything the interpreter cannot do
 //! is an error naming the feature, never a silent guess.
 
+mod agenda;
 mod events;
 pub mod test;
 mod value;
@@ -239,6 +240,8 @@ pub struct Run<'s> {
     /// How deeply handlers are nested right now.
     firing: usize,
     started: bool,
+    /// While an NPC works out `toward`: the kind of way it keeps to (`via wide`).
+    via: Option<String>,
 }
 
 impl<'s> Run<'s> {
@@ -267,8 +270,10 @@ impl<'s> Run<'s> {
             handler_counts: Vec::new(),
             firing: 0,
             started: false,
+            via: None,
         };
         run.init();
+        run.place_npcs();
         run
     }
 
@@ -689,7 +694,8 @@ impl<'s> Run<'s> {
                 self.burn(&id, 1.0)?;
             }
         }
-        Ok(())
+        // Then everyone you are not playing takes their move.
+        self.agendas()
     }
 
     /// Arrive at a passage: run its header, show its body, offer its Links.
@@ -1223,7 +1229,6 @@ impl<'s> Run<'s> {
                     .is_some_and(V::truthy);
                 self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
                 if fact == "dead" && !already {
-                    self.output.push(format!("{} dies.", self.label(&who)));
                     self.fire(Event {
                         on: "death",
                         what: "",
@@ -1233,8 +1238,25 @@ impl<'s> Run<'s> {
                 }
             }
             "play" => {
-                let links = self.render(&word(0), false)?;
-                let _ = links;
+                self.render(&word(0), false)?;
+            }
+            // `roll standoff`: roll on a table.
+            "roll" => self.roll_table(&word(0))?,
+            // `fix actor`: it stays where it is from now on.
+            "fix" => {
+                let who = match args.first() {
+                    Some(a) => self.who(a)?,
+                    None => pov,
+                };
+                self.vals.insert(format!("{who}.fixed"), V::Bool(true));
+            }
+            // `feign sleep`: an NPC pretends; `x.asleep` believes it.
+            "feign" => {
+                let who = match self.locals.get("self") {
+                    Some(Local::Value(V::Id(id))) => id.clone(),
+                    _ => pov,
+                };
+                self.vals.insert(format!("{who}.feigning"), V::Bool(true));
             }
             "say" => {
                 let who = f(e, "who").as_str().unwrap_or("");
@@ -1246,7 +1268,7 @@ impl<'s> Run<'s> {
                 self.output
                     .push(format!("{who}: {}", f(e, "text").as_str().unwrap_or("")));
             }
-            "stop" | "nothing" | "fix" | "feign" => {}
+            "stop" | "nothing" => {}
             other => {
                 return Err(format!(
                     "the effect `{other}` is not supported by the interpreter yet"
@@ -1475,12 +1497,15 @@ impl<'s> Run<'s> {
                 };
                 self.quantify(&items[0], check)?
             }
-            "is" => {
-                let who = self.who(&items[0])?;
-                let what = self.eval(&items[1])?;
-                let what = what.name().unwrap_or("");
-                V::Bool(who == what || self.story.has_tag(&who, what))
-            }
+            // `nobody.is(rook)` is simply false.
+            "is" => match self.eval(&items[0])? {
+                V::Id(who) | V::Str(who) => {
+                    let what = self.eval(&items[1])?;
+                    let what = what.name().unwrap_or("");
+                    V::Bool(who == what || self.tagged(&who, what))
+                }
+                _ => V::Bool(false),
+            },
             "has" => {
                 let target = self.eval(&items[0])?;
                 let target = target.name().unwrap_or("").to_string();
@@ -1547,10 +1572,9 @@ impl<'s> Run<'s> {
                 let found = self.things(&tag, place.as_deref());
                 if op == "count" {
                     V::Num(found.len() as f64)
-                } else if found.len() == 1 {
-                    V::Id(found[0].clone())
                 } else {
-                    V::Null
+                    // One of them, or nothing if there are none.
+                    found.first().map_or(V::Null, |id| V::Id(id.clone()))
                 }
             }
             "asleep" => {
@@ -1560,8 +1584,30 @@ impl<'s> Run<'s> {
                     .vals
                     .get(&format!("{who}.woken"))
                     .is_some_and(V::truthy);
-                V::Bool(V::Num(f64::from(self.chronon)).within(&during) && !woken)
+                let feigning = self
+                    .vals
+                    .get(&format!("{who}.feigning"))
+                    .is_some_and(V::truthy);
+                V::Bool((V::Num(f64::from(self.chronon)).within(&during) || feigning) && !woken)
             }
+            "nearest" => {
+                let tag = items.first().and_then(Value::as_str).unwrap_or("");
+                self.nearest(tag)?
+            }
+            "alone_with" => {
+                let a = self.who(&items[0])?;
+                match self.eval(&items[1])? {
+                    V::Id(b) | V::Str(b) => V::Bool(self.alone_with(&a, &b)),
+                    _ => V::Bool(false),
+                }
+            }
+            "last_seen" => {
+                let who = self.who(&items[0])?;
+                let tag = named("holding").as_str().unwrap_or("").to_string();
+                self.last_seen(&who, &tag)
+            }
+            // NPCs do not see acts yet: `self.saw(dash)` never holds.
+            "saw" => V::Bool(false),
             other => return Err(format!("`{other}` is not supported by the interpreter yet")),
         })
     }
@@ -1595,6 +1641,12 @@ impl<'s> Run<'s> {
                 return v;
             }
             None => {}
+        }
+        // `d6`, `d20`: a die, rolled each time it is read.
+        if let Some(sides) = n.strip_prefix('d').and_then(|s| s.parse().ok()) {
+            if self.story.kind(n).is_none() {
+                return Ok(V::Num(self.roll(sides) as f64));
+            }
         }
         Ok(self.global(n))
     }
@@ -1686,6 +1738,8 @@ impl<'s> Run<'s> {
                 }
             },
             (_, "past" | "passed") => V::Bool(false),
+            (_, "watched") => V::Bool(self.watched(&id)?),
+            (_, "offstage") => V::Bool(self.offstage(&id)?),
             // `x.here`: is x where the pov is?
             (_, "here") => V::Bool(self.location(&id) == place_of(self.here())),
             // Not stored: a field of the thing's declaration, `knight.weight`.
@@ -1753,9 +1807,15 @@ impl<'s> Run<'s> {
         if let Some(p) = self.place.get(id) {
             return p.clone();
         }
+        // Held by someone or inside something: wherever that is. Otherwise
+        // the holder is a place, or a passage in one.
         match self.holder.get(id) {
-            Some(h) if h != id => self.location(h),
-            Some(h) => h.clone(),
+            Some(h)
+                if h != id && matches!(self.story.kind(h), Some("character" | "npc" | "item")) =>
+            {
+                self.location(h)
+            }
+            Some(h) => place_of(h).to_string(),
             None => String::new(),
         }
     }
@@ -1786,8 +1846,9 @@ impl<'s> Run<'s> {
                     "living" => {
                         matches!(d.kind.as_str(), "character" | "npc")
                             && !self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)
+                            && !self.tagged(id, "lifeless")
                     }
-                    _ => d.kind == tag || self.story.has_tag(id, tag),
+                    _ => d.kind == tag || self.tagged(id, tag),
                 };
                 tagged && place.is_none_or(|p| self.location(id) == p)
             })
@@ -1795,6 +1856,12 @@ impl<'s> Run<'s> {
             .collect();
         out.sort();
         out
+    }
+
+    /// Has `id` the tag, itself or through what it is `like`?
+    fn tagged(&self, id: &str, tag: &str) -> bool {
+        let like = self.story.field(id, "like").as_str().unwrap_or("");
+        self.story.has_tag(id, tag) || self.story.has_tag(like, tag)
     }
 
     /// A number from 1 to `sides`, from the run's seed (xorshift64).

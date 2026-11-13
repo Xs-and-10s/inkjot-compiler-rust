@@ -118,6 +118,7 @@ archetype lever: ~ fixed
 ~ fact oiled: no
 ~ fact snapped: no
 ~ fact mended: no
+archetype statue: ~ lifeless
 archetype mirror: ~ fixed
 ~ fact open: yes
 ~ watches here when self.open
