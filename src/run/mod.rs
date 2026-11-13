@@ -6,8 +6,11 @@
 //! agendas and clashes are not here yet; anything the interpreter cannot do
 //! is an error naming the feature, never a silent guess.
 
+mod events;
 pub mod test;
 mod value;
+
+use events::Event;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -45,6 +48,9 @@ pub struct Story {
     /// Every way between two places: `(way, from, to)`. A two-way way is
     /// listed in both directions; a `route` adds one way per step.
     ways: Vec<(String, String, String)>,
+    /// Every `on` handler, in source order, with the NPC or character whose
+    /// margin it is in: that is who `self` means inside it.
+    handlers: Vec<(Value, Option<String>)>,
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -71,6 +77,7 @@ impl Story {
             povs: Vec::new(),
             start_for: HashMap::new(),
             ways: Vec::new(),
+            handlers: Vec::new(),
         };
         let config = ir
             .get("config")
@@ -100,6 +107,9 @@ impl Story {
     /// Record the declarations and the few settings the interpreter needs.
     fn statements(&mut self, stmts: &[Value], home: Option<&str>) {
         for s in stmts {
+            if s.get("on").is_some() {
+                self.handlers.push((s.clone(), home.map(str::to_string)));
+            }
             if f(s, "declare").as_str() == Some("way") {
                 let id = f(s, "id").as_str().unwrap_or("").to_string();
                 let (from, to) = (
@@ -224,6 +234,11 @@ pub struct Run<'s> {
     aka: HashMap<String, (Vec<usize>, usize)>,
     /// Failed `expect:` checks in the story's own passages.
     pub failures: Vec<String>,
+    /// How many times each handler has fired, by its index in the story.
+    handler_counts: Vec<u32>,
+    /// How deeply handlers are nested right now.
+    firing: usize,
+    started: bool,
 }
 
 impl<'s> Run<'s> {
@@ -249,6 +264,9 @@ impl<'s> Run<'s> {
             rng: seed.max(1),
             aka: HashMap::new(),
             failures: Vec::new(),
+            handler_counts: Vec::new(),
+            firing: 0,
+            started: false,
         };
         run.init();
         run
@@ -390,6 +408,16 @@ impl<'s> Run<'s> {
             Some(p) => p.to_string(),
             None => self.story.start.clone(),
         };
+        if !self.started {
+            self.started = true;
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: "start",
+                what: "",
+                actor: &actor,
+                before: false,
+            })?;
+        }
         self.enter(&passage, HashMap::new())
     }
 
@@ -522,8 +550,33 @@ impl<'s> Run<'s> {
         self.vals.insert("attempt.clashed".into(), V::Bool(false));
         if success && f(link, "act").as_str() == Some("take") {
             if let Some(item) = f(link, "arg").as_str() {
+                if self.fire(Event {
+                    on: "take",
+                    what: item,
+                    actor: &actor,
+                    before: true,
+                })? {
+                    self.pov = pov;
+                    return self.relist();
+                }
                 self.holder.insert(item.to_string(), actor.clone());
+                self.fire(Event {
+                    on: "take",
+                    what: item,
+                    actor: &actor,
+                    before: false,
+                })?;
             }
+        }
+        // A loud act is heard: `force`, `dash`, or a Link marked `~ loud`.
+        let act = f(link, "act").as_str().unwrap_or("");
+        if self.story.has_tag(act, "loud") || f(link, "loud") == &Value::Bool(true) {
+            self.fire(Event {
+                on: "loud",
+                what: act,
+                actor: &actor,
+                before: false,
+            })?;
         }
         for effect in f(link, "effects").as_arr().unwrap_or(&[]).to_vec() {
             self.apply(&effect, &[])?;
@@ -542,6 +595,25 @@ impl<'s> Run<'s> {
                 let to = self
                     .arrival(&target)
                     .ok_or_else(|| format!("there is nowhere to arrive at `{target}`"))?;
+                // Crossing a way: `before` handlers may stop it.
+                let way = f(link, "way").as_str().unwrap_or("").to_string();
+                if !way.is_empty() {
+                    let actor = self.pov.clone();
+                    if self.fire(Event {
+                        on: "cross",
+                        what: &way,
+                        actor: &actor,
+                        before: true,
+                    })? {
+                        return self.relist();
+                    }
+                    self.fire(Event {
+                        on: "cross",
+                        what: &way,
+                        actor: &actor,
+                        before: false,
+                    })?;
+                }
                 if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
                     self.end_turn()?;
                 }
@@ -590,6 +662,13 @@ impl<'s> Run<'s> {
     }
 
     fn end_turn(&mut self) -> R<()> {
+        let actor = self.pov.clone();
+        self.fire(Event {
+            on: "turn",
+            what: "",
+            actor: &actor,
+            before: false,
+        })?;
         self.chronon += 1;
         let story = self.story;
         for id in story.ids_of("resource") {
@@ -623,6 +702,31 @@ impl<'s> Run<'s> {
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
+        let actor = self.pov.clone();
+        if place_of(&from) != place_of(passage) {
+            if !from.is_empty() {
+                self.fire(Event {
+                    on: "leave",
+                    what: place_of(&from),
+                    actor: &actor,
+                    before: false,
+                })?;
+            }
+            self.fire(Event {
+                on: "enter",
+                what: place_of(passage),
+                actor: &actor,
+                before: false,
+            })?;
+        }
+        if p.tags.iter().any(|t| t == "act") {
+            self.fire(Event {
+                on: "act",
+                what: passage,
+                actor: &actor,
+                before: false,
+            })?;
+        }
         // A cell, `dining@2`, is a place at a time: being there means it is stop 2.
         if let Some(n) = passage.rsplit_once('@').and_then(|(_, n)| n.parse().ok()) {
             self.chronon = n;
@@ -762,6 +866,7 @@ impl<'s> Run<'s> {
             links.push(Value::obj([
                 ("type", Value::str("link")),
                 ("id", Value::str(format!("walk:{to}"))),
+                ("way", Value::str(way.clone())),
                 ("label", Value::str(label)),
                 ("target", Value::str(to)),
                 ("kind", Value::str("walk")),
@@ -997,7 +1102,20 @@ impl<'s> Run<'s> {
         let pov = self.pov.clone();
         match f(e, "do").as_str().unwrap_or("") {
             "learn" => {
-                self.knows.entry(pov).or_default().insert(word(0));
+                let clue = word(0);
+                if self
+                    .knows
+                    .entry(pov.clone())
+                    .or_default()
+                    .insert(clue.clone())
+                {
+                    self.fire(Event {
+                        on: "learn",
+                        what: &clue,
+                        actor: &pov,
+                        before: false,
+                    })?;
+                }
             }
             "teach" => {
                 let who = self.who(&args[0])?;
@@ -1034,7 +1152,13 @@ impl<'s> Run<'s> {
                     return Ok(());
                 }
                 let key = self.path(f(e, "target"))?;
-                self.vals.insert(key, v);
+                self.vals.insert(key.clone(), v);
+                self.fire(Event {
+                    on: "set",
+                    what: &key,
+                    actor: &pov,
+                    before: false,
+                })?;
             }
             "raise" | "lower" | "toggle" => {
                 self.change(f(e, "do").as_str().unwrap_or(""), &args)?
@@ -1082,9 +1206,10 @@ impl<'s> Run<'s> {
                     .insert(format!("{}.destroyed", word(0)), V::Bool(true));
             }
             "kill" | "detain" | "wake" | "wound" => {
+                // `wound 1` wounds the pov; `wound actor 1` someone else.
                 let who = match args.first() {
-                    Some(a) => self.who(a)?,
-                    None => pov,
+                    Some(a) if !matches!(a, Value::Num(_)) => self.who(a)?,
+                    _ => pov,
                 };
                 let fact = match f(e, "do").as_str() {
                     Some("kill") => "dead",
@@ -1092,7 +1217,20 @@ impl<'s> Run<'s> {
                     Some("wake") => "woken",
                     _ => "wounded",
                 };
+                let already = self
+                    .vals
+                    .get(&format!("{who}.{fact}"))
+                    .is_some_and(V::truthy);
                 self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
+                if fact == "dead" && !already {
+                    self.output.push(format!("{} dies.", self.label(&who)));
+                    self.fire(Event {
+                        on: "death",
+                        what: "",
+                        actor: &who,
+                        before: false,
+                    })?;
+                }
             }
             "play" => {
                 let links = self.render(&word(0), false)?;
@@ -1100,10 +1238,10 @@ impl<'s> Run<'s> {
             }
             "say" => {
                 let who = f(e, "who").as_str().unwrap_or("");
-                let who = if who == "self" {
-                    String::from("?")
-                } else {
-                    self.label(who)
+                // `say self "…"`: self is the one whose margin the handler is in.
+                let who = match self.name(who)? {
+                    V::Id(id) => self.label(&id),
+                    _ => self.label(who),
                 };
                 self.output
                     .push(format!("{who}: {}", f(e, "text").as_str().unwrap_or("")));
@@ -1149,7 +1287,17 @@ impl<'s> Run<'s> {
             }
             V::Num(n)
         };
-        self.vals.insert(key, v);
+        let changed = self.vals.get(&key) != Some(&v);
+        self.vals.insert(key.clone(), v);
+        if changed && verb != "toggle" {
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: verb,
+                what: &key,
+                actor: &actor,
+                before: false,
+            })?;
+        }
         Ok(())
     }
 
@@ -1189,6 +1337,13 @@ impl<'s> Run<'s> {
         let left = before - by;
         self.vals.insert(key, V::Num(left));
         if before > 0.0 && left <= 0.0 {
+            let actor = self.pov.clone();
+            self.fire(Event {
+                on: "out",
+                what: fuse,
+                actor: &actor,
+                before: false,
+            })?;
             for effect in self
                 .story
                 .field(fuse, "then")
@@ -1450,6 +1605,8 @@ impl<'s> Run<'s> {
             "me" => return V::Id(self.pov.clone()),
             "here" => return V::Id(self.here().to_string()),
             "nothing" | "nobody" => return V::Null,
+            // Nothing is hushed unless a story says so.
+            "hushed" => return self.vals.get("hushed").cloned().unwrap_or(V::Bool(false)),
             _ => {}
         }
         if let Some(v) = self.vals.get(n) {
@@ -1531,6 +1688,12 @@ impl<'s> Run<'s> {
             (_, "past" | "passed") => V::Bool(false),
             // `x.here`: is x where the pov is?
             (_, "here") => V::Bool(self.location(&id) == place_of(self.here())),
+            // Not stored: a field of the thing's declaration, `knight.weight`.
+            _ if !self.vals.contains_key(&format!("{id}.{m}"))
+                && *story.field(&id, m) != Value::Null =>
+            {
+                self.constant(story.field(&id, m))
+            }
             _ => self
                 .vals
                 .get(&format!("{id}.{m}"))
