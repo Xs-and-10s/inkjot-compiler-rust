@@ -67,6 +67,7 @@ pub(crate) const SETTINGS: &[&str] = &[
     "checkpoint",
     "expect",
     "let",
+    "get",
     "starts",
     "ties",
     "goal",

@@ -60,6 +60,32 @@ pub const BUILTINS: &[&str] = &[
     "inquest",
 ];
 
+/// Every bare name an expression reads, in order. `a.b(c)` reads `a` and `c`.
+pub fn names(e: &Expr) -> Vec<String> {
+    let mut out = Vec::new();
+    collect(e, &mut out);
+    out
+}
+
+fn collect(e: &Expr, out: &mut Vec<String>) {
+    match e {
+        Expr::Num(_) | Expr::Str(_) => {}
+        Expr::Name(name, _) => out.push(name.clone()),
+        Expr::Member(target, _) => collect(target, out),
+        Expr::Call(target, args) => {
+            collect(target, out);
+            args.iter().for_each(|a| collect(&a.value, out));
+        }
+        Expr::Index(a, b) | Expr::Binary(_, a, b) => {
+            collect(a, out);
+            collect(b, out);
+        }
+        Expr::List(items) => items.iter().for_each(|i| collect(i, out)),
+        Expr::Unary(_, a) => collect(a, out),
+        Expr::Range { lo, hi, .. } => [lo, hi].into_iter().flatten().for_each(|b| collect(b, out)),
+    }
+}
+
 /// Every name in `e` that does not resolve.
 pub fn unresolved(e: &Expr, lookup: &impl Lookup) -> Vec<Problem> {
     let mut out = Vec::new();

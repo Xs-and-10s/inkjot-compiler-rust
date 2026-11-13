@@ -194,6 +194,51 @@ impl Checker {
         }
     }
 
+    /// A `get` is worked out each time it is read, so one that depends on
+    /// itself, directly or through other `get`s, would never finish.
+    fn get_cycles(&mut self, stmts: &[Stmt]) {
+        let mut deps: HashMap<String, (Vec<String>, usize, usize)> = HashMap::new();
+        for s in stmts.iter().filter(|s| s.kw == "get") {
+            let head = &s.clauses[0];
+            let rest = head.text[3..].trim_start();
+            let Some((name, value)) = rest.split_once(':') else {
+                continue;
+            };
+            if let Ok(e) = expr::parse(before_when(value.trim())) {
+                deps.insert(
+                    name.trim().to_string(),
+                    (resolve::names(&e), head.line, head.col),
+                );
+            }
+        }
+        let mut names: Vec<&String> = deps.keys().collect();
+        names.sort();
+        for start in names {
+            // Depth-first from `start`, looking for a way back to it.
+            let mut stack = vec![(start.clone(), vec![start.clone()])];
+            let mut seen = HashSet::new();
+            while let Some((at, path)) = stack.pop() {
+                for next in &deps[&at].0 {
+                    if next == start {
+                        let (_, line, col) = deps[start];
+                        let chain = format!("{} → {start}", path.join(" → "));
+                        self.err(
+                            line,
+                            col,
+                            format!("`get {start}` depends on itself: {chain}"),
+                        );
+                        return;
+                    }
+                    if deps.contains_key(next) && seen.insert(next.clone()) {
+                        let mut longer = path.clone();
+                        longer.push(next.clone());
+                        stack.push((next.clone(), longer));
+                    }
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------ pass one
 
     fn collect(&mut self, passages: &[Passage]) {
@@ -290,7 +335,7 @@ impl Checker {
     /// hand to the passages they lead to.
     fn collect_scope(&mut self, p: &Passage, stmts: &[Stmt]) {
         let mut names: HashSet<String> = HashSet::new();
-        for s in stmts.iter().filter(|s| s.kw == "let") {
+        for s in stmts.iter().filter(|s| s.kw == "let" || s.kw == "get") {
             names.insert(first_word(s.clauses[0].text[3..].trim_start()).to_string());
         }
         let mut target: Option<String> = None;
@@ -379,6 +424,7 @@ impl Checker {
             self.stmt(s);
         }
         self.body(body);
+        self.get_cycles(&stmts);
     }
 
     fn story_data(&mut self, p: &Passage) {
@@ -776,10 +822,14 @@ impl Checker {
                     self.expr(value, line, vcol);
                 }
             }
-            "let" => {
+            "let" | "get" => {
                 let v = before_when(value);
                 if v.is_empty() {
-                    self.err(line, rest_col, "`let` is written `let name: value`");
+                    self.err(
+                        line,
+                        rest_col,
+                        format!("`{kw}` is written `{kw} name: value`"),
+                    );
                 } else if !v.starts_with("roll ") {
                     self.expr(v, line, vcol);
                 }

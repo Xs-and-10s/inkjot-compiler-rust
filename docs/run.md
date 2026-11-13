@@ -65,10 +65,17 @@ running the three examples.
 
 - **Arriving** at a passage runs its header (`let`, effects, `expect`,
   `next:`), shows its body, and offers its Links.
-- **A `let` is read when it is used**, not when the passage is entered. So
-  `let aligned: orrery.ember == orrery.tide` is true the moment the planets
-  line up, later in the same passage. A roll (`let stirs: roll d6`) is the
-  exception: it is rolled once, on arrival.
+- **`let` and `get`.** A `let` is worked out on arrival and then fixed for
+  that visit: `let before: me.vults` remembers what you had. A `get` is worked
+  out each time it is read: `get aligned: orrery.ember == orrery.tide` is true
+  the moment the planets line up, even later in the same passage. A `get` that
+  reads another `get` reads it fresh too. A `let` that reads a `get` takes its
+  value at that moment. `set` pins either one to a value; every `get` that
+  reads it then sees the new value. `let stirs: roll d6` rolls once;
+  `get die: roll d6` rolls on every read. `inkjot check` rejects a `get` that
+  depends on itself.
+- **A passage's `let`s run again** whenever its Links are worked out again:
+  on returning to it after an act, and each time it is embedded.
 - **A sub-Nib sees its parents' `let`s**: `orrery:crank` sees those of
   `orrery`, as `inkjot check` already assumes.
 - **An `[act]` passage shows its result, then returns** the pov to where they

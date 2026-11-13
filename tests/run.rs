@@ -136,3 +136,66 @@ proptest! {
         }
     }
 }
+
+/// A tiny story where `let` and `get` must disagree: a counter is raised in
+/// the header, after both are bound by the parent passage.
+const LET_AND_GET: &str = r#":: StoryTitle
+Counting
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "room"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: ann
+character ann: "Ann" ~ playable
+fact count: 0
+fact pinned: 0
+
+:: room
+let before: count
+get now: count
+get double: now * 2
+--
+> [[Count->room:count]]
+
+:: room:count [act]
+raise count 1
+--
+Before: {before}. Now: {now}. Double: {double}.
+
+:: pin [test]
+start: room
+do: "Count"
+expect text: "Before: 0. Now: 1. Double: 2."
+do: "Count"
+expect text: "Before: 1. Now: 2. Double: 4."
+"#;
+
+#[test]
+fn let_is_fixed_on_arrival_and_get_is_read_when_used() {
+    let ir = inkjot::build(LET_AND_GET).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    let outcomes = run_all(LET_AND_GET, &ir).unwrap();
+    assert!(
+        outcomes[0].passed(),
+        "{:#?}\n{}",
+        outcomes[0].failures,
+        outcomes[0].transcript.join("\n")
+    );
+}
+
+#[test]
+fn a_get_that_depends_on_itself_is_an_error() {
+    let src = LET_AND_GET.replace(
+        "get double: now * 2",
+        "get double: now * other\nget other: double + 1",
+    );
+    let report = inkjot::check(&src);
+    let msgs: Vec<&str> = report.diags.iter().map(|d| d.msg.as_str()).collect();
+    assert!(
+        msgs.iter()
+            .any(|m| m.contains("depends on itself") && m.contains("double → other → double")),
+        "{msgs:#?}"
+    );
+}

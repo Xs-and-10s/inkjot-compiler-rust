@@ -175,10 +175,11 @@ impl Story {
 /// A name bound in a passage.
 #[derive(Debug, Clone)]
 enum Local {
-    /// A value fixed when the passage was entered: a Link parameter, or a roll.
+    /// A value fixed when it was bound: a `let`, a Link parameter, or
+    /// anything `set` since.
     Value(V),
-    /// A `let`: an expression, worked out again each time the name is read.
-    /// So `let aligned: orrery.ember == orrery.tide` is true the moment the
+    /// A `get`: an expression, worked out again each time the name is read.
+    /// So `get aligned: orrery.ember == orrery.tide` is true the moment the
     /// planets line up, even later in the same passage.
     Expr(Value),
 }
@@ -777,12 +778,11 @@ impl<'s> Run<'s> {
             let when = f(s, "when");
             if *when == Value::Null || self.eval(when)?.truthy() {
                 let value = f(s, "value");
-                let local = match value.get("roll").and_then(Value::as_str) {
-                    Some(dice) => {
-                        let sides = dice.trim_start_matches('d').parse().unwrap_or(6);
-                        Local::Value(V::Num(self.roll(sides) as f64))
-                    }
-                    None => Local::Expr(value.clone()),
+                // `get` keeps the expression; `let` works it out now, once.
+                let local = if f(s, "derived") == &Value::Bool(true) {
+                    Local::Expr(value.clone())
+                } else {
+                    Local::Value(self.eval(value)?)
                 };
                 self.locals.insert(name.to_string(), local);
             }
@@ -903,6 +903,8 @@ impl<'s> Run<'s> {
             match f(part, "insert").as_str().unwrap_or("") {
                 "embed" => {
                     let nib = f(part, "nib").as_str().unwrap_or("").to_string();
+                    // An embedded passage brings its own `let`s with it.
+                    self.lets_of(&nib)?;
                     links.extend(self.render(&nib, quiet)?);
                 }
                 "present" => {
@@ -1021,8 +1023,17 @@ impl<'s> Run<'s> {
                 self.vals.insert(key, V::Num(left.max(0.0)));
             }
             "set" => {
-                let key = self.path(f(e, "target"))?;
                 let v = self.eval(f(e, "value"))?;
+                // Setting a local pins it: a `get` set to 2 is 2 from then on,
+                // and every `get` that reads it sees 2.
+                if let Some(name) = f(e, "target")
+                    .as_str()
+                    .filter(|n| self.locals.contains_key(*n))
+                {
+                    self.locals.insert(name.to_string(), Local::Value(v));
+                    return Ok(());
+                }
+                let key = self.path(f(e, "target"))?;
                 self.vals.insert(key, v);
             }
             "raise" | "lower" | "toggle" => {
@@ -1128,9 +1139,13 @@ impl<'s> Run<'s> {
                     .unwrap_or(1.0);
                 n = n.rem_euclid(m);
             }
-            // A relation stays inside its declared range.
-            if let V::Range { lo, hi, .. } = self.constant(self.story.field(&key, "range")) {
+            // A relation stays inside its declared range; a resource under its max.
+            let decl = key.rsplit('.').next().unwrap_or(&key);
+            if let V::Range { lo, hi, .. } = self.constant(self.story.field(decl, "range")) {
                 n = n.max(lo.unwrap_or(f64::MIN)).min(hi.unwrap_or(f64::MAX));
+            }
+            if let Some(max) = self.constant(self.story.field(decl, "max")).num() {
+                n = n.min(max);
             }
             V::Num(n)
         };
@@ -1201,6 +1216,13 @@ impl<'s> Run<'s> {
         match target {
             Value::Str(name) => Ok(match name.as_str() {
                 "me" => self.pov.clone(),
+                // A stat or resource of each character's own means the pov's:
+                // `raise rewinds 1`.
+                _ if matches!(self.story.kind(name), Some("stat" | "resource"))
+                    && !self.story.has_tag(name, "shared") =>
+                {
+                    format!("{}.{name}", self.pov)
+                }
                 _ => name.clone(),
             }),
             _ => {
@@ -1234,6 +1256,16 @@ impl<'s> Run<'s> {
         let named = |key: &str| f(f(e, "with"), key);
         Ok(match op.as_str() {
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
+            // `roll d6`: under a `let`, rolled once; under a `get`, on every read.
+            "roll" => {
+                let sides = x
+                    .as_str()
+                    .unwrap_or("d6")
+                    .trim_start_matches('d')
+                    .parse()
+                    .unwrap_or(6);
+                V::Num(self.roll(sides) as f64)
+            }
             "range" | "inclusive" => {
                 let bound = |i: usize, run: &mut Self| match items.get(i) {
                     Some(Value::Null) | None => Ok(None),

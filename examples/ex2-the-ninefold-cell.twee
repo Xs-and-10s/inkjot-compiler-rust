@@ -204,7 +204,7 @@ fact shown_heart: no
 fact grounded: no
 fact dodging: no
 fact mortal: no
-let holder: one(character, holding: heart)
+get holder: one(character, holding: heart)
 --
 starts: sanctum
 
@@ -819,7 +819,7 @@ fact ember: 2 ~ of 6
 fact tide: 0 ~ of 6
 fact crown: 4 ~ of 6
 let hours: ["dawn", "morning", "noon", "dusk", "evening", "midnight"]
-let aligned: orrery.ember == orrery.tide and orrery.tide == orrery.crown
+get aligned: orrery.ember == orrery.tide and orrery.tide == orrery.crown
 learn heart_is_life when me.wits >= 3 and orrery_mirror.open
 inquest: "The three planets move at different speeds." ~ wits ..=2
 inquest: "Count how far each planet moves for one turn of the crank." ~ wits 3..

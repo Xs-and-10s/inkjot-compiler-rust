@@ -67,3 +67,13 @@ expect no link: "Talk with the Colonel"
 expect no link: "Wake the Colonel"
 as: rook
 expect link: "Wake the Colonel"
+
+:: a_watch_winds_only_once [test]
+start: baggage@1
+~ as ada
+expect: ada.rewinds == 2
+do: "Wind your watch at the generator"
+expect text: "One more charge."
+expect: ada.rewinds == 3 and ada.wound_watch
+start: baggage@2
+expect no link: "Wind your watch at the generator"

@@ -1201,7 +1201,8 @@
             "one": ["character"],
             "with": {"holding": "heart"}
           },
-          "when": null
+          "when": null,
+          "derived": true
         },
         {"setting": "starts", "value": "sanctum"},
         {
@@ -5504,7 +5505,8 @@
               }
             ]
           },
-          "when": null
+          "when": null,
+          "derived": true
         },
         {
           "effect": {
