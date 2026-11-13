@@ -205,3 +205,76 @@ fn yes_and_no_become_booleans() {
         Some(&Value::Bool(true))
     );
 }
+
+/// Phrases the IR may leave untyped. All are the Ex 2 duel's spell
+/// vocabulary, deferred to Inkjot v0.6.
+const UNTYPED_V06: &[&str] = &[
+    "absorbs spells",
+    "cracks glass",
+    "interrupts flame, frost",
+    "needs two to hold it",
+    "parries flame",
+    "shields target from the next spell",
+    "thaws ice",
+];
+
+#[test]
+fn every_phrase_is_typed_except_the_v06_duel() {
+    for name in NAMES {
+        let ir = ir(name);
+        walk(&ir, &mut |v| {
+            for other in v.get("other").and_then(Value::as_arr).unwrap_or(&[]) {
+                let text = other.get("text").and_then(Value::as_str).unwrap_or("");
+                assert!(
+                    UNTYPED_V06.contains(&text),
+                    "{name}: `{text}` was left untyped in {v}"
+                );
+            }
+        });
+    }
+}
+
+/// Find the config statement that declares `id`.
+fn declared<'a>(ir: &'a Value, id: &str) -> &'a Value {
+    ir.get("config")
+        .and_then(Value::as_arr)
+        .unwrap()
+        .iter()
+        .find(|s| s.get("id").and_then(Value::as_str) == Some(id))
+        .unwrap_or_else(|| panic!("nothing declares `{id}`"))
+}
+
+#[test]
+fn declarations_are_typed() {
+    let ir = ir(NAMES[0]);
+    let expected = r#"{"declare": "npc", "id": "marsh", "label": "Colonel Marsh", "tags": ["witness"],
+        "moves": [], "in": "sleeper", "asleep_during": {"range": [2, 4], "inclusive": true},
+        "wakes_on": "loud", "stays_awake": 1}"#;
+    assert_eq!(declared(&ir, "marsh"), &json::parse(expected).unwrap());
+
+    let expected = r#"{"declare": "way", "id": "vestibule", "from": "baggage", "to": "platform",
+        "one_way": true, "for": ["npc"], "open_when": {">=": [{"get": ["clock", "now"]}, 1]},
+        "tags": ["loud"], "shown_as": "the vestibule door"}"#;
+    assert_eq!(declared(&ir, "vestibule"), &json::parse(expected).unwrap());
+}
+
+#[test]
+fn stats_on_characters_and_list_entries_are_typed() {
+    let ex2 = ir(NAMES[1]);
+    let stats = json::parse(r#"{"wits": 4, "might": 1, "hp": 1}"#).unwrap();
+    assert_eq!(declared(&ex2, "roland").get("stats"), Some(&stats));
+
+    let ex3 = ir(NAMES[2]);
+    let holds = declared(&ex3, "the_list")
+        .get("holds")
+        .and_then(Value::as_arr)
+        .unwrap();
+    assert_eq!(
+        holds[0],
+        json::parse(r#"{"id": "vacuum", "label": "the vacuum"}"#).unwrap()
+    );
+    assert_eq!(
+        holds[4],
+        json::parse(r#"{"id": "leo", "mark": "pending"}"#).unwrap()
+    );
+}

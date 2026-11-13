@@ -24,7 +24,8 @@ examples/ex1-the-night-train.twee: built night-train.json (123671 bytes)
 
 Without `-o`, `build` writes the IR to standard output. Source with errors is
 not built. [`docs/ir.md`](docs/ir.md) describes the format, and `examples/ir/`
-holds the IR of the three examples.
+holds the IR of the three examples. [`docs/status.md`](docs/status.md) says
+what is done and what comes next.
 
 An error shows the file, line and column, and the line itself:
 
@@ -137,7 +138,8 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/resolve.rs` | Name resolution inside expressions |
 | `src/syntax.rs` | Shared vocabulary and line-level splitting |
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
-| `src/ir.rs` | Lowering to the JSON IR |
+| `src/ir/mod.rs` | Lowering to the JSON IR |
+| `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | A small JSON value type, writer and reader |
 | `src/main.rs` | The `inkjot` command |

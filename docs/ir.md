@@ -3,7 +3,7 @@
 `inkjot build story.twee -o story.json` compiles an Inklink to one JSON file.
 A runtime reads that file and never parses Inkjot itself.
 
-This describes IR format version `"1"`. The three files under `examples/ir/`
+This describes IR format version `"2"`. The three files under `examples/ir/`
 are the compiler's real output for the three examples, and a test keeps them
 current.
 
@@ -11,7 +11,7 @@ current.
 
 ```json
 {
-  "ir": "1",
+  "ir": "2",
   "inkjot": "0.5.0",
   "title": "The Night Train",
   "ifid": "…",
@@ -121,17 +121,82 @@ parameters), `become`, `order`, `by`, `chance`, `requires`, `once`, `loud`,
 
 ## Statements
 
-A statement is an object whose first key says what it is.
+A statement is an object whose first key says what it is. Statements are
+**sparse**: a field that was not written is absent, not `null`.
 
-| First key | Source | Other keys |
+| First key | Source | Example |
 |---|---|---|
-| `declare` | `item key: "a key" ~ in hall` | `id`, `label`, `value`, `words`, `when`, `clauses` |
-| `setting` | `mode: solo`, `goal flee:` | `value`, `words`, `when`, `clauses` |
+| `declare` | `npc marsh: "Colonel Marsh" ~ …` | `{"declare": "npc", "id": "marsh", "label": "Colonel Marsh", …}` |
+| `setting` | `cohort: 2..=5 ~ best 3..=4` | `{"setting": "cohort", "value": {range}, "best": {range}}` |
+| `goal`, `reaction` | `goal flee: ~ toward platform ~ weight 6` | `{"goal": "flee", "toward": "platform", "weight": 6}` |
+| `checkpoint` | `checkpoint cells: ~ on death in prison` | `{"checkpoint": "cells", "on_death_in": "prison", …}` |
+| `inquest` | `inquest: "…" ~ wits 3..` | `{"inquest": "…", "stats": {"wits": {range}}}` |
 | `effect` | `learn secret` | the effect; `clauses` if it has any |
 | `let` | `let ready: me.knows.secret` | `value` (an expression, or `{"roll": "d6"}`), `when` |
 | `expect` | `expect always: …` | `always`, `else` |
 | `on` | `on enter cellar when …` | `timing`, `what`, `by`, `when`, `then`, `once`, `at_most`, `tags` |
 | `stretch` | a v0.6 statement | `source`: the text as written |
+
+### What follows a declaration's colon
+
+| Declares | Field |
+|---|---|
+| most things | `label`, from the quoted text |
+| `fact` | `value`, an expression (`no` is `false`) |
+| `stat` | `range` |
+| `resource` | `value`, if it starts with a number |
+| `fuse` | `start` |
+| `way` | `from`, `to` |
+| `combo` | `acts` |
+| `relation` | `between` |
+| `table` | `roll`, an expression (`d6 + bonus`); dice are names like `d6` |
+| `map` | `size`, `[columns, rows]` |
+
+### Fields from `~` clauses
+
+Each clause is one phrase, and each phrase fills one field. When a key
+repeats, lists extend and objects merge.
+
+| Phrase | Field |
+|---|---|
+| `"…"` | `label`, or `description` if there is already a label |
+| one word: `evidence`, `playable`, `loud` | added to `tags` |
+| `in X`, `at X` | `in`, `at` |
+| `held by X`, `belongs to X` | `held_by`, `belongs_to` |
+| `holds a, b: "label", c as mark` | `holds`: `[{"id", "label"?, "mark"?}]` |
+| `knows a`, `for a, b`, `shared by a` | `knows`, `for`, `shared_by` (lists) |
+| `like X`, `with k: v`, `fact k: v` | `like`, `with` (object), `facts` (object) |
+| `shown as "…"`, `formally "…"` | `shown_as`, `formally` |
+| `aka "a", "b"` / `aka shuffled` | `aka` (list) / `aka_order` |
+| `else absent`, `weight heavy`, `of 6`, `survives death` | `else`, `weight`, `of`, `survives` |
+| `when E`, `open when E`, `done when E` | `when`, `open_when`, `done_when` |
+| `hidden until E`, `fixed until E`, `offstage until E` | `hidden_until`, `fixed_until`, `offstage_until` |
+| `watches here` / `watches here when E` | `watches: true` / `watches_when` |
+| `then EFFECT` | `then` (list of effects) |
+| `cost …`, `check E`, `min n`, `steps R`, `capacity n` | `cost` (list), `check`, `min`, `steps`, `capacity` |
+| `requires …` | `requires` (lowered words) |
+| `ends turn`, `one way`, `on tap` | `ends_turn`, `one_way`, `on_tap`: `true` |
+| `learned from clue X`, `once per day` | `learned_from`, `once_per` |
+| `moves a, b` / `moves none` / `moves 2 per chronon` | `moves` (list; `[]` for none) / `speed` |
+| `asleep during R`, `wakes on loud`, `stays awake n` | `asleep_during`, `wakes_on`, `stays_awake` |
+| `toward E`, `via X`, `pace X` | `toward`, `via`, `pace` |
+| `max n`, `per character`, `refill each chronon` / `refill on checkpoint` | `max`, `per`, `refill`: `"chronon"` / `"checkpoint"` |
+| `part of X`, `after X` | `part_of`, `after` |
+| `culprit X`, `method X`, `methods a, b` | `culprit`, `method`, `methods` |
+| `best R`, `advance x`, `turn limit 24h`, `turn ends when E` | `best`, `advance`, `turn_limit`, `turn_ends_when` |
+| `switch freely`, `lead X`, `order each other within earshot` | `switch`, `lead`, `order_within` |
+| `timed 40ms`, `beat 1s`, `shows visited` | `timed`, `beat`, `shows` |
+| `on death in X`, `keeps a, b`, `resets a, b` | `on_death_in`, `keeps`, `resets` |
+| `to X` / `to a for x, b for y` | `to`: a string / an object keyed by who |
+| `unseen by X` | `unseen_by` |
+| a stat or resource and a value: `wits 4`, `hp 2` | `stats`: `{"wits": 4, "hp": 2}` |
+| a range: `0..=3` | `range` |
+| a table row: `1..=2: then kill blocker` | `rows`: `[{"range", "then"}]` |
+| a map row: `a | b | c` | `rows`: `[["a", "b", "c"]]` |
+| anything else | `other`: `[{"text", "words"}]` |
+
+The vocabulary lives in one table, `PATTERNS` in `src/ir/clauses.rs`. When
+several phrases match, the longest wins.
 
 ### Effects
 
@@ -184,15 +249,18 @@ A method call puts its receiver first: `here.has(vell)` is
 `{"has": ["here", "vell"]}`. The `in` operator is spelled `within` so it can
 never be confused with a method named `in`. `but` is lowered as `and`.
 
-## What version 1 does not lower
+## What version 2 does not lower
 
-These are carried as text plus a `words` list, not as typed fields:
+Only one thing reaches `other`: the Ex 2 duel's spell vocabulary (`thaws ice`,
+`absorbs spells`, `shields target from the next spell`, and four more), which
+belongs to Inkjot v0.6. A test lists these seven phrases and fails if any other
+phrase is left untyped.
 
-- config settings (`cohort: 2..=5 ~ best 3..=4`)
-- most declaration clauses (`~ in dining`, `~ held by wren`, `~ moves walk, dash`)
-- NPC agendas: `goal` and `reaction` appear as settings with clauses
-- insert arguments for inputs, `accuse`, `reveal` and sounds (`args` is text)
-- v0.6 features, which appear as `stretch` with their source text
+Insert arguments for inputs, `accuse`, `reveal` and sounds are still text in
+`args`, and v0.6 statements appear as `stretch` with their source.
 
-A runtime can act on `words` without parsing, but it has to know the
-vocabulary. Typing these is the next step for the IR.
+## Changes from version 1
+
+- Declarations and settings are typed fields instead of `clauses` and `words`.
+- Statements are sparse: absent fields are left out.
+- Goals, reactions, checkpoints and inquests have their own first key.
