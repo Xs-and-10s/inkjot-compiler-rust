@@ -7,6 +7,7 @@
 //! saves it under `proptest-regressions/`, so it is retried on every run.
 
 use inkjot::expr::{Arg, Expr};
+use inkjot::json::{self, Value};
 use inkjot::{check, expr, render, Severity};
 use proptest::prelude::*;
 
@@ -160,7 +161,7 @@ fn tree() -> impl Strategy<Value = Expr> {
         let binary = select(vec![
             "or", "and", "==", "!=", ">=", "<=", ">", "<", "in", "+", "-", "*", "/", "mod",
         ]);
-        let range_op = select(vec!["..", "..=", "..<"]);
+        let range_op = select(vec!["..=", "..<"]);
         prop_oneof![
             (boxed(), member).prop_map(|(t, m)| Expr::Member(t, m.to_string())),
             (boxed(), vec(arg, 0..3)).prop_map(|(t, args)| Expr::Call(t, args)),
@@ -183,6 +184,23 @@ fn tree() -> impl Strategy<Value = Expr> {
                 hi: None,
                 op: ".."
             }),
+        ]
+    })
+}
+
+/// Any JSON value: every kind, any nesting, any characters in strings.
+fn json_value() -> impl Strategy<Value = Value> {
+    let leaf = prop_oneof![
+        Just(Value::Null),
+        any::<bool>().prop_map(Value::Bool),
+        any::<i32>().prop_map(|n| Value::Num(n.to_string())),
+        (any::<i16>(), 0..1000u32).prop_map(|(a, b)| Value::Num(format!("{a}.{b}"))),
+        any::<String>().prop_map(Value::Str),
+    ];
+    leaf.prop_recursive(4, 48, 4, |inner| {
+        prop_oneof![
+            proptest::collection::vec(inner.clone(), 0..4).prop_map(Value::Arr),
+            proptest::collection::vec((any::<String>(), inner), 0..4).prop_map(Value::Obj),
         ]
     })
 }
@@ -322,5 +340,40 @@ proptest! {
         let once = expr::parse(&src).unwrap().to_string();
         let twice = expr::parse(&once).unwrap().to_string();
         prop_assert_eq!(once, twice);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(2000))]
+
+    /// The JSON writer and reader agree: any value printed and read back is
+    /// the same value. Strings may hold quotes, backslashes, newlines,
+    /// control characters and any Unicode.
+    #[test]
+    fn json_survives_printing_and_reading(value in json_value()) {
+        let text = value.to_string();
+        let reread = json::parse(&text);
+        prop_assert_eq!(reread.as_ref(), Ok(&value), "printed as: {}", text);
+    }
+
+    /// Lowering never panics, and what it produces is valid JSON.
+    #[test]
+    fn lowered_expressions_are_valid_json(tree in tree()) {
+        let lowered = inkjot::ir::lower(&tree);
+        let text = lowered.to_string();
+        let reread = json::parse(&text);
+        prop_assert_eq!(reread.as_ref(), Ok(&lowered), "printed as: {}", text);
+    }
+}
+
+proptest! {
+    /// `build` never panics: damaged source is either rejected with a report
+    /// or compiled, and what is compiled is valid JSON.
+    #[test]
+    fn build_never_panics_on_damaged_examples(recipe in damage()) {
+        if let Ok(ir) = inkjot::build(&damaged(&recipe)) {
+            let text = ir.to_string();
+            prop_assert!(json::parse(&text).is_ok());
+        }
     }
 }

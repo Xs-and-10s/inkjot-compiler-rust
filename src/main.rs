@@ -5,6 +5,8 @@ inkjot: the Inkjot compiler
 
 usage:
   inkjot check <file.twee>...   read each file and report what is wrong with it
+  inkjot build <file.twee>      compile one file to its JSON IR, on standard output
+  inkjot build <file.twee> -o <out.json>
   inkjot --version
   inkjot --help
 
@@ -14,6 +16,14 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("check") if args.len() > 1 => check(&args[1..]),
+        Some("build") => match &args[1..] {
+            [file] => build(file, None),
+            [file, flag, out] if flag == "-o" => build(file, Some(out)),
+            _ => {
+                eprintln!("{USAGE}");
+                ExitCode::from(2)
+            }
+        },
         Some("--version") | Some("-V") => {
             println!(
                 "inkjot {} (Inkjot {}.x)",
@@ -69,4 +79,40 @@ fn check(files: &[String]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn build(file: &str, out: Option<&String>) -> ExitCode {
+    let src = match std::fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: cannot read {file}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let ir = match inkjot::build(&src) {
+        Ok(ir) => ir,
+        Err(report) => {
+            for d in &report.diags {
+                eprintln!("{}", inkjot::render(d, file, &src));
+            }
+            let n = report.errors();
+            eprintln!(
+                "{file}: not built; fix the {n} error{} above",
+                if n == 1 { "" } else { "s" }
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+    let text = format!("{ir}\n");
+    match out {
+        None => print!("{text}"),
+        Some(path) => {
+            if let Err(e) = std::fs::write(path, &text) {
+                eprintln!("error: cannot write {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+            println!("{file}: built {path} ({} bytes)", text.len());
+        }
+    }
+    ExitCode::SUCCESS
 }
