@@ -1,0 +1,69 @@
+:: choosing_wren_shows_her_secret_and_no_one_elses [test]
+start: cast
+do: "Wren Hollis"
+expect: me.is(wren)
+expect text: "you lifted a brass key from the Professor’s pocket"
+expect no text: "you saw Miss Vell slip out"
+do: "Board the train"
+expect at: lounge@0
+expect text: "Each of you still wears one of his prototypes, ticking."
+expect link: "Examine the body"
+
+:: rook_remembers_what_he_saw [test]
+start: cast
+do: "Captain Rook"
+do: "Board the train"
+expect text: "In the dark you are sure of one thing: Miss Vell slipped out a moment before."
+
+:: the_letter_question_waits_for_the_blueprint [test]
+start: dining@1
+~ as rook
+expect no link: "Ask Mrs. Ardent about her letter"
+do: "Unroll the blueprint"
+expect: me.knows.two_hands
+expect: rook.vults == 2
+expect link: "Ask Mrs. Ardent about her letter"
+do: "Ask Mrs. Ardent about her letter"
+expect text: "It is for my solicitor"
+expect: rook.vults == 0
+
+:: only_wren_may_lift_the_letter [test]
+start: dining@1
+~ as wren
+expect link: "Lift her letter"
+as: rook
+expect no link: "Lift her letter"
+
+:: a_taken_cufflink_stops_glinting [test]
+start: dining@1
+~ as wren
+expect text: "Something glints beside the sugar bowl."
+do: "Pocket the glint"
+expect: me.holds.cufflink
+expect: cufflink.taken
+start: dining@2
+expect no text: "Something still glints"
+
+:: sallow_reads_the_bruise [test]
+start: lounge@1
+~ as sallow
+do: "Examine the body"
+expect: me.knows.scorched_wrist and me.knows.bruise
+expect text: "the bruise at his temple is wrong"
+
+:: anyone_else_only_sees_the_burn [test]
+start: lounge@1
+~ as ada
+do: "Examine the body"
+expect: me.knows.scorched_wrist and not me.knows.bruise
+
+:: the_colonel_talks_differently_by_stop [test]
+start: sleeper@1
+~ as ada
+do: "Talk with the Colonel"
+expect text: "Had a girl in the workshop for that."
+start: sleeper@3
+expect no link: "Talk with the Colonel"
+expect no link: "Wake the Colonel"
+as: rook
+expect link: "Wake the Colonel"

@@ -172,6 +172,17 @@ impl Story {
     }
 }
 
+/// A name bound in a passage.
+#[derive(Debug, Clone)]
+enum Local {
+    /// A value fixed when the passage was entered: a Link parameter, or a roll.
+    Value(V),
+    /// A `let`: an expression, worked out again each time the name is read.
+    /// So `let aligned: orrery.ember == orrery.tide` is true the moment the
+    /// planets line up, even later in the same passage.
+    Expr(Value),
+}
+
 /// One entry on a `list`.
 #[derive(Debug, Clone)]
 struct Entry {
@@ -199,7 +210,9 @@ pub struct Run<'s> {
     visits: HashMap<String, u32>,
     once: HashSet<String>,
     /// `let`s and Link parameters of the passage being run.
-    locals: HashMap<String, V>,
+    locals: HashMap<String, Local>,
+    /// The `let`s being worked out right now, to catch one that uses itself.
+    evaluating: Vec<String>,
     /// The Links of the passage the pov is at, as last rendered.
     links: Vec<Value>,
     /// Text shown since the output was last taken.
@@ -228,6 +241,7 @@ impl<'s> Run<'s> {
             visits: HashMap::new(),
             once: HashSet::new(),
             locals: HashMap::new(),
+            evaluating: Vec::new(),
             links: Vec::new(),
             output: Vec::new(),
             chronon: 0,
@@ -282,12 +296,10 @@ impl<'s> Run<'s> {
                 }
                 "fact" | "state" => {
                     let v = self.constant(field("value"));
-                    // A fact declared in a character's or NPC's margin is theirs.
-                    let margin_of = d
-                        .home
-                        .as_deref()
-                        .filter(|h| matches!(story.kind(h), Some("character" | "npc")));
-                    match field("belongs_to").as_str().or(margin_of) {
+                    // A fact declared in a passage belongs to its place, or to the
+                    // character or NPC whose margin it is: `orrery.ember`, `vell.cornered`.
+                    let owner = d.home.as_deref().map(place_of);
+                    match field("belongs_to").as_str().or(owner) {
                         Some("character") => {
                             for c in &characters {
                                 self.vals.insert(format!("{c}.{id}"), v.clone());
@@ -303,7 +315,8 @@ impl<'s> Run<'s> {
                 }
                 "resource" => {
                     let v = self.constant(field("value"));
-                    if field("per").as_str() == Some("character") {
+                    // A resource is each character's own unless it is `shared`.
+                    if !story.has_tag(id, "shared") {
                         for c in &characters {
                             self.vals.entry(format!("{c}.{id}")).or_insert(v.clone());
                         }
@@ -472,13 +485,13 @@ impl<'s> Run<'s> {
         self.vals.get(&format!("{who}.vults")).and_then(V::num)
     }
 
+    /// Is an item here: lying in this place, or held by an NPC who is?
     fn in_reach(&self, item: &str) -> bool {
+        let here = self.here();
+        let place = place_of(here);
         match self.holder.get(item) {
-            Some(h) => {
-                let here = self.here();
-                let place = place_of(here);
-                h == here || h == place
-            }
+            Some(h) if h == here || h == place => true,
+            Some(h) => self.story.kind(h) == Some("npc") && self.location(h) == place,
             None => false,
         }
     }
@@ -525,16 +538,12 @@ impl<'s> Run<'s> {
         };
         match f(link, "kind").as_str() {
             Some("walk") => {
+                let to = self
+                    .arrival(&target)
+                    .ok_or_else(|| format!("there is nowhere to arrive at `{target}`"))?;
                 if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
                     self.end_turn()?;
                 }
-                // In a world of cells, arrive at this chronon's cell of the place.
-                let cell = format!("{target}@{}", self.chronon);
-                let to = if self.story.passages.contains_key(&cell) {
-                    cell
-                } else {
-                    target
-                };
                 return self.enter(&to, HashMap::new());
             }
             Some("switch") => {
@@ -553,13 +562,7 @@ impl<'s> Run<'s> {
             self.pov = who.to_string();
         }
         match target.as_str() {
-            "here" => {
-                let at = self.here().to_string();
-                self.links = self.render(&at, true)?;
-                let more = self.standing_links()?;
-                self.links.extend(more);
-                Ok(())
-            }
+            "here" => self.relist(),
             "rewind" => Err("rewinds are not supported by the interpreter yet".into()),
             _ => self.enter(&target, params),
         }
@@ -579,7 +582,7 @@ impl<'s> Run<'s> {
         if let Some(chance) = link.get("chance").and_then(Value::as_arr) {
             let stat = chance.first().and_then(Value::as_str).unwrap_or("");
             let sides = chance.get(2).and_then(Value::as_u64).unwrap_or(6);
-            let need = self.name(stat).num().unwrap_or(0.0);
+            let need = self.name(stat)?.num().unwrap_or(0.0);
             return Ok(self.roll(sides) as f64 <= need);
         }
         Ok(true)
@@ -619,7 +622,15 @@ impl<'s> Run<'s> {
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
-        self.locals = params;
+        // A cell, `dining@2`, is a place at a time: being there means it is stop 2.
+        if let Some(n) = passage.rsplit_once('@').and_then(|(_, n)| n.parse().ok()) {
+            self.chronon = n;
+        }
+        self.locals = params
+            .into_iter()
+            .map(|(k, v)| (k, Local::Value(v)))
+            .collect();
+        self.parent_lets(passage)?;
         let mut next = None;
         for stmt in &p.header {
             if let Some(n) = self.statement(stmt)? {
@@ -635,9 +646,7 @@ impl<'s> Run<'s> {
             if now == passage {
                 // An act shows its result, and the pov is where they were.
                 self.at.insert(self.pov.clone(), from.clone());
-                self.links = self.render(&from, true)?;
-                let more = self.standing_links()?;
-                self.links.extend(more);
+                self.relist()?;
             } else {
                 // The act moved them: show where they are now.
                 return self.enter(&now, HashMap::new());
@@ -646,6 +655,63 @@ impl<'s> Run<'s> {
             self.links = links;
             let more = self.standing_links()?;
             self.links.extend(more);
+        }
+        Ok(())
+    }
+
+    /// The passage a walk to `place` arrives at: the place's cell for the
+    /// chronon it will be by then, or the place's own passage.
+    fn arrival(&self, place: &str) -> Option<String> {
+        let ends_turn = self.story.field("walk", "ends_turn") == &Value::Bool(true);
+        let when = self.chronon + u32::from(ends_turn);
+        let cell = format!("{place}@{when}");
+        if self.story.passages.contains_key(&cell) {
+            Some(cell)
+        } else if self.story.passages.contains_key(place) {
+            Some(place.to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Work out the Links on offer where the pov is, without showing anything:
+    /// re-run the passage's `let`s, then render it quietly.
+    fn relist(&mut self) -> R<()> {
+        let at = self.here().to_string();
+        self.locals.clear();
+        self.parent_lets(&at)?;
+        self.lets_of(&at)?;
+        self.links = self.render(&at, true)?;
+        let more = self.standing_links()?;
+        self.links.extend(more);
+        Ok(())
+    }
+
+    /// A sub-Nib sees the `let`s of the passages it belongs to:
+    /// `orrery:crank` sees those of `orrery`. Outermost first.
+    fn parent_lets(&mut self, passage: &str) -> R<()> {
+        let mut parents = Vec::new();
+        let mut name = passage;
+        while let Some((parent, _)) = name.rsplit_once(':') {
+            parents.push(parent.to_string());
+            name = parent;
+        }
+        for parent in parents.iter().rev() {
+            self.lets_of(parent)?;
+        }
+        Ok(())
+    }
+
+    /// Run only the `let`s of a passage's header.
+    fn lets_of(&mut self, passage: &str) -> R<()> {
+        let header = self
+            .story
+            .passages
+            .get(passage)
+            .map(|p| p.header.clone())
+            .unwrap_or_default();
+        for stmt in header.iter().filter(|s| s.get("let").is_some()) {
+            self.statement(stmt)?;
         }
         Ok(())
     }
@@ -682,10 +748,14 @@ impl<'s> Run<'s> {
                         continue;
                     }
                 } else if let Some(name) = story.field(&way, "open_when").as_str() {
-                    if !self.name(name).truthy() {
+                    if !self.name(name)?.truthy() {
                         continue;
                     }
                 }
+            }
+            // No passage to arrive at (the last stop has passed): no walk.
+            if self.arrival(&to).is_none() {
+                continue;
             }
             let label = format!("Go to {}", self.label(&to));
             links.push(Value::obj([
@@ -707,13 +777,14 @@ impl<'s> Run<'s> {
             let when = f(s, "when");
             if *when == Value::Null || self.eval(when)?.truthy() {
                 let value = f(s, "value");
-                let v = match value.get("roll").and_then(Value::as_str) {
+                let local = match value.get("roll").and_then(Value::as_str) {
                     Some(dice) => {
-                        V::Num(self.roll(dice.trim_start_matches('d').parse().unwrap_or(6)) as f64)
+                        let sides = dice.trim_start_matches('d').parse().unwrap_or(6);
+                        Local::Value(V::Num(self.roll(sides) as f64))
                     }
-                    None => self.eval(value)?,
+                    None => Local::Expr(value.clone()),
                 };
-                self.locals.insert(name.to_string(), v);
+                self.locals.insert(name.to_string(), local);
             }
         } else if let Some(effect) = s.get("effect") {
             let clauses = f(s, "clauses").as_arr().unwrap_or(&[]).to_vec();
@@ -1154,7 +1225,7 @@ impl<'s> Run<'s> {
     pub fn eval(&mut self, e: &Value) -> R<V> {
         let Value::Obj(pairs) = e else {
             return Ok(match e {
-                Value::Str(name) => self.name(name),
+                Value::Str(name) => self.name(name)?,
                 other => self.constant(other),
             });
         };
@@ -1187,7 +1258,22 @@ impl<'s> Run<'s> {
                 binary(op, &a, &b)?
             }
             "get" => self.get(items)?,
-            "at" => match (self.eval(&items[0])?, self.eval(&items[1])?) {
+            // `who.at(spot)`: is someone at a spot within their place?
+            "at" => {
+                let spot = items
+                    .get(1)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let check = |run: &Self, who: &str| {
+                    run.vals
+                        .get(&format!("{who}.at"))
+                        .and_then(V::name)
+                        .is_some_and(|at| at == spot)
+                };
+                self.quantify(&items[0], check)?
+            }
+            "index" => match (self.eval(&items[0])?, self.eval(&items[1])?) {
                 (V::List(list), V::Num(i)) => list.get(i as usize).cloned().unwrap_or(V::Null),
                 _ => V::Null,
             },
@@ -1309,10 +1395,25 @@ impl<'s> Run<'s> {
     }
 
     /// The value of a bare name.
-    fn name(&self, n: &str) -> V {
-        if let Some(v) = self.locals.get(n) {
-            return v.clone();
+    fn name(&mut self, n: &str) -> R<V> {
+        match self.locals.get(n).cloned() {
+            Some(Local::Value(v)) => return Ok(v),
+            Some(Local::Expr(e)) => {
+                if self.evaluating.iter().any(|x| x == n) {
+                    return Err(format!("the let `{n}` is defined in terms of itself"));
+                }
+                self.evaluating.push(n.to_string());
+                let v = self.eval(&e);
+                self.evaluating.pop();
+                return v;
+            }
+            None => {}
         }
+        Ok(self.global(n))
+    }
+
+    /// The value of a bare name that is not a local.
+    fn global(&self, n: &str) -> V {
         match n {
             "me" => return V::Id(self.pov.clone()),
             "here" => return V::Id(self.here().to_string()),
@@ -1335,6 +1436,21 @@ impl<'s> Run<'s> {
 
     /// `x.a.b`: walk a path of members.
     fn get(&mut self, path: &[Value]) -> R<V> {
+        // `pov.all.here`, `pov.any.blessed`: the rest of the path, for each pov.
+        if path.first().and_then(Value::as_str) == Some("pov") && path.len() > 2 {
+            let all = path[1].as_str() == Some("all");
+            let mut results = Vec::new();
+            for p in self.story.povs.clone() {
+                let mut each = vec![Value::str(p)];
+                each.extend(path[2..].iter().cloned());
+                results.push(self.get(&each)?.truthy());
+            }
+            return Ok(V::Bool(if all {
+                results.iter().all(|r| *r)
+            } else {
+                results.iter().any(|r| *r)
+            }));
+        }
         let mut v = self.eval(path.first().ok_or("an empty path")?)?;
         for member in path[1..].iter().filter_map(Value::as_str) {
             v = self.member(&v, member)?;
@@ -1381,6 +1497,8 @@ impl<'s> Run<'s> {
                 }
             },
             (_, "past" | "passed") => V::Bool(false),
+            // `x.here`: is x where the pov is?
+            (_, "here") => V::Bool(self.location(&id) == place_of(self.here())),
             _ => self
                 .vals
                 .get(&format!("{id}.{m}"))

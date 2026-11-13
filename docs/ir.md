@@ -243,7 +243,7 @@ The `~` clauses of a declaration or setting:
 | `x in 2..=4` | `{"within": ["x", {"range": [2, 4], "inclusive": true}]}` |
 | `3..` | `{"range": [3, null], "inclusive": false}` |
 | `[a, b]` | `{"list": ["a", "b"]}` |
-| `hours[i]` | `{"at": ["hours", "i"]}` |
+| `hours[i]` | `{"index": ["hours", "i"]}` |
 
 A method call puts its receiver first: `here.has(vell)` is
 `{"has": ["here", "vell"]}`. The `in` operator is spelled `within` so it can
@@ -264,3 +264,6 @@ Insert arguments for inputs, `accuse`, `reveal` and sounds are still text in
 - Declarations and settings are typed fields instead of `clauses` and `words`.
 - Statements are sparse: absent fields are left out.
 - Goals, reactions, checkpoints and inquests have their own first key.
+- Indexing (`hours[i]`) is `{"index": …}`, so `at` is free for the method
+  `who.at(spot)`.
+- `[test]` passages are left out.

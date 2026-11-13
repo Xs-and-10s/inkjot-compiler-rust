@@ -1,0 +1,78 @@
+:: both_heroes_start_where_the_prologue_says [test]
+start: prologue
+do: "Wake as Roland, in the pit"
+expect at: oubliette
+expect: roland.in(oubliette) and eldric.in(chapel)
+expect: eldric.chained
+expect no link: "Climb the chain"
+
+:: the_first_escape [test]
+start: prologue
+do: "Wake as Roland, in the pit"
+do: "Look up through the grate"
+expect: me.knows.far_bolt
+expect link: "Tug the bolt across the room"
+do: "Tug the bolt across the room"
+expect text: "the bolt grates, sticks, and slides free"
+expect: bolted_door.open
+expect: cleverness == 1
+expect: roland.vults == 40
+do: "Switch to Eldric"
+expect at: chapel
+do: "Tear the ring out of the pillar"
+expect: not eldric.chained
+expect: eldric.holds.chain
+expect: eldric.vults == 0
+expect no link: "Go to the Ossuary"
+do: "End the turn"
+expect: eldric.vults == 60
+do: "Go to the Ossuary"
+expect at: ossuary
+do: "Lift the grate"
+expect: grate.open
+do: "Let your chain down into the pit"
+expect: rope_down
+do: "Switch to Roland"
+expect at: oubliette
+expect link: "Climb the chain"
+do: "Climb the chain"
+expect at: ossuary
+expect: trust == 1
+expect text: "Eldric looks as surprised as you are."
+
+:: roland_is_too_weak_to_lift_the_grate [test]
+start: ossuary
+~ as roland
+do: "Lift the grate"
+expect: not grate.open
+expect text: "It wants a stronger back."
+
+:: a_bolt_needs_finding_before_tugging [test]
+start: oubliette
+~ as roland
+expect no link: "Tug the bolt across the room"
+given: learn far_bolt
+expect link: "Tug the bolt across the room"
+
+:: two_turns_of_the_crank_line_up_the_planets [test]
+start: orrery
+~ as eldric
+expect text: "red Ember at noon, blue Tide at dawn, gold Crown at evening"
+expect no link: "Draw the rod"
+do: "Turn the crank"
+expect text: "Ember creeps to dusk"
+do: "Turn the crank"
+expect text: "All three stop in a line"
+expect: orrery.ember == 4 and orrery.tide == 4 and orrery.crown == 4
+do: "Draw the rod"
+expect: eldric.holds.lumen
+expect link: "Lift out the sun"
+
+:: only_eldric_can_draw_lumen [test]
+start: orrery
+~ as roland
+do: "Turn the crank"
+do: "Turn the crank"
+do: "Draw the rod"
+expect text: "It won’t come for you."
+expect: not roland.holds.lumen

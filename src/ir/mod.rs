@@ -198,7 +198,8 @@ pub fn lower(e: &Expr) -> Value {
             }
             Value::Obj(pairs)
         }
-        Expr::Index(target, index) => one("at", vec![lower(target), lower(index)]),
+        // `index`, not `at`: `me.at(lectern)` is a method named `at`.
+        Expr::Index(target, index) => one("index", vec![lower(target), lower(index)]),
         Expr::List(items) => one("list", items.iter().map(lower).collect()),
         Expr::Unary(op, operand) => {
             Value::obj([(if *op == "-" { "neg" } else { *op }, lower(operand))])
