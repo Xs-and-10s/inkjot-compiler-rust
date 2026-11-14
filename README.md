@@ -13,7 +13,8 @@ Four commands:
 
 - `inkjot check` reads a `.twee` file and reports what is wrong with it.
 - `inkjot build` compiles a file that passes into its JSON IR.
-- `inkjot play` plays a story in the terminal.
+- `inkjot play` plays a story in the terminal; `--as rook,wren` seats several
+  Linkers at one keyboard.
 - `inkjot test` runs a story's `[test]` passages: scripted playthroughs that
   check what is shown and what is offered. See [`docs/run.md`](docs/run.md).
 
@@ -150,6 +151,7 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/run/value.rs` | Values while a story runs |
 | `src/run/events.rs` | `on` handlers: what happens when something happens |
 | `src/run/agenda.rs` | NPC agendas: goals, reactions, routes |
+| `src/run/cohort.rs` | Several Linkers at once: seats, claims, clashes, stops |
 | `src/run/test.rs` | `[test]` passages |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | A small JSON value type, writer and reader |

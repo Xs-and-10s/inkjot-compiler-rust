@@ -163,11 +163,55 @@ The words agendas lean on:
 - `roll standoff`: roll a table and run every row the result falls in.
 - `feign sleep`: `x.asleep` holds while the NPC pretends.
 
+## Several Linkers at once
+
+In a world of stops (where `walk` ends the turn, as in Ex 1) several
+Linkers can play together, one per character. `start: lounge@0 ~ as ada,
+rook` in a test, or `inkjot play --as ada,rook story.twee` at one keyboard.
+Within a stop each acts in any order:
+
+- **Private acts** (`examine`, `ask`) happen at once. Only the actor sees
+  the result.
+- **Shared acts with a capacity** (`take`, `force`) are *claims*. A claim is
+  settled as soon as no one else in the place could still reach for the same
+  thing (everyone else there has claimed it too, or locked in their move).
+  If more reach than there is room for, they *clash*: `attempt.clashed`
+  holds for all of them, and the Link's `clash` rule decides who succeeds.
+  `random_winner` (the default) picks as many winners as there is room;
+  `random` flips a coin for each; `all` and `none` mean what they say.
+  `{claimants}` names the others who reached. Others in the place see the
+  winner take it.
+- **Moves end the turn**: `Go to`, `Dash to` and `Slip to` (as far as the
+  act's `steps` and the character's `moves` allow), `Stay`, `Observe`, or
+  any act marked `ends turn` (which happens first, then the Linker stays).
+  A Linker who has moved waits; their Links are gone until the stop
+  resolves.
+
+When everyone has moved, the stop resolves in the order the paper playtest
+used:
+
+1. Open claims are settled.
+2. Everyone moves at the same moment. Who ends the stop where sees who came
+   and went: a walk is seen leaving and arriving; a loud move (a dash) also
+   by anyone in a place it passes through; a quiet one (a slip) only where
+   it arrives.
+3. The turn ends: `turn` handlers, the clock (which stops at its last stop),
+   refills, fuses, then the NPCs' agendas. NPCs then note who is in their
+   place and what they hold; `x.last_seen(holding: tag)` reads these
+   sightings, so Vell hunts whoever she last saw holding evidence.
+4. Each Linker arrives at their cell for the new stop.
+
+A run with one Linker follows the same rules; its claims settle at once,
+since no one else could reach.
+
 ## What it does not do yet
 
 It says so, by name, if a story needs one of these. It never guesses.
 
-- Several Linkers at once: simultaneous turns, clashes, echoes.
+- Several Linkers in a world without stops (Ex 2 and Ex 3 are solo).
+- Talking between Linkers, the `turn limit` timeout, and a Nib's own
+  `moves:` (Ex 1's mail car allows only walking).
+- Sleepers woken by a loud move (`~ wakes on loud`).
 - Checkpoints: a death plays its `[interlude]` (Ex 2's `again`), but
   nothing is reset and no one is moved back.
 - NPCs seeing acts: `self.saw(dash)` never holds yet, so Vell never gives
