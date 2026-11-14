@@ -1674,7 +1674,19 @@ impl<'s> Run<'s> {
                     V::Bool(wanted.iter().all(|w| entries.iter().any(|en| en.id == *w)))
                 } else {
                     let thing = self.who(&items[1])?;
-                    V::Bool(self.location(&thing) == place_of(&target))
+                    let place = place_of(&target).to_string();
+                    // `here.has(knight)` is one thing; `here.has(statue)`,
+                    // anything of that kind.
+                    if matches!(self.story.kind(&thing), Some("character" | "npc" | "item")) {
+                        V::Bool(self.location(&thing) == place)
+                    } else {
+                        let any = self
+                            .story
+                            .decls
+                            .keys()
+                            .any(|id| self.is_kind(id, &thing) && self.location(id) == place);
+                        V::Bool(any)
+                    }
                 }
             }
             "in" => {
@@ -1760,8 +1772,9 @@ impl<'s> Run<'s> {
             }
             "last_seen" => {
                 let who = self.who(&items[0])?;
+                let kind = items.get(1).and_then(Value::as_str);
                 let tag = named("holding").as_str().unwrap_or("").to_string();
-                self.last_seen(&who, &tag)
+                self.last_seen(&who, kind, &tag)
             }
             // NPCs do not see acts yet: `self.saw(dash)` never holds.
             "saw" => V::Bool(false),

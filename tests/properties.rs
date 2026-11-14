@@ -511,3 +511,37 @@ proptest! {
         prop_assert!(text.contains(&now_line), "{}\n{}", e.source(), text);
     }
 }
+
+// -------------------------------------------------------------------- comments
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Comments are invisible: putting `((…))` lines anywhere in an example,
+    /// and `~ ((…))` at the end of any statement line, leaves its IR exactly
+    /// as it was.
+    #[test]
+    fn comments_change_nothing(which in 0..3usize, spots in proptest::collection::vec((any::<prop::sample::Index>(), any::<bool>()), 1..30)) {
+        let src = EXAMPLES[which];
+        let before = inkjot::build(src).map_err(|r| TestCaseError::fail(format!("{:?}", r.diags)))?;
+        let mut lines: Vec<String> = src.lines().map(str::to_string).collect();
+        for (spot, trailing) in spots {
+            let i = spot.index(lines.len());
+            let line = lines[i].clone();
+            let t = line.trim();
+            // A statement line (not prose, a Link, a `::` header or JSON)
+            // may end in a comment; any line may be preceded by one.
+            let statement = !t.is_empty() && t.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+                && t.split_whitespace().next().is_some_and(|w| w.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+                && !t.contains("((");
+            if trailing && statement {
+                lines[i] = format!("{line} ~ ((a note: {i}))");
+            } else if !t.starts_with("::") && !lines[..i].iter().all(|l| !l.starts_with("::")) {
+                lines.insert(i, format!("((a note: {i}))"));
+            }
+        }
+        let commented = lines.join("\n");
+        let after = inkjot::build(&commented).map_err(|r| TestCaseError::fail(format!("{:?}", r.diags)))?;
+        prop_assert!(before == after, "the IR changed");
+    }
+}

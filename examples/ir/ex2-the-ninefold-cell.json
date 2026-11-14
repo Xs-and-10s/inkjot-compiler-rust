@@ -746,7 +746,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "chill": {
       "cost": [
@@ -755,7 +756,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "climb": {
       "cost": [
@@ -764,7 +766,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "crank": {
       "cost": [
@@ -773,7 +776,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "ember_lance": {
       "cost": [
@@ -782,7 +786,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "examine": {
       "cost": [
@@ -791,7 +796,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "force": {
       "cost": [
@@ -802,7 +808,8 @@
       "ends_turn": false,
       "check": {
         ">=": ["might", 4]
-      }
+      },
+      "choice": null
     },
     "frostglass": {
       "cost": [
@@ -811,7 +818,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "guard": {
       "cost": [
@@ -820,7 +828,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "gust": {
       "cost": [
@@ -829,7 +838,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "hush": {
       "cost": [
@@ -838,7 +848,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "lift": {
       "cost": [
@@ -849,7 +860,8 @@
       "ends_turn": false,
       "check": {
         ">=": ["might", 4]
-      }
+      },
+      "choice": null
     },
     "lodestone": {
       "cost": [
@@ -858,7 +870,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "mend": {
       "cost": [
@@ -867,7 +880,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "observe": {
       "cost": [
@@ -876,7 +890,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "pick": {
       "cost": [
@@ -887,7 +902,8 @@
       "ends_turn": false,
       "check": {
         ">=": ["wits", 3]
-      }
+      },
+      "choice": null
     },
     "push": {
       "cost": [
@@ -898,7 +914,8 @@
       "ends_turn": false,
       "check": {
         ">=": ["might", 5]
-      }
+      },
+      "choice": null
     },
     "read": {
       "cost": [
@@ -909,7 +926,8 @@
       "ends_turn": false,
       "check": {
         ">=": ["wits", 3]
-      }
+      },
+      "choice": null
     },
     "rime_shield": {
       "cost": [
@@ -918,7 +936,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "second_dawn": {
       "cost": [
@@ -927,7 +946,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "spark": {
       "cost": [
@@ -936,7 +956,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "strike": {
       "cost": [
@@ -945,7 +966,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "take": {
       "cost": [
@@ -954,7 +976,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "thunderclap": {
       "cost": [
@@ -963,7 +986,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "together": {
       "cost": [
@@ -972,7 +996,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "tug": {
       "cost": [
@@ -981,7 +1006,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "vigil": {
       "cost": [
@@ -990,7 +1016,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "walk": {
       "cost": [
@@ -999,7 +1026,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     }
   },
   "passages": [
@@ -1652,6 +1680,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1673,6 +1702,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1820,6 +1850,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1842,6 +1873,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1864,6 +1896,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1886,6 +1919,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -1919,6 +1953,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -1952,6 +1987,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": "rope_down",
           "hidden_until": null,
           "for": null,
@@ -1974,6 +2010,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -2012,6 +2049,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -2419,6 +2457,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "not": {
               "get": ["grate", "open"]
@@ -2445,6 +2484,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -2481,6 +2521,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["bolted_door", "open"]
@@ -2507,6 +2548,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["well", "drained"]
@@ -2535,6 +2577,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "get": ["portcullis_lever", "rusty"]
           },
@@ -2559,6 +2602,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -2590,6 +2634,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "or": [
               {
@@ -3097,6 +3142,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "get": ["eldric", "chained"]
           },
@@ -3124,6 +3170,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3159,6 +3206,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -3181,6 +3229,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3214,6 +3263,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["glyph", "broken"]
@@ -3242,6 +3292,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3277,6 +3328,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3310,6 +3362,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3855,6 +3908,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "at": ["me", "lectern"]
@@ -3881,6 +3935,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3912,6 +3967,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -3944,6 +4000,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -3968,6 +4025,7 @@
           "check": {
             ">=": ["wits", 3]
           },
+          "choice": null,
           "when": {
             "at": ["me", "lectern"]
           },
@@ -3995,6 +4053,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "at": ["me", "lectern"]
           },
@@ -4019,6 +4078,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -4057,6 +4117,7 @@
           "check": {
             ">=": ["wits", 3]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -4090,6 +4151,7 @@
           "check": {
             ">=": ["wits", 3]
           },
+          "choice": null,
           "when": {
             "not": {
               "get": ["orrery_door", "open"]
@@ -4119,6 +4181,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "not": {
               "get": ["orrery_door", "open"]
@@ -4559,6 +4622,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["well_mirror", "open"]
           },
@@ -4583,6 +4647,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -4614,6 +4679,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["well", "drained"]
@@ -4641,6 +4707,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "at": ["me", "bottom"]
           },
@@ -4665,6 +4732,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "at": ["me", "bottom"]
           },
@@ -4689,6 +4757,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -4966,6 +5035,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -4988,6 +5058,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -5010,6 +5081,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -5034,6 +5106,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "get": ["statue_lever", "rusty"]
           },
@@ -5058,6 +5131,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -5089,6 +5163,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "or": [
               {
@@ -5120,6 +5195,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["statue_lever", "snapped"]
           },
@@ -5727,6 +5803,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -5749,6 +5826,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -5784,6 +5862,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -5806,6 +5885,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -5828,6 +5908,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               "aligned",
@@ -5859,6 +5940,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["lumen", "taken"]
           },
@@ -5886,6 +5968,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -5921,6 +6004,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "has": ["here", "jester"]
           },
@@ -6434,6 +6518,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -6456,6 +6541,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["gallery_mirror", "open"]
           },
@@ -6482,6 +6568,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "has": ["here", "knight"]
           },
@@ -6508,6 +6595,7 @@
           "check": {
             ">=": ["might", 5]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -6547,15 +6635,9 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
-            "or": [
-              {
-                "has": ["here", "knight"]
-              },
-              {
-                "has": ["here", "widow"]
-              }
-            ]
+            "has": ["here", "statue"]
           },
           "hidden_until": null,
           "for": null,
@@ -6890,6 +6972,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -6912,6 +6995,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["gate", "scale_seal"]
@@ -6938,6 +7022,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -6971,6 +7056,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["gate", "mouth_seal"]
@@ -6997,6 +7083,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -7035,6 +7122,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "has": ["here", "widow"]
           },
@@ -7245,6 +7333,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -7266,6 +7355,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["eldric"],
@@ -7287,6 +7377,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             ">": ["inquests", 0]
           },
@@ -7312,6 +7403,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -7349,6 +7441,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             ">": [
               {
@@ -7377,6 +7470,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": "inactive",
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -7523,6 +7617,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -7552,7 +7647,7 @@
         {"stretch": "spell", "source": "spell blink: through mirror ~ then set hask.dodging: yes ~ then set hask.grounded: yes next round ~ fails when count(mirror, in: here, open: yes) == 0 or hask.pinned ~ on fail: set hask.grounded: yes"},
         {"stretch": "spell", "source": "spell sunfall: at pov.all ~ then kill target ~ blocked by shield, absorb"},
         {"stretch": "spell", "source": "spell recall: at holder ~ then take heart ~ blocked by shield, absorb, guard"},
-        {"stretch": "spell", "source": "spell falter: ~ then nothing"}
+        {"stretch": "spell", "source": "spell falter ~ then nothing"}
       ],
       "body": []
     },
@@ -7685,6 +7780,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -8003,6 +8099,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["eldric", "frozen"]
           },
@@ -8027,6 +8124,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -8050,6 +8148,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -8073,6 +8172,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -8096,6 +8196,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -8119,6 +8220,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
@@ -8141,6 +8243,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "knows": ["roland", "lodestone"]
           },
@@ -8165,6 +8268,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -8198,6 +8302,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -8243,6 +8348,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["eldric", "frozen"]
@@ -8269,6 +8375,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -8305,6 +8412,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "not": {
               "get": ["eldric", "frozen"]
@@ -8334,6 +8442,7 @@
           "check": {
             ">=": ["might", 4]
           },
+          "choice": null,
           "when": {
             "and": [
               {
@@ -8367,6 +8476,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "holds": ["me", "heart"]
           },
@@ -8392,6 +8502,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -8430,6 +8541,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": "inactive",
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -9362,6 +9474,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -9396,6 +9509,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "==": [
               {
@@ -9472,6 +9586,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -9508,6 +9623,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -9544,6 +9660,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -9575,6 +9692,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["hask", "mortal"]
           },

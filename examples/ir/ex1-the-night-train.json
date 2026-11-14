@@ -134,7 +134,8 @@
         {"vults": "rest"}
       ],
       "min": 1,
-      "ends_turn": true
+      "ends_turn": true,
+      "choice": "inactive"
     },
     {
       "declare": "act",
@@ -177,7 +178,8 @@
         {"vults": 1}
       ],
       "tags": ["shared"],
-      "capacity": "many"
+      "capacity": "many",
+      "choice": "proactive"
     },
     {
       "declare": "act",
@@ -419,7 +421,8 @@
       "scope": "private",
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "confront": {
       "cost": [
@@ -428,7 +431,8 @@
       "scope": "shared",
       "capacity": "many",
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": "proactive"
     },
     "dash": {
       "cost": [
@@ -437,7 +441,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": true,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "examine": {
       "cost": [
@@ -446,7 +451,8 @@
       "scope": "private",
       "capacity": null,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "force": {
       "cost": [
@@ -455,7 +461,8 @@
       "scope": "shared",
       "capacity": 1,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "observe": {
       "cost": [
@@ -464,7 +471,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": true,
-      "check": null
+      "check": null,
+      "choice": "inactive"
     },
     "slip": {
       "cost": [
@@ -473,7 +481,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": true,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "take": {
       "cost": [
@@ -482,7 +491,8 @@
       "scope": "shared",
       "capacity": 1,
       "ends_turn": false,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "walk": {
       "cost": [
@@ -491,7 +501,8 @@
       "scope": null,
       "capacity": null,
       "ends_turn": true,
-      "check": null
+      "check": null,
+      "choice": null
     },
     "wind": {
       "cost": [
@@ -500,7 +511,8 @@
       "scope": "private",
       "capacity": null,
       "ends_turn": true,
-      "check": null
+      "check": null,
+      "choice": null
     }
   },
   "passages": [
@@ -516,7 +528,7 @@
         {
           "let": "target",
           "value": {
-            "last_seen": ["self"],
+            "last_seen": ["self", "character"],
             "with": {"holding": "evidence"}
           },
           "when": null
@@ -769,6 +781,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -790,6 +803,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -811,6 +825,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -832,6 +847,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -853,6 +869,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -896,6 +913,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "!=": [
               {
@@ -1097,6 +1115,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1184,6 +1203,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1270,6 +1290,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1370,6 +1391,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": {
             "holds": ["me", "compartment_key"]
           },
@@ -1395,6 +1417,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": {
             "and": [
               {
@@ -1555,6 +1578,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "asleep": ["here", "marsh"]
@@ -1582,6 +1606,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "asleep": ["here", "marsh"]
           },
@@ -1768,6 +1793,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "asleep": ["here", "vell"]
           },
@@ -1867,6 +1893,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1890,6 +1917,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1913,6 +1941,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1942,6 +1971,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": {
             "knows": ["me", "two_hands"]
@@ -1967,6 +1997,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -1990,6 +2021,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["wren"],
@@ -2013,6 +2045,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": ["wren"],
@@ -2283,6 +2316,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -2386,6 +2420,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": "can_wind",
           "hidden_until": null,
           "for": null,
@@ -2409,6 +2444,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -2487,6 +2523,7 @@
           "capacity": 1,
           "clash": "random_winner",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -2555,6 +2592,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -2608,6 +2646,7 @@
           "capacity": "many",
           "clash": "random_winner",
           "check": null,
+          "choice": "proactive",
           "when": {
             "and": [
               {
@@ -2649,6 +2688,7 @@
           "capacity": "many",
           "clash": "random_winner",
           "check": null,
+          "choice": "proactive",
           "when": {
             "and": [
               {
@@ -2895,6 +2935,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": null,
           "hidden_until": null,
           "for": null,
@@ -3378,6 +3419,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "not": {
               "get": ["vell", "cornered"]
@@ -4419,6 +4461,7 @@
           "capacity": null,
           "clash": "none",
           "check": null,
+          "choice": null,
           "when": {
             "get": ["accusation", "done"]
           },

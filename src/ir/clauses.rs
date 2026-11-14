@@ -106,6 +106,7 @@ const PATTERNS: &[Pattern] = &[
     p(&["ends", "turn"], "ends_turn", Shape::Flag),
     p(&["learned", "from", "clue"], "learned_from", Shape::Id),
     p(&["once", "per"], "once_per", Shape::Token),
+    p(&["choice"], "choice", Shape::Token),
     // Actors.
     p(&["moves"], "moves", Shape::Moves),
     p(&["asleep", "during"], "asleep_during", Shape::Expr),

@@ -456,3 +456,112 @@ fn link_parameters_are_in_scope_in_the_target() {
         errors(&src)
     );
 }
+
+/// Comments: `((…))` lines, `~ ((…))` at the end of a line, and `(((…)))`
+/// blocks, the first of which documents its passage.
+const COMMENTED: &str = r#":: StoryTitle
+Comments
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "room"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: ann
+character ann: "Ann" ~ playable ~ ((the only one))
+fact lit: no ~ ((a line comment after a tilde))
+((a whole-line comment, with an undeclared_name in it))
+
+:: room
+(((
+The only room.
+It has a lamp.
+)))
+let both: not ((lit or lit) and lit)
+--
+((this line is not shown))
+A room. ~ ((nor is this))
+(((
+A block comment
+in the body.
+)))
+The lamp is {both}.
+> [[Light it->room:light]] ~ ((it costs nothing))
+
+:: room:light [act]
+set lit: yes
+--
+Light.
+"#;
+
+#[test]
+fn comments_are_left_out_and_doc_comments_kept() {
+    let report = inkjot::check(COMMENTED);
+    let errors: Vec<_> = report
+        .diags
+        .iter()
+        .filter(|d| d.severity == inkjot::Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    let ir = inkjot::build(COMMENTED).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    let room = ir
+        .get("passages")
+        .and_then(|p| p.as_arr())
+        .unwrap()
+        .iter()
+        .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("room"))
+        .unwrap();
+    assert_eq!(
+        room.get("doc").and_then(|d| d.as_str()),
+        Some("The only room.\nIt has a lamp.")
+    );
+    let body = room.get("body").unwrap().to_string();
+    assert!(
+        !body.contains("not shown")
+            && !body.contains("nor is this")
+            && !body.contains("block comment"),
+        "{body}"
+    );
+    assert!(body.contains("A room."), "{body}");
+    // `((lit or lit)` inside an expression is not a comment.
+    let header = room.get("header").unwrap().to_string();
+    assert!(header.contains("\"or\""), "{header}");
+}
+
+#[test]
+fn an_unclosed_comment_block_is_an_error() {
+    let src = COMMENTED.replace("in the body.\n)))", "in the body.");
+    let report = inkjot::check(&src);
+    assert!(
+        report
+            .diags
+            .iter()
+            .any(|d| d.msg.contains("never closed with `)))`")),
+        "{:#?}",
+        report.diags
+    );
+}
+
+#[test]
+fn a_choice_is_proactive_reactive_or_inactive() {
+    let src = COMMENTED.replace(
+        "> [[Light it->room:light]] ~ ((it costs nothing))",
+        "> [[Light it->room:light]] ~ choice eager",
+    );
+    let report = inkjot::check(&src);
+    assert!(
+        report
+            .diags
+            .iter()
+            .any(|d| d.msg.contains("`choice` is one of")),
+        "{:#?}",
+        report.diags
+    );
+    let fine = COMMENTED.replace(
+        "> [[Light it->room:light]] ~ ((it costs nothing))",
+        "> [[Light it->room:light]] ~ choice proactive",
+    );
+    let ir = inkjot::build(&fine).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    assert!(ir.to_string().contains("\"choice\": \"proactive\""));
+}

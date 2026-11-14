@@ -678,12 +678,17 @@ impl Checker {
             );
         }
         let after = rest[name.len()..].trim_start();
-        let Some(value) = after.strip_prefix(':') else {
-            return self.err(
-                head.line,
-                rest_col + cols(name),
-                format!("expected `:` after the name `{name}`"),
-            );
+        // When there is no value, there is no colon: `archetype statue ~ lifeless`.
+        let value = match after.strip_prefix(':') {
+            Some(value) => value,
+            None if after.is_empty() => "",
+            None => {
+                return self.err(
+                    head.line,
+                    rest_col + cols(name),
+                    format!("expected `:` after the name `{name}`"),
+                )
+            }
         };
         let value_col = rest_col + cols(&rest[..rest.len() - value.len()]);
         match kind {
@@ -696,12 +701,30 @@ impl Checker {
                     }
                 }
             }
+            "act" => {
+                for c in &s.clauses[1..] {
+                    if let Some(v) = c.text.strip_prefix("choice ") {
+                        self.choice(v.trim(), c.line, c.col + 7);
+                    }
+                }
+            }
             "combo" => {
                 for act in value.split(',') {
                     self.need(act.trim(), &["act", "combo"], "act", head.line, value_col);
                 }
             }
             _ => {}
+        }
+    }
+
+    /// `~ choice proactive`: one of the three kinds of choice.
+    fn choice(&mut self, value: &str, line: usize, col: usize) {
+        if !CHOICES.contains(&value) {
+            self.err(
+                line,
+                col,
+                "`choice` is one of: proactive, reactive, inactive",
+            );
         }
     }
 
@@ -1044,6 +1067,7 @@ impl Checker {
         let arg = c.text[word.len()..].split_whitespace().next().unwrap_or("");
         let arg_col = c.col + cols(word) + 1;
         match word {
+            "choice" => self.choice(arg, c.line, arg_col),
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
             "become" | "order" => self.need(arg, &["character"], "character", c.line, arg_col),
             _ => {}

@@ -40,6 +40,8 @@ struct ActDef {
     capacity: Option<Value>,
     ends_turn: bool,
     check: Option<Value>,
+    /// `~ choice proactive | reactive | inactive`.
+    choice: Option<String>,
 }
 
 struct Builder {
@@ -279,6 +281,7 @@ impl Builder {
                 "capacity" => def.capacity = Some(token(rest)),
                 "ends" => def.ends_turn = true,
                 "check" => def.check = Some(expression(rest)),
+                "choice" => def.choice = Some(rest.to_string()),
                 _ => {}
             }
         }
@@ -337,6 +340,10 @@ impl Builder {
                     ("capacity", def.capacity.clone().unwrap_or(Value::Null)),
                     ("ends_turn", Value::Bool(def.ends_turn)),
                     ("check", def.check.clone().unwrap_or(Value::Null)),
+                    (
+                        "choice",
+                        def.choice.as_deref().map_or(Value::Null, Value::str),
+                    ),
                 ]),
             )
         });
@@ -349,16 +356,24 @@ impl Builder {
     fn passage(&self, p: &Passage) -> Value {
         let (stmts, body) = gather(p, &mut Vec::new());
         let margin = p.tags.iter().any(|t| MARGIN_TAGS.contains(&t.as_str()));
-        Value::obj([
-            ("name", Value::str(&p.name)),
-            ("tags", strings(p.tags.iter().map(String::as_str))),
-            ("margin", Value::Bool(margin)),
+        let mut pairs = vec![
+            ("name".to_string(), Value::str(&p.name)),
             (
-                "header",
+                "tags".to_string(),
+                strings(p.tags.iter().map(String::as_str)),
+            ),
+            ("margin".to_string(), Value::Bool(margin)),
+            (
+                "header".to_string(),
                 Value::Arr(stmts.iter().map(|s| self.statement(s)).collect()),
             ),
-            ("body", Value::Arr(self.body(p, body))),
-        ])
+            ("body".to_string(), Value::Arr(self.body(p, body))),
+        ];
+        // A `(((…)))` doc comment, for Inkwell. Only passages that have one.
+        if let Some(doc) = &p.doc {
+            pairs.insert(2, ("doc".to_string(), Value::str(doc)));
+        }
+        Value::Obj(pairs)
     }
 
     // ------------------------------------------------------------ statements
@@ -616,6 +631,7 @@ impl Builder {
         let mut costs = Vec::new();
         let (mut scope, mut capacity, mut clash, mut ends_turn, mut check_) =
             (None, None, None, None, None);
+        let mut choice: Option<String> = None;
         let (mut whens, mut hidden, mut audience, mut effects) =
             (Vec::new(), Value::Null, Value::Null, Vec::new());
         let mut kind = "go";
@@ -640,6 +656,7 @@ impl Builder {
                 "capacity" => capacity = Some(token(rest)),
                 "clash" => clash = Some(rest.to_string()),
                 "check" => check_ = Some(expression(rest)),
+                "choice" => choice = Some(rest.to_string()),
                 "with" => extra.push(("with".into(), parameters(rest))),
                 "switch" | "pass" | "inquest" | "release" => kind = word,
                 "become" | "order" | "by" | "chance" | "after" | "requires" => {
@@ -677,6 +694,7 @@ impl Builder {
             ("clash", clash.is_some()),
             ("ends_turn", ends_turn.is_some()),
             ("check", check_.is_some()),
+            ("choice", choice.is_some()),
         ] {
             if set {
                 overrides.push(field);
@@ -717,6 +735,14 @@ impl Builder {
             ),
             ("clash".into(), Value::str(clash)),
             ("check".into(), check_.or(def.check).unwrap_or(Value::Null)),
+            // A Link's own choice, else its act's; passing is inactive.
+            (
+                "choice".into(),
+                choice
+                    .or(def.choice)
+                    .or((kind == "pass").then(|| "inactive".to_string()))
+                    .map_or(Value::Null, Value::str),
+            ),
             ("when".into(), when),
             ("hidden_until".into(), hidden),
             ("for".into(), audience),

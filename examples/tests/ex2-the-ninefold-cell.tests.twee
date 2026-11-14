@@ -121,3 +121,11 @@ expect: knight.in(gate) and widow.in(gate)
 expect: gate.scale_seal
 expect: knight.fixed
 expect: not roland.dead
+
+:: here_has_takes_a_kind [test]
+start: gallery ~ as eldric
+expect: here.has(statue)
+expect: here.has(knight)
+expect link: "Watch the statues"
+as: roland
+expect: not here.has(statue)
