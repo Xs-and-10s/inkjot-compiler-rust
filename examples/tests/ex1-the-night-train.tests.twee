@@ -256,3 +256,32 @@ expect at: terminus
 expect text: "The night express sighs into Kingsgate at dawn"
 as: ada
 expect at: terminus
+
+:: only_linkers_and_awake_witnesses_spoil_being_alone [test]
+(((
+Vell kills only when no other Linker and no awake witness is in the car.
+Hobbs, always awake, keeps the dining car safe; Mrs. Ardent is no witness.
+)))
+start: dining@1 ~ as rook
+given: move vell to dining
+expect: not alone_with(vell, rook) ~ ((Hobbs is watching))
+given: move hobbs to lounge
+expect: alone_with(vell, rook) ~ ((Mrs. Ardent does not count))
+
+:: two_hands_on_the_cufflink_seeded [test]
+(((
+Two investors reach for the same cufflink in the same stop. Exactly one
+gets it, both pay for trying, and each hears who else reached.
+)))
+seed: 7
+start: dining@1 ~ as rook, wren
+given: learn two_hands ~ ((Rook has already read the blueprint))
+do: "Pocket the glint"
+expect text: "(Waiting to see whether anyone else here reaches for it.)"
+expect no link: "Pocket the glint"
+as: wren
+do: "Pocket the glint"
+expect text: "reached for it at the same moment"
+expect: rook.holds.cufflink or wren.holds.cufflink
+expect: not (rook.holds.cufflink and wren.holds.cufflink)
+expect: rook.vults == 2 and wren.vults == 2

@@ -172,8 +172,15 @@ impl Run<'_> {
         let current = self.snapshot();
         let mut now = current.clone();
         self.merge(&mut now, &saved, &resets);
-        // What it keeps wins over what it resets.
+        // What it keeps wins over what it resets, and so does a fact that
+        // `survives death` (Ex 2's `fact deaths: 0 ~ survives death`).
         self.merge(&mut now, &current, &keeps);
+        for (key, value) in &current.vals {
+            let name = key.rsplit('.').next().unwrap_or(key);
+            if *self.story.field(name, "survives") != Value::Null {
+                now.vals.insert(key.clone(), value.clone());
+            }
+        }
         self.restore(now);
         for c in self.story.ids_of("character") {
             self.vals.remove(&format!("{c}.dead"));

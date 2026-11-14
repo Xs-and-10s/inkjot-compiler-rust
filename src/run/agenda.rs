@@ -418,14 +418,27 @@ impl Run<'_> {
     }
 
     /// `alone_with(a, b)`: in the same place, with no one else living there.
+    /// `alone_with(a, b)`: a and b are the only Linkers or awake
+    /// witnesses in the place. A sleeping Colonel sees nothing, and Mrs.
+    /// Ardent, who is no witness, does not count.
     pub(super) fn alone_with(&self, a: &str, b: &str) -> bool {
         let place = self.location(a);
         if place.is_empty() || self.location(b) != place {
             return false;
         }
-        self.things("living", Some(&place))
-            .iter()
-            .all(|id| id == a || id == b)
+        self.things("living", Some(&place)).iter().all(|id| {
+            let counts =
+                self.is_kind(id, "linker") || (self.tagged(id, "witness") && !self.is_asleep(id));
+            id == a || id == b || !counts
+        })
+    }
+
+    /// Asleep now: during the hours `asleep during` says, or pretending,
+    /// and not woken.
+    pub(super) fn is_asleep(&self, who: &str) -> bool {
+        let during = self.constant(self.story.field(who, "asleep_during"));
+        let flag = |f: &str| self.vals.get(&format!("{who}.{f}")).is_some_and(V::truthy);
+        (V::Num(f64::from(self.chronon)).within(&during) || flag("feigning")) && !flag("woken")
     }
 
     /// `x.last_seen(character, holding: evidence)`: whoever of that kind
