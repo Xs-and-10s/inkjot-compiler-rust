@@ -164,3 +164,21 @@ expect: roland.rewinds == 0
 expect: clock.now == 1
 expect at: oubliette
 expect no link: "Tie the Backward Knot"
+
+:: the_mouth_hears_three_cantrips [test]
+start: gate ~ as roland
+do: "Speak three cantrips into the mouth"
+expect text: "(Choose 3, in order, from:"
+expect no link: "Speak three cantrips into the mouth"
+answer: gust, spark, hush
+expect text: "its lips close with a click"
+expect: gate.mouth_seal
+expect at: gate
+
+:: the_wrong_words_cost_everything [test]
+start: gate ~ as roland
+do: "Speak three cantrips into the mouth"
+answer: spark, gust, hush
+expect text: "The mouth laughs at you"
+expect: not gate.mouth_seal
+expect: roland.vults == 0

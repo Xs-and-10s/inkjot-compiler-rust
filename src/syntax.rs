@@ -83,6 +83,8 @@ pub(crate) const SETTINGS: &[&str] = &[
     "param",
     // `[test]` passages.
     "given",
+    "answer",
+    "vote",
     "do",
     "seed",
     "as",
@@ -117,6 +119,12 @@ pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
     "check", "chance", "inquest", "order", "after", "become", "with", "by", "switch", "pass",
     "release", "requires", "once", "loud", "quiet", "choice",
+];
+
+/// The input family: `{name input for: me.name}`.
+pub(crate) const INPUTS: &[&str] = &[
+    "name", "choose", "act", "choice", "pick", "rank", "allocate", "number", "target", "secret",
+    "roll", "note",
 ];
 
 /// What kind of choice an act or Link is: `~ choice proactive`.

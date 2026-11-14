@@ -763,6 +763,50 @@ impl Builder {
 
 // ---------------------------------------------------------------- the pieces
 
+/// `who: suspect, how: scenario.methods, revote: 1` as an object: a number
+/// is a number, `'quoted'` text is text, and anything else an expression.
+pub(crate) fn insert_args(text: &str) -> Value {
+    Value::Obj(
+        split_args(text)
+            .into_iter()
+            .filter_map(|part| {
+                let (key, value) = part.split_once(':')?;
+                let value = value.trim();
+                let lowered = match value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')) {
+                    Some(text) => Value::str(text),
+                    None if value.parse::<f64>().is_ok() => Value::Num(value.to_string()),
+                    None => expression(value),
+                };
+                Some((key.trim().to_string(), lowered))
+            })
+            .collect(),
+    )
+}
+
+/// Split at the commas that are outside brackets and quotes.
+pub(crate) fn split_args(text: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let (mut depth, mut quote, mut cur) = (0i32, None::<char>, String::new());
+    for ch in text.chars() {
+        match ch {
+            '\'' | '"' if quote == Some(ch) => quote = None,
+            '\'' | '"' if quote.is_none() => quote = Some(ch),
+            '(' | '[' | '{' if quote.is_none() => depth += 1,
+            ')' | ']' | '}' if quote.is_none() => depth -= 1,
+            ',' if quote.is_none() && depth == 0 => {
+                parts.push(std::mem::take(&mut cur));
+                continue;
+            }
+            _ => {}
+        }
+        cur.push(ch);
+    }
+    if !cur.trim().is_empty() {
+        parts.push(cur);
+    }
+    parts.into_iter().map(|p| p.trim().to_string()).collect()
+}
+
 /// `2`, `rest`, `1 per step`, `30 from roland`, `0 when me.is(ada)`.
 fn cost(text: &str) -> Value {
     let (core, when) = split_when(text);
@@ -1009,11 +1053,18 @@ fn insert(content: &str) -> Value {
             let name = format!("{first} {}", second.trim_end_matches(':'));
             named(&name, c.split_once(':').map_or("", |(_, r)| r))
         }
-        "accuse" => named("accuse", &c[first.len()..]),
-        _ if second == "input" => named(
-            &format!("{first} input"),
-            c.split_once("input").map_or("", |(_, r)| r),
-        ),
+        // The jury and the inputs take typed arguments.
+        "accuse" => Value::obj([
+            ("insert", Value::str("accuse")),
+            ("args", insert_args(&c[first.len()..])),
+        ]),
+        _ if second == "input" => Value::obj([
+            ("insert", Value::str(format!("{first} input"))),
+            (
+                "args",
+                insert_args(c.split_once("input").map_or("", |(_, r)| r)),
+            ),
+        ]),
         _ => Value::obj([("value", expression(c))]),
     }
 }

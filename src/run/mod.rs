@@ -9,6 +9,7 @@
 mod agenda;
 mod cohort;
 mod events;
+mod inputs;
 pub mod test;
 mod time;
 mod value;
@@ -18,6 +19,7 @@ use events::Event;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::json::Value;
+pub use inputs::Ask;
 pub use value::V;
 
 /// An interpreter result. The error says what went wrong in plain words.
@@ -301,6 +303,12 @@ pub struct Run<'s> {
     dying: Vec<(String, String)>,
     /// While a rewind is announced: whose handlers do not see it.
     unseen_by: Vec<String>,
+    /// The inputs open to the Linker being served: `{name input}`, `{accuse}`.
+    asking: Vec<Value>,
+    /// An arrival paused at a header input until it is answered.
+    paused: Option<inputs::Paused>,
+    /// The jury's ballots, by voter, until the jury decides.
+    ballots: HashMap<String, inputs::Ballot>,
 }
 
 impl<'s> Run<'s> {
@@ -344,9 +352,13 @@ impl<'s> Run<'s> {
             passed: HashMap::new(),
             dying: Vec::new(),
             unseen_by: Vec::new(),
+            asking: Vec::new(),
+            paused: None,
+            ballots: HashMap::new(),
         };
         run.init();
         run.place_npcs();
+        run.pick_scenario();
         run.start_the_log();
         run
     }
@@ -472,6 +484,8 @@ impl<'s> Run<'s> {
             Value::Obj(_) if v.get("str").is_some() => {
                 V::Str(f(v, "str").as_str().unwrap_or("").to_string())
             }
+            // `methods device, poison, fall`.
+            Value::Arr(items) => V::List(items.iter().map(|i| self.constant(i)).collect()),
             _ => V::Null,
         }
     }
@@ -508,6 +522,46 @@ impl<'s> Run<'s> {
         std::mem::take(&mut self.output)
     }
 
+    /// The clock's last stop, if it has one: 5 for `clock: 0..=5`.
+    fn last_stop(&self) -> Option<u32> {
+        match self.constant(self.story.defaults.get("clock")?) {
+            V::Range {
+                hi: Some(hi),
+                inclusive,
+                ..
+            } => Some(if inclusive { hi as u32 } else { hi as u32 - 1 }),
+            _ => None,
+        }
+    }
+
+    /// When the clock runs out, where everyone goes: the `[finale]` passage
+    /// no Link leads to (Ex 1's `terminus`, not its `verdict`).
+    fn finale(&self) -> Option<String> {
+        let targets: std::collections::HashSet<&str> = self
+            .story
+            .passages
+            .values()
+            .flat_map(|p| p.body.iter().chain(p.header.iter()))
+            .filter_map(|n| f(n, "target").as_str())
+            .collect();
+        let mut finales: Vec<&String> = self
+            .story
+            .passages
+            .iter()
+            .filter(|(name, p)| {
+                p.tags.iter().any(|t| t == "finale") && !targets.contains(name.as_str())
+            })
+            .map(|(name, _)| name)
+            .collect();
+        finales.sort();
+        finales.first().map(|f| f.to_string())
+    }
+
+    /// Is this the last stop, with a finale to go to when it ends?
+    pub(super) fn finale_due(&self) -> bool {
+        self.last_stop() == Some(self.when()) && self.finale().is_some()
+    }
+
     /// The stop it is: `clock.now`.
     pub fn now(&self) -> u32 {
         self.chronon
@@ -526,8 +580,9 @@ impl<'s> Run<'s> {
     /// The Links the pov can take now, as `(id, label)`.
     pub fn choices(&mut self) -> R<Vec<(String, String)>> {
         let mut out = Vec::new();
-        // A Linker who has locked in their move waits for the others.
-        if self.waiting() {
+        // A Linker who has locked in their move waits for the others; one
+        // paused at an input answers it first.
+        if self.waiting() || self.paused.is_some() {
             return Ok(out);
         }
         for link in self.links.clone() {
@@ -843,18 +898,7 @@ impl<'s> Run<'s> {
             before: false,
         })?;
         // The clock stops at its last stop: `clock: 0..=5`.
-        let last = match self.story.defaults.get("clock") {
-            Some(range) => match self.constant(range) {
-                V::Range {
-                    hi: Some(hi),
-                    inclusive,
-                    ..
-                } => Some(if inclusive { hi as u32 } else { hi as u32 - 1 }),
-                _ => None,
-            },
-            None => None,
-        };
-        if last.is_none_or(|last| self.chronon < last) {
+        if self.last_stop().is_none_or(|last| self.chronon < last) {
             self.chronon += 1;
         }
         let story = self.story;
@@ -929,12 +973,41 @@ impl<'s> Run<'s> {
             .map(|(k, v)| (k, Local::Value(v)))
             .collect();
         self.parent_lets(passage)?;
-        let mut next = None;
-        for stmt in &p.header {
+        self.arrive(passage, &from, 0, None)
+    }
+
+    /// Run a passage's header from statement `start`, then show it and
+    /// offer its Links. A header input pauses the arrival there until it is
+    /// answered (see `inputs.rs`).
+    fn arrive(
+        &mut self,
+        passage: &str,
+        from: &str,
+        start: usize,
+        mut next: Option<String>,
+    ) -> R<()> {
+        let story = self.story;
+        let p = &story.passages[passage];
+        let from = from.to_string();
+        for (i, stmt) in p.header.iter().enumerate().skip(start) {
+            if inputs::is_input(stmt) {
+                self.asking.clear();
+                let prompt = self.meet_input(stmt)?;
+                self.output.push(prompt);
+                self.links.clear();
+                self.paused = Some(inputs::Paused {
+                    passage: passage.to_string(),
+                    from,
+                    next_statement: i + 1,
+                    next,
+                });
+                return Ok(());
+            }
             if let Some(n) = self.statement(stmt)? {
                 next = Some(n);
             }
         }
+        self.asking.clear();
         let links = self.render(passage, false)?;
         if let Some(next) = next {
             return self.enter(&next, HashMap::new());
@@ -984,6 +1057,7 @@ impl<'s> Run<'s> {
     /// re-run the passage's `let`s, then render it quietly.
     fn relist(&mut self) -> R<()> {
         let at = self.here().to_string();
+        self.asking.clear();
         self.locals.clear();
         self.parent_lets(&at)?;
         self.lets_of(&at)?;
@@ -1027,8 +1101,12 @@ impl<'s> Run<'s> {
     fn standing_links(&mut self) -> R<Vec<Value>> {
         let story = self.story;
         let mut links = Vec::new();
-        // In a lobby, before anyone is anyone, nothing stands everywhere.
-        if self.pov.is_empty() {
+        // In a lobby, before play begins, nothing stands everywhere.
+        let in_lobby = story
+            .passages
+            .get(self.here())
+            .is_some_and(|p| p.tags.iter().any(|t| t == "lobby"));
+        if self.pov.is_empty() || in_lobby {
             return Ok(links);
         }
         let mut libs: Vec<&String> = story
@@ -1253,6 +1331,12 @@ impl<'s> Run<'s> {
                         .map(|w| self.label(w))
                         .collect();
                     text.push_str(&names.join(" and "));
+                }
+                kind if kind == "accuse" || kind.ends_with(" input") => {
+                    let prompt = self.meet_input(part)?;
+                    if !quiet {
+                        text.push_str(&prompt);
+                    }
                 }
                 "claimants" => {
                     let names = if self.claimants.is_empty() {
@@ -1965,7 +2049,15 @@ impl<'s> Run<'s> {
                     "`pov.{m}` needs a method after it, such as `pov.{m}.in(place)`"
                 ))
             }
-            (_, "name") => V::Str(self.label(&id)),
+            // A `custom` character has no name until one is typed in.
+            (_, "name") => match self.vals.get(&format!("{id}.name")) {
+                Some(name) => name.clone(),
+                None if story.has_tag(&id, "custom") => V::Str(String::new()),
+                None => V::Str(self.label(&id)),
+            },
+            // `cohort.size`, `cohort.alive`: the Linkers playing, and those alive.
+            ("cohort", "size") => V::Num(self.voters_count(false)),
+            ("cohort", "alive") => V::Num(self.voters_count(true)),
             (_, "aka") => self.aka(&id),
             (_, "visits") => V::Num(f64::from(
                 self.visits.get(self.here()).copied().unwrap_or(0),

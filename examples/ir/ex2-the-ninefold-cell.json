@@ -7237,7 +7237,10 @@
       "tags": ["act"],
       "margin": false,
       "header": [
-        {"insert": "choose input", "args": "for: mouth_words, from: cantrip, length: 3"},
+        {
+          "insert": "choose input",
+          "args": {"for": "mouth_words", "from": "cantrip", "length": 3}
+        },
         {
           "effect": {
             "do": "set",

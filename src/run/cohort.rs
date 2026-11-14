@@ -33,6 +33,8 @@ pub(super) struct Seat {
     links: Vec<Value>,
     output: Vec<String>,
     locals: HashMap<String, Local>,
+    asking: Vec<Value>,
+    paused: Option<super::inputs::Paused>,
 }
 
 /// A shared act waiting to be settled.
@@ -139,6 +141,8 @@ impl Run<'_> {
         self.links = seat.links;
         self.output = seat.output;
         self.locals = seat.locals;
+        self.asking = seat.asking;
+        self.paused = seat.paused;
         Ok(())
     }
 
@@ -153,6 +157,8 @@ impl Run<'_> {
             links: std::mem::take(&mut self.links),
             output: std::mem::take(&mut self.output),
             locals: std::mem::take(&mut self.locals),
+            asking: std::mem::take(&mut self.asking),
+            paused: self.paused.take(),
         };
         self.parked.insert(self.pov.clone(), seat);
     }
@@ -302,7 +308,7 @@ impl Run<'_> {
                 ]));
             }
         }
-        if self.arrival(&here).is_some() {
+        if self.arrival(&here).is_some() || self.finale_due() {
             links.push(Value::obj([
                 ("type", Value::str("link")),
                 ("id", Value::str("stay")),
@@ -464,6 +470,9 @@ impl Run<'_> {
         let served = self.pov.clone();
         self.settle(true)?;
 
+        // Was this the last stop? Then the finale follows it.
+        let ending = self.finale_due();
+
         // Every Linker moves, at the same moment.
         let mut moves = Vec::new();
         for who in self.linkers() {
@@ -493,8 +502,14 @@ impl Run<'_> {
         }
 
         // Each Linker arrives at their cell for the new stop.
+        let finale = if ending { self.finale() } else { None };
         for (who, _, to, _, passage) in moves {
             self.sit(&who)?;
+            // The clock has run out: everyone goes to the finale.
+            if let Some(finale) = &finale {
+                self.enter(finale, HashMap::new())?;
+                continue;
+            }
             match self.arrival_at(&to, self.chronon) {
                 Some(cell) => self.enter(&cell, HashMap::new())?,
                 // Past the last stop (an act that ends the turn, taken at
