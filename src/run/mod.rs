@@ -10,6 +10,7 @@ mod agenda;
 mod cohort;
 mod events;
 mod inputs;
+mod inquests;
 pub mod test;
 mod time;
 mod value;
@@ -315,6 +316,8 @@ pub struct Run<'s> {
     ballots: HashMap<String, inputs::Ballot>,
     /// The jury's last count: `(who, how, votes)`, most votes first.
     tally: Vec<(String, String, usize)>,
+    /// Hints bought with Inquests: the player's, so a rewind keeps them.
+    heard: inquests::Heard,
 }
 
 impl<'s> Run<'s> {
@@ -362,6 +365,7 @@ impl<'s> Run<'s> {
             paused: None,
             ballots: HashMap::new(),
             tally: Vec::new(),
+            heard: Default::default(),
         };
         run.init();
         run.place_npcs();
@@ -618,6 +622,10 @@ impl<'s> Run<'s> {
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
+        // An Inquest is offered only when it would tell something.
+        if f(link, "kind").as_str() == Some("inquest") && !self.may_inquire()? {
+            return Ok(false);
+        }
         // An echo may look and learn, but take nothing and reach for nothing.
         if self.in_past() && (self.is_claim(link) || f(link, "act").as_str() == Some("take")) {
             return Ok(false);
@@ -858,9 +866,7 @@ impl<'s> Run<'s> {
                 return self.enter(&at, HashMap::new());
             }
             Some("pass") => self.end_turn()?,
-            Some("inquest") => {
-                return Err("Inquests are not supported by the interpreter yet".into())
-            }
+            Some("inquest") => self.inquire()?,
             _ => {}
         }
         if let Some(who) = f(link, "become").as_str() {
