@@ -204,6 +204,54 @@ used:
 A run with one Linker follows the same rules; its claims settle at once,
 since no one else could reach.
 
+## Time: checkpoints and rewinds
+
+The interpreter keeps a log, as the paper Conductor did: a snapshot of the
+whole world at the start of every turn, and one for each checkpoint (taken
+at the start, and again whenever a passage says `checkpoint name`).
+
+**A death** is settled after the Link that caused it:
+
+1. If a checkpoint covers the place (`checkpoint cells ~ on death in
+   prison`), the world falls back. What it `resets` comes from the
+   checkpoint's snapshot; what it `keeps` stays, and keeps win over resets.
+   The dead come back, resources that `refill on checkpoint` refill, and
+   everyone goes where `to` says.
+2. Otherwise, a Linker with a charge left (`me.rewinds > 0`) is pulled back:
+   the charge is spent and they re-live the stop they died in, as an echo.
+3. Otherwise they stay dead.
+
+**A Link to `rewind`** spends a charge and offers where to go back to:
+
+- `rewind: undo` (Ex 2): the start of any turn in the log, or any checkpoint
+  reached. Everything goes back except what the rewind `keeps` and what the
+  player owns rather than the characters (charges and Inquests). Handlers of
+  whoever the rewind is `unseen by` do not hear the `rewind` event. The
+  dice go back too, so the same rolls come again.
+- `rewind: echo` (Ex 1): back as many stops as `back 1..=2` allows. Only
+  this Linker goes back; everyone else stays in the present.
+
+**An echo** re-lives an earlier stop in their old cell: `me.past` holds and
+`clock.now` is that stop. They may look, ask and learn, but take nothing,
+reach for nothing, change nothing and spend nothing: only `learn`, `say` and
+`play` happen. Each move takes them one stop forward, and the move that
+reaches the present brings them back. The others wait for them, since they
+have not moved yet this stop.
+
+What a checkpoint resets, or a rewind keeps, is a list of categories:
+
+| Category | Means |
+|---|---|
+| `world` | every fact, everyone's included (`eldric.chained`); NPCs' places; items lying anywhere; lists. Not resources |
+| `held` | which character holds which item |
+| `knows` | what everyone knows |
+| a fact, stat, resource or relation (`trust`, `hp`) | its value, for everyone |
+| a place or map (`sanctum`, `prison`) | the facts of the places in it, and the items lying there |
+| a character or NPC (`hask`) | every fact about them |
+
+`here.passed` holds, and `{passers}` names them, when someone dashed
+through this place on the way to the stop it is.
+
 ## What it does not do yet
 
 It says so, by name, if a story needs one of these. It never guesses.
@@ -212,11 +260,11 @@ It says so, by name, if a story needs one of these. It never guesses.
 - Talking between Linkers, the `turn limit` timeout, and a Nib's own
   `moves:` (Ex 1's mail car allows only walking).
 - Sleepers woken by a loud move (`~ wakes on loud`).
-- Checkpoints: a death plays its `[interlude]` (Ex 2's `again`), but
-  nothing is reset and no one is moved back.
 - NPCs seeing acts: `self.saw(dash)` never holds yet, so Vell never gives
   chase.
 - `span` and `quiet` on handlers (reserved).
-- Inquests and rewinds.
+- Inquests.
+- An echo sees the NPCs where they are now, not where they were then.
+- `once per day` and `needs two to hold it` on a rewind spell.
 - The jury (`{accuse}`), and inputs (`{name input}`, `{choose input}`).
 - Anything marked v0.6: the duel, `retell`.

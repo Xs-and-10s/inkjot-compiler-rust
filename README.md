@@ -152,6 +152,7 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/run/events.rs` | `on` handlers: what happens when something happens |
 | `src/run/agenda.rs` | NPC agendas: goals, reactions, routes |
 | `src/run/cohort.rs` | Several Linkers at once: seats, claims, clashes, stops |
+| `src/run/time.rs` | Time: snapshots, checkpoints, rewinds and echoes |
 | `src/run/test.rs` | `[test]` passages |
 | `src/diag.rs` | Diagnostics and how they print |
 | `src/json.rs` | A small JSON value type, writer and reader |
