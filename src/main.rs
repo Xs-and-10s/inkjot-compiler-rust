@@ -9,6 +9,8 @@ usage:
   inkjot build <file.twee> -o <out.json>
   inkjot test <file.twee>...    run the [test] passages; the files are read as one story
   inkjot play <file.twee>...    play the story in the terminal
+      --as a,b                  several Linkers at one keyboard, one per character
+      --at passage              begin at this passage
   inkjot --version
   inkjot --help
 
@@ -223,9 +225,24 @@ fn test(paths: &[String]) -> ExitCode {
     }
 }
 
-fn play(paths: &[String]) -> ExitCode {
+fn play(args: &[String]) -> ExitCode {
     use std::io::{BufRead, Write};
-    let sources = match Sources::read(paths) {
+    // `--as rook,wren` seats several Linkers; `--at dining@1` picks where.
+    let mut paths = Vec::new();
+    let mut cast: Vec<String> = Vec::new();
+    let mut at: Option<String> = None;
+    let mut words = args.iter();
+    while let Some(word) = words.next() {
+        match word.as_str() {
+            "--as" => {
+                let names = words.next().map_or("", String::as_str);
+                cast = names.split(',').map(|n| n.trim().to_string()).collect();
+            }
+            "--at" => at = words.next().cloned(),
+            _ => paths.push(word.clone()),
+        }
+    }
+    let sources = match Sources::read(&paths) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("error: {e}");
@@ -243,12 +260,32 @@ fn play(paths: &[String]) -> ExitCode {
         }
     };
     let mut run = inkjot::run::Run::new(&story, 1);
-    if let Err(e) = run.start(None, None) {
+    let started = if cast.len() > 1 {
+        let who: Vec<&str> = cast.iter().map(String::as_str).collect();
+        run.start_cohort(at.as_deref(), &who)
+    } else {
+        run.start(at.as_deref(), cast.first().map(String::as_str))
+    };
+    if let Err(e) = started {
         eprintln!("error: {e}");
         return ExitCode::FAILURE;
     }
     let stdin = std::io::stdin();
+    let mut serving = String::new();
     loop {
+        // Hot seat: once a Linker has locked in their move, pass the
+        // keyboard to the next one who has not.
+        if run.waiting() {
+            let seated = run.seated().to_vec();
+            if let Some(next) = seated.iter().find(|w| run.sit(w).is_ok() && !run.waiting()) {
+                let next = next.clone();
+                let _ = run.sit(&next);
+            }
+        }
+        if !run.seated().is_empty() && run.pov != serving {
+            serving = run.pov.clone();
+            println!("—— {serving} ——\n");
+        }
         for line in run.take_output() {
             println!("{line}\n");
         }

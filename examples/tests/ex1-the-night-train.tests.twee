@@ -92,5 +92,67 @@ expect: not notebook.exists
 start: lounge@0 ~ as rook
 given: gain notebook
 do: "Go to the baggage car"
+expect: vell.in(baggage)
+expect: not rook.dead
+do: "Stay"
 expect: rook.dead
 expect: rook.knows.the_attack
+
+:: two_hands_on_the_cufflink [test]
+start: dining@1 ~ as rook, wren
+do: "Pocket the glint"
+expect text: "(Waiting to see whether anyone else here reaches for it.)"
+expect no link: "Pocket the glint"
+as: wren
+do: "Pocket the glint"
+expect text: "Captain Hal Rook, retired reached for it at the same moment."
+expect: rook.holds.cufflink or wren.holds.cufflink
+expect: not (rook.holds.cufflink and wren.holds.cufflink)
+expect: rook.vults == 2 and wren.vults == 2
+as: rook
+expect text: "Wren Hollis, investor reached for it at the same moment."
+
+:: a_claim_settles_when_the_rival_moves_on [test]
+start: dining@1 ~ as rook, wren
+do: "Pocket the glint"
+expect no text: "A silver cufflink"
+as: wren
+do: "Stay"
+as: rook
+expect text: "A silver cufflink, monogrammed E.V."
+expect no text: "at the same moment"
+expect: rook.holds.cufflink
+
+:: everyone_moves_at_once [test]
+start: lounge@0 ~ as ada, rook
+expect text: "Ada Thorne, financier, Captain Hal Rook, retired, Miss Edith Vell are here."
+do: "Stay"
+expect text: "(Waiting for the others.)"
+expect no link: "Go to the dining car"
+expect: clock.now == 0
+as: rook
+do: "Go to the dining car"
+expect: clock.now == 1
+expect at: dining@1
+as: ada
+expect at: lounge@1
+expect text: "Captain Hal Rook, retired leaves for the dining car."
+expect link: "Go to the dining car"
+
+:: a_dash_is_seen_wherever_it_passes [test]
+start: dining@1 ~ as wren, ada
+do: "Dash to the baggage car"
+as: ada
+do: "Go to the observation lounge"
+expect at: lounge@2
+expect text: "Wren Hollis, investor runs through, toward the baggage car."
+as: wren
+expect at: baggage@2
+
+:: only_some_may_dash_or_slip [test]
+start: dining@1 ~ as rook, wren
+expect no link: "Dash to the baggage car"
+expect no link: "Slip to the observation lounge"
+as: wren
+expect link: "Dash to the baggage car"
+expect link: "Slip to the observation lounge"

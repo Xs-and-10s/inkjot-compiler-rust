@@ -271,3 +271,95 @@ fn a_statue_moves_and_strikes_only_when_no_one_is_looking() {
         );
     }
 }
+
+/// Play Ex 1 with a cohort: `cast` picks who sits, and each step serves the
+/// `seat`-th Linker who can still act and takes their `pick`-th Link.
+/// Returns everything shown, or the error that stopped play, and checks the
+/// stop's invariants after every step.
+fn cohort_play(
+    cast: &[&str],
+    seed: u64,
+    steps: &[(usize, usize)],
+) -> Result<Vec<String>, TestCaseError> {
+    let src = std::fs::read_to_string(format!(
+        "{}/examples/ex1-the-night-train.twee",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let ir = inkjot::build(&src).unwrap();
+    let story = Story::new(&ir).unwrap();
+    let mut run = Run::new(&story, seed);
+    let mut text = Vec::new();
+    if let Err(why) = run.start_cohort(Some("lounge@0"), cast) {
+        prop_assert!(why.contains("not supported"), "{why}");
+        return Ok(text);
+    }
+    for &(seat, pick) in steps {
+        // Whoever can still act this stop.
+        let mut free = Vec::new();
+        for who in run.seated().to_vec() {
+            run.sit(&who).unwrap();
+            if !run.waiting() && !run.choices().unwrap().is_empty() {
+                free.push(who);
+            }
+        }
+        let Some(who) = free.get(seat % free.len().max(1)).cloned() else {
+            break;
+        };
+        run.sit(&who).unwrap();
+        let choices = run.choices().unwrap();
+        let (id, label) = choices[pick % choices.len()].clone();
+        let before = run.now();
+        text.push(format!("[{who}] > {label}"));
+        if let Err(why) = run.choose(&id) {
+            prop_assert!(why.contains("not supported"), "unexpected failure: {why}");
+            break;
+        }
+        text.extend(run.take_output());
+        // The clock only moves forward, and only once everyone has moved:
+        // then no one is left waiting and no claim is left open.
+        prop_assert!(run.now() >= before);
+        prop_assert!(run.now() <= 5, "the clock ran past its last stop");
+        if run.now() > before {
+            prop_assert_eq!(run.open_claims(), 0);
+            for other in run.seated().to_vec() {
+                run.sit(&other).unwrap();
+                prop_assert!(
+                    !run.waiting(),
+                    "{other} still waiting after the stop resolved"
+                );
+                prop_assert!(!run.here().is_empty());
+            }
+        }
+    }
+    Ok(text)
+}
+
+fn cast() -> impl Strategy<Value = Vec<&'static str>> {
+    proptest::sample::subsequence(vec!["ada", "rook", "wren", "sallow"], 2..=4).prop_shuffle()
+}
+
+proptest! {
+    /// A cohort of two to four Linkers, acting in random order, never makes
+    /// the interpreter fail, and every stop resolves cleanly.
+    #[test]
+    fn cohorts_play_cleanly(
+        who in cast(),
+        seed in 1..1000u64,
+        steps in proptest::collection::vec((0..4usize, 0..20usize), 1..60),
+    ) {
+        cohort_play(&who, seed, &steps)?;
+    }
+
+    /// The same seed and the same choices tell the same story, word for word.
+    #[test]
+    fn cohort_play_is_deterministic(
+        who in cast(),
+        seed in 1..1000u64,
+        steps in proptest::collection::vec((0..4usize, 0..20usize), 1..40),
+    ) {
+        let first = cohort_play(&who, seed, &steps)?;
+        let second = cohort_play(&who, seed, &steps)?;
+        prop_assert_eq!(first, second);
+    }
+}

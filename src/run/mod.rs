@@ -7,6 +7,7 @@
 //! is an error naming the feature, never a silent guess.
 
 mod agenda;
+mod cohort;
 mod events;
 pub mod test;
 mod value;
@@ -52,6 +53,8 @@ pub struct Story {
     /// Every `on` handler, in source order, with the NPC or character whose
     /// margin it is in: that is who `self` means inside it.
     handlers: Vec<(Value, Option<String>)>,
+    /// `default moves: walk, dash`, `default clash: random_winner`.
+    defaults: HashMap<String, Value>,
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -79,6 +82,7 @@ impl Story {
             start_for: HashMap::new(),
             ways: Vec::new(),
             handlers: Vec::new(),
+            defaults: HashMap::new(),
         };
         let config = ir
             .get("config")
@@ -142,6 +146,14 @@ impl Story {
             }
             match f(s, "setting").as_str() {
                 Some("pov") => self.povs = strs(f(s, "value")),
+                Some("clock") => {
+                    self.defaults.insert("clock".into(), f(s, "value").clone());
+                }
+                Some("default") => {
+                    if let Some(of) = f(s, "of").as_str() {
+                        self.defaults.insert(of.to_string(), f(s, "value").clone());
+                    }
+                }
                 Some("start") => match f(s, "value") {
                     Value::Obj(pairs) => {
                         for (who, at) in pairs {
@@ -182,6 +194,10 @@ impl Story {
         strs(self.field(id, "tags")).iter().any(|t| t == tag)
     }
 }
+
+/// What an NPC saw at the end of one turn: the turn, and each person in
+/// its place with what they held.
+type Sighting = (u32, Vec<(String, Vec<String>)>);
 
 /// A name bound in a passage.
 #[derive(Debug, Clone)]
@@ -242,6 +258,20 @@ pub struct Run<'s> {
     started: bool,
     /// While an NPC works out `toward`: the kind of way it keeps to (`via wide`).
     via: Option<String>,
+    /// Several Linkers: the characters seated, in order. Empty for one.
+    order: Vec<String>,
+    /// The seated Linkers not being served right now.
+    parked: HashMap<String, cohort::Seat>,
+    /// Each Linker's move for this stop, once locked in.
+    committed: HashMap<String, Value>,
+    /// Shared acts waiting to be settled.
+    claims: Vec<cohort::Claim>,
+    /// While a claim is settled: who else reached for it (`{claimants}`)...
+    claimants: String,
+    /// ...and how it came out for this Linker: `(success, clashed)`.
+    verdict: Option<(bool, bool)>,
+    /// What each NPC saw at the end of each turn: who, holding what.
+    sightings: HashMap<String, Vec<Sighting>>,
 }
 
 impl<'s> Run<'s> {
@@ -271,6 +301,13 @@ impl<'s> Run<'s> {
             firing: 0,
             started: false,
             via: None,
+            order: Vec::new(),
+            parked: HashMap::new(),
+            committed: HashMap::new(),
+            claims: Vec::new(),
+            claimants: String::new(),
+            verdict: None,
+            sightings: HashMap::new(),
         };
         run.init();
         run.place_npcs();
@@ -431,6 +468,16 @@ impl<'s> Run<'s> {
         std::mem::take(&mut self.output)
     }
 
+    /// The stop it is: `clock.now`.
+    pub fn now(&self) -> u32 {
+        self.chronon
+    }
+
+    /// Shared acts reached for and not yet settled.
+    pub fn open_claims(&self) -> usize {
+        self.claims.len()
+    }
+
     /// Where the pov is.
     pub fn here(&self) -> &str {
         self.at.get(&self.pov).map_or("", String::as_str)
@@ -439,6 +486,10 @@ impl<'s> Run<'s> {
     /// The Links the pov can take now, as `(id, label)`.
     pub fn choices(&mut self) -> R<Vec<(String, String)>> {
         let mut out = Vec::new();
+        // A Linker who has locked in their move waits for the others.
+        if self.waiting() {
+            return Ok(out);
+        }
         for link in self.links.clone() {
             if self.available(&link)? {
                 let text = |key| f(&link, key).as_str().unwrap_or("").to_string();
@@ -463,6 +514,16 @@ impl<'s> Run<'s> {
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
+        // Already reached for, and waiting to be settled.
+        if self.claimed(link) {
+            return Ok(false);
+        }
+        // Each character is played by one Linker.
+        if let Some(who) = f(link, "become").as_str() {
+            if who != self.pov && self.order.iter().any(|o| o == who) {
+                return Ok(false);
+            }
+        }
         if let Some(audience) = link.get("for").and_then(Value::as_arr) {
             let pov = self.pov.clone();
             let fits = |w: &Value| match w.as_str() {
@@ -493,6 +554,19 @@ impl<'s> Run<'s> {
         let actor = f(link, "order")
             .as_str()
             .map_or(self.pov.clone(), str::to_string);
+        let have = self.vults(&actor);
+        // `observe: cost rest ~ min 1`; `dash: requires full vults`.
+        if let (Some(min), Some(have)) = (f(link, "min").as_u64(), have) {
+            if have < min as f64 {
+                return Ok(false);
+            }
+        }
+        if f(link, "requires_full") == &Value::Bool(true) {
+            let full = self.constant(self.story.field("vults", "value")).num();
+            if have.is_some_and(|h| full.is_some_and(|full| h < full)) {
+                return Ok(false);
+            }
+        }
         match self.cost(link)? {
             Some(cost) => Ok(self.vults(&actor).is_none_or(|have| have >= cost)),
             None => Ok(true),
@@ -530,14 +604,31 @@ impl<'s> Run<'s> {
         }
     }
 
+    /// Take a Link: a move or an ends-turn act in a world of stops is
+    /// committed, a shared act with limited room is claimed, and anything
+    /// else happens at once.
     fn take(&mut self, link: &Value) -> R<()> {
-        self.output.clear();
-        let pov = self.pov.clone();
-        // An order: the other character acts, with the pov's ideas.
-        if let Some(actor) = f(link, "order").as_str() {
-            self.pov = actor.to_string();
+        if self.story.field("walk", "ends_turn") == &Value::Bool(true) && self.ends_turn(link) {
+            if matches!(f(link, "kind").as_str(), Some("walk" | "stay")) {
+                return self.commit(link, false);
+            }
+            // An act that ends the turn (`wind`) happens now; then the
+            // Linker stays where they are.
+            self.perform(link, false)?;
+            let stay = Value::obj([("kind", Value::str("stay"))]);
+            return self.commit(&stay, true);
         }
-        let actor = self.pov.clone();
+        if self.is_claim(link) {
+            return self.claim(link);
+        }
+        self.perform(link, false)
+    }
+
+    /// Pay what a Link costs, from whoever acts.
+    fn pay(&mut self, link: &Value) -> R<()> {
+        let actor = f(link, "order")
+            .as_str()
+            .map_or(self.pov.clone(), str::to_string);
         if let Some(cost) = self.cost(link)? {
             if f(link, "cost")
                 .as_arr()
@@ -550,9 +641,27 @@ impl<'s> Run<'s> {
                     .insert(format!("{actor}.vults"), V::Num(have - cost));
             }
         }
-        let success = self.attempt(link)?;
+        Ok(())
+    }
+
+    /// Do what a Link does, now. `paid`: its cost was taken when it was claimed.
+    fn perform(&mut self, link: &Value, paid: bool) -> R<()> {
+        if !paid {
+            self.pay(link)?;
+        }
+        let pov = self.pov.clone();
+        // An order: the other character acts, with the pov's ideas.
+        if let Some(actor) = f(link, "order").as_str() {
+            self.pov = actor.to_string();
+        }
+        let actor = self.pov.clone();
+        // A settled claim brings its verdict; it still has to succeed.
+        let (success, clashed) = match self.verdict.take() {
+            Some((won, clashed)) => (won && self.attempt(link)?, clashed),
+            None => (self.attempt(link)?, false),
+        };
         self.vals.insert("attempt.success".into(), V::Bool(success));
-        self.vals.insert("attempt.clashed".into(), V::Bool(false));
+        self.vals.insert("attempt.clashed".into(), V::Bool(clashed));
         if success && f(link, "act").as_str() == Some("take") {
             if let Some(item) = f(link, "arg").as_str() {
                 if self.fire(Event {
@@ -637,6 +746,10 @@ impl<'s> Run<'s> {
             _ => {}
         }
         if let Some(who) = f(link, "become").as_str() {
+            // The seat now plays `who`.
+            if let Some(seat) = self.order.iter_mut().find(|o| **o == self.pov) {
+                *seat = who.to_string();
+            }
             self.pov = who.to_string();
         }
         match target.as_str() {
@@ -674,7 +787,21 @@ impl<'s> Run<'s> {
             actor: &actor,
             before: false,
         })?;
-        self.chronon += 1;
+        // The clock stops at its last stop: `clock: 0..=5`.
+        let last = match self.story.defaults.get("clock") {
+            Some(range) => match self.constant(range) {
+                V::Range {
+                    hi: Some(hi),
+                    inclusive,
+                    ..
+                } => Some(if inclusive { hi as u32 } else { hi as u32 - 1 }),
+                _ => None,
+            },
+            None => None,
+        };
+        if last.is_none_or(|last| self.chronon < last) {
+            self.chronon += 1;
+        }
         let story = self.story;
         for id in story.ids_of("resource") {
             if story.field(&id, "refill").as_str() == Some("chronon") {
@@ -694,8 +821,11 @@ impl<'s> Run<'s> {
                 self.burn(&id, 1.0)?;
             }
         }
-        // Then everyone you are not playing takes their move.
-        self.agendas()
+        // Then everyone you are not playing takes their move, and the NPCs
+        // note who they saw.
+        self.agendas()?;
+        self.look();
+        Ok(())
     }
 
     /// Arrive at a passage: run its header, show its body, offer its Links.
@@ -774,10 +904,18 @@ impl<'s> Run<'s> {
     /// chronon it will be by then, or the place's own passage.
     fn arrival(&self, place: &str) -> Option<String> {
         let ends_turn = self.story.field("walk", "ends_turn") == &Value::Bool(true);
-        let when = self.chronon + u32::from(ends_turn);
+        self.arrival_at(place, self.chronon + u32::from(ends_turn))
+    }
+
+    /// The passage for being at `place` at stop `when`: its cell, or the
+    /// place's own passage.
+    fn arrival_at(&self, place: &str, when: u32) -> Option<String> {
         let cell = format!("{place}@{when}");
         if self.story.passages.contains_key(&cell) {
             Some(cell)
+        } else if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
+            // In a world of stops, you arrive at a time: a cell or nothing.
+            None
         } else if self.story.passages.contains_key(place) {
             Some(place.to_string())
         } else {
@@ -841,6 +979,11 @@ impl<'s> Run<'s> {
         libs.sort();
         for lib in libs {
             links.extend(self.render(lib, true)?);
+        }
+        // In a world of stops, moving ends the turn: walk, dash, slip, stay.
+        if story.field("walk", "ends_turn") == &Value::Bool(true) {
+            links.extend(self.move_links()?);
+            return Ok(links);
         }
         let here = place_of(self.here()).to_string();
         let walk_cost = story.field("walk", "cost").clone();
@@ -1020,15 +1163,29 @@ impl<'s> Run<'s> {
                 }
                 "present" => {
                     let here = place_of(self.here()).to_string();
-                    let mut who: Vec<String> = self
+                    let who: Vec<String> = self
                         .story
                         .ids_of("npc")
                         .into_iter()
                         .filter(|n| self.place.get(n).is_some_and(|p| *p == here))
                         .map(|n| self.label(&n))
                         .collect();
-                    who.insert(0, self.label(&self.pov.clone()));
-                    text.push_str(&who.join(", "));
+                    // The Linkers here, then the NPCs.
+                    let mut linkers: Vec<String> = self
+                        .linkers_here(&here)
+                        .iter()
+                        .map(|l| self.label(l))
+                        .collect();
+                    linkers.extend(who);
+                    text.push_str(&linkers.join(", "));
+                }
+                "claimants" => {
+                    let names = if self.claimants.is_empty() {
+                        String::from("Someone")
+                    } else {
+                        self.claimants.clone()
+                    };
+                    text.push_str(&names);
                 }
                 "list" => {
                     let name = f(part, "list").as_str().unwrap_or("");
