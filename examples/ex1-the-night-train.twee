@@ -36,6 +36,9 @@ way vestibule: baggage - platform
 
 resource vults: 3 ~ refill each chronon ~ shown as "minutes"
 resource rewinds: 2 ~ max 3 ~ shown as "charges"
+rewind: echo
+~ back 1..=2
+~ keeps knows
 
 act walk: cost 2 ~ steps 1 ~ ends turn
 act dash: requires full vults ~ cost 1 per step ~ steps 1..=2 ~ ends turn ~ loud
@@ -384,6 +387,13 @@ Miss Vell’s ticket, never punched. It must have been under him since the light
 
 [else]
 {claimants} got to it first.
+
+:: watch [lib everywhere]
+(((
+The Professor's prototype. Before acting at a stop, a charge throws you back
+a stop or two, to re-live it: look and learn, but change nothing.
+)))
+> [[Turn your watch back->rewind]] ~ when me.rewinds > 0 and me.vults == 3 and not me.past
 
 :: baggage_car [lib]
 let can_wind: me.rewinds < 3 and not me.wound_watch

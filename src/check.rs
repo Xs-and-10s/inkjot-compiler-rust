@@ -761,6 +761,12 @@ impl Checker {
                     self.err(line, vcol, "`mode` is `solo` or `cohort`");
                 }
             }
+            // `undo` puts everything back; `echo` sends one Linker back to re-live.
+            "rewind" => {
+                if !["undo", "echo"].contains(&value) {
+                    self.err(line, vcol, "`rewind` is `undo` or `echo`");
+                }
+            }
             "pov" => {
                 for who in value.split(',') {
                     let who = who.trim();

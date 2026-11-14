@@ -279,7 +279,7 @@
       "checkpoint": "cells",
       "on_death_in": "prison",
       "resets": ["world", "held", "trust", "hp"],
-      "keeps": ["knows"],
+      "keeps": ["knows", "hask"],
       "to": {"roland": "oubliette", "eldric": "chapel"}
     },
     {

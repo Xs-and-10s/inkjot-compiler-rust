@@ -57,6 +57,10 @@ impl Run<'_> {
                     continue;
                 }
             }
+            // A rewind `unseen by hask` is not seen by hask's handlers.
+            if owner.as_ref().is_some_and(|o| self.unseen_by.contains(o)) {
+                continue;
+            }
             if let Some(by) = f(handler, "by").as_str() {
                 let a = event.actor;
                 let fits = a == by

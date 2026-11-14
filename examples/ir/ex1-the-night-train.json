@@ -95,6 +95,15 @@
       "shown_as": "charges"
     },
     {
+      "setting": "rewind",
+      "value": "echo",
+      "back": {
+        "range": [1, 2],
+        "inclusive": true
+      },
+      "keeps": ["knows"]
+    },
+    {
       "declare": "act",
       "id": "walk",
       "cost": [
@@ -2373,6 +2382,65 @@
               " got to it first."
             ]
           ]
+        }
+      ]
+    },
+    {
+      "name": "watch",
+      "tags": ["lib", "everywhere"],
+      "doc": "The Professor's prototype. Before acting at a stop, a charge throws you back\na stop or two, to re-live it: look and learn, but change nothing.",
+      "margin": false,
+      "header": [],
+      "body": [
+        {
+          "type": "link",
+          "id": "watch#1",
+          "lib": "watch",
+          "label": "Turn your watch back",
+          "target": "rewind",
+          "kind": "go",
+          "act": null,
+          "arg": null,
+          "cost": [],
+          "scope": "private",
+          "capacity": null,
+          "clash": "none",
+          "check": null,
+          "choice": null,
+          "when": {
+            "and": [
+              {
+                "and": [
+                  {
+                    ">": [
+                      {
+                        "get": ["me", "rewinds"]
+                      },
+                      0
+                    ]
+                  },
+                  {
+                    "==": [
+                      {
+                        "get": ["me", "vults"]
+                      },
+                      3
+                    ]
+                  }
+                ]
+              },
+              {
+                "not": {
+                  "get": ["me", "past"]
+                }
+              }
+            ]
+          },
+          "hidden_until": null,
+          "for": null,
+          "effects": [],
+          "ends_turn": false,
+          "overrides": []
         }
       ]
     },

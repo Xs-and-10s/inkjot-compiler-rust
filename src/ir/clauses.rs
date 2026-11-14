@@ -107,6 +107,8 @@ const PATTERNS: &[Pattern] = &[
     p(&["learned", "from", "clue"], "learned_from", Shape::Id),
     p(&["once", "per"], "once_per", Shape::Token),
     p(&["choice"], "choice", Shape::Token),
+    // Rewinds: `rewind: echo ~ back 1..=2`.
+    p(&["back"], "back", Shape::Expr),
     // Actors.
     p(&["moves"], "moves", Shape::Moves),
     p(&["asleep", "during"], "asleep_during", Shape::Expr),

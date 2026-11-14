@@ -527,6 +527,12 @@ proptest! {
         let mut lines: Vec<String> = src.lines().map(str::to_string).collect();
         for (spot, trailing) in spots {
             let i = spot.index(lines.len());
+            // Not inside a `(((…)))` block, which is a comment already.
+            let opened = lines[..i].iter().filter(|l| l.trim_start().starts_with("(((")).count();
+            let closed = lines[..i].iter().filter(|l| l.trim_end().ends_with(")))")).count();
+            if opened > closed || lines[i].trim_end().ends_with(")))") {
+                continue;
+            }
             let line = lines[i].clone();
             let t = line.trim();
             // A statement line (not prose, a Link, a `::` header or JSON)

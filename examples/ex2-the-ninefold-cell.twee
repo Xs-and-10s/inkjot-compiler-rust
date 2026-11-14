@@ -79,7 +79,7 @@ rewind: undo
 ~ unseen by hask
 checkpoint cells ~ on death in prison
 ~ resets world, held, trust, hp
-~ keeps knows
+~ keeps knows, hask
 ~ to oubliette for roland, chapel for eldric
 checkpoint threshold ~ on death in sanctum
 ~ resets sanctum, hp

@@ -114,6 +114,8 @@ impl Run<'_> {
             self.pov = w.to_string();
             self.start(passage, Some(w))?;
         }
+        // The log begins with everyone seated.
+        self.history = vec![self.snapshot()];
         self.sit(who[0])
     }
 
@@ -480,6 +482,15 @@ impl Run<'_> {
 
         // The turn ends: the clock, refills, fuses, then the NPCs.
         self.end_turn()?;
+        // A dash leaves its mark on the places it passed: `here.passed`.
+        for (who, _, _, link, _) in &moves {
+            for place in strs(f(link, "via")) {
+                self.passed
+                    .entry((self.chronon, place))
+                    .or_default()
+                    .push(who.clone());
+            }
+        }
 
         // Each Linker arrives at their cell for the new stop.
         for (who, _, to, _, passage) in moves {
