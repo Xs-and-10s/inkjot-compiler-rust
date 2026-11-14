@@ -284,7 +284,7 @@ reset by a checkpoint.
 
 - `rewind: undo` (Ex 2): the start of any turn in the log, or any checkpoint
   reached. Everything goes back except what the rewind `keeps` and what the
-  player owns rather than the characters (charges and Inquests). Handlers of
+  player owns rather than the characters (charges and hints). Handlers of
   whoever the rewind is `unseen by` do not hear the `rewind` event. The
   dice go back too, so the same rolls come again.
 - `rewind: echo` (Ex 1): back as many stops as `back 1..=2` allows. Only
@@ -311,6 +311,47 @@ What a checkpoint resets, or a rewind keeps, is a list of categories:
 `here.passed` holds, and `{passers}` names them, when someone dashed
 through this place on the way to the stop it is.
 
+## Hints
+
+A hint is help the player asks for. A Nib lists its hints in its header,
+vaguest first; a Link with `~ hint` spends one hint request and tells the
+next hint the pov has not heard:
+
+```
+resource hints: 3 ~ shared
+
+:: oubliette [room]
+hint: "The grate is too heavy for anything you can do from down here." ~ wits ..=2
+hint: "Look past the grate. On the far door above, something only needs to slide." ~ wits 3..
+--
+
+:: party_bar [lib everywhere]
+> [[Ask for a hint->here]] ~ hint ~ when hints > 0
+```
+
+- **Which hints.** Those of the Nib the pov is on, then of the Nibs it
+  belongs to (`ossuary` for `ossuary:bolt`), then of its place. A hint
+  applies when each stat it names is in its range for the pov (`~ wits 3..`)
+  and its `~ when` holds. So Roland and Eldric hear different hints in the
+  same room, and a list of hints is a ladder: one rung per request.
+- **Never for nothing.** The Link is offered only when a request is left
+  and a hint here applies that has not been heard. An echo spends nothing,
+  so it cannot ask.
+- **Off, if the Linker wants.** A Linker may turn hints off for an Inklink
+  (`inkjot play --no-hints`); then no hint Link is offered.
+- **The player's.** Requests and the hints they bought belong to the player,
+  not the characters: a rewind or a checkpoint gives neither back. In solo
+  play a hint is heard once, whichever character asks; in a cohort, each
+  Linker hears their own.
+- **Whose requests.** `~ shared` makes one pool; otherwise each character
+  has their own and the pov spends from theirs. `inkjot check` refuses a
+  `~ hint` Link in a story with no `resource hints`.
+
+**Hints are not Inquests.** An Inquest is a Linker asking the story to
+diverge from its canon at a point where the Inker hid a fork (`~ inquest`
+on a Link). `inkjot check` accepts `~ inquest` with a notice; the
+interpreter does not run it yet.
+
 ## What it does not do yet
 
 It says so, by name, if a story needs one of these. It never guesses.
@@ -322,7 +363,8 @@ It says so, by name, if a story needs one of these. It never guesses.
 - NPCs seeing acts: `self.saw(dash)` never holds yet, so Vell never gives
   chase.
 - `span` and `quiet` on handlers (reserved).
-- Inquests.
+- Inquests: hidden forks a Linker can ask for (`~ inquest`).
+- `plus 2s when hinted` on an encounter (encounters are v0.6).
 - An echo sees the NPCs where they are now, not where they were then.
 - `once per day` and `needs two to hold it` on a rewind spell.
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,

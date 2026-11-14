@@ -500,7 +500,7 @@ impl Builder {
             "goal" | "reaction" | "checkpoint" => {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
-            "inquest" => f.add("inquest", Value::str(quoted(value).unwrap_or(value))),
+            "hint" => f.add("hint", Value::str(quoted(value).unwrap_or(value))),
             "tags" => {
                 let all =
                     std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
@@ -660,7 +660,7 @@ impl Builder {
                 "check" => check_ = Some(expression(rest)),
                 "choice" => choice = Some(rest.to_string()),
                 "with" => extra.push(("with".into(), parameters(rest))),
-                "switch" | "pass" | "inquest" | "release" => kind = word,
+                "switch" | "pass" | "hint" | "inquest" | "release" => kind = word,
                 "become" | "order" | "by" | "chance" | "after" | "requires" => {
                     let mut values = words(rest);
                     let value = if values.len() == 1 {
