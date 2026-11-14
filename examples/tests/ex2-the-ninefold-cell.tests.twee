@@ -216,3 +216,28 @@ expect at: oubliette
 expect: roland.rewinds == 0
 expect: hints == 2
 expect no link: "Ask for a hint"
+
+:: the_flood_drowns_whoever_is_in_the_pit [test]
+(((
+`kill each in oubliette`: the flood takes everyone down there, and the cells' checkpoint puts the world back.
+)))
+start: prologue
+do: "Wake as Roland, in the pit"
+given: light flood
+do: "End the turn"
+do: "End the turn"
+expect text: "You wake where you began"
+expect: not roland.dead
+expect at: oubliette
+
+:: the_collapse_buries_both_heroes [test]
+(((
+`kill pov.all`: when the ceiling comes down with either hero still in the prison, it takes them both.
+)))
+start: prologue
+do: "Wake as Roland, in the pit"
+given: light collapse
+given: set collapse.left: 1
+do: "End the turn"
+expect text: "You wake where you began"
+expect: not roland.dead and not eldric.dead

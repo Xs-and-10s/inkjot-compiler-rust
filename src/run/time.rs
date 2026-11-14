@@ -68,6 +68,13 @@ pub(super) struct Snapshot {
     sightings: HashMap<String, Vec<Sighting>>,
 }
 
+impl Snapshot {
+    /// Where an NPC stood then.
+    pub(super) fn place_of(&self, npc: &str) -> Option<String> {
+        self.place.get(npc).cloned()
+    }
+}
+
 impl Run<'_> {
     /// The world as it is now.
     pub(super) fn snapshot(&self) -> Snapshot {

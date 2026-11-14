@@ -305,3 +305,76 @@ vote: vell ~ how device ~ proof cufflink
 as: rook
 vote: vell ~ how device
 expect: accusation.proven
+
+:: the_mail_car_allows_only_walking [test]
+(((
+`moves: walk` in the mail car cuts Wren's walk, dash and slip down to a walk.
+)))
+start: mail@1 ~ as wren
+expect link: "Go to the baggage car"
+expect no link: "Dash to the baggage car"
+expect no link: "Slip to the baggage car"
+start: baggage@1 ~ as wren
+expect link: "Dash to the observation lounge"
+
+:: forcing_the_compartment_wakes_the_colonel [test]
+(((
+Marsh sleeps through stops 2 to 4, wakes on anything loud, and stays awake one stop more.
+)))
+start: sleeper@2 ~ as ada
+expect: here.asleep(marsh)
+expect no link: "Talk with the Colonel"
+do: "Force the Professor’s compartment"
+expect text: "The lock gives with a crack"
+expect text: "Colonel Marsh wakes with a start."
+expect: not here.asleep(marsh)
+expect link: "Talk with the Colonel"
+do: "Stay"
+expect: clock.now == 3
+expect: not here.asleep(marsh) ~ ((awake the stop after))
+expect no text: "snores"
+do: "Stay"
+expect: clock.now == 4
+expect: here.asleep(marsh) ~ ((and asleep again after that))
+
+:: a_dash_wakes_the_colonel_but_a_walk_does_not [test]
+start: sleeper@2 ~ as wren, ada
+do: "Go to the dining car"
+as: ada
+do: "Stay"
+expect: here.asleep(marsh)
+start: sleeper@2 ~ as wren, ada
+do: "Dash to the observation lounge"
+as: ada
+do: "Stay"
+expect text: "Colonel Marsh wakes with a start."
+expect: not here.asleep(marsh)
+
+:: vell_chases_a_dash_toward_where_she_is_heading [test]
+(((
+Vell is making for the sleeper to burn the notebook. Wren dashes for it too, in front of her, so Vell runs: two cars, not one.
+)))
+start: lounge@0 ~ as wren
+do: "Dash to the sleeper car"
+expect: vell.in(sleeper)
+
+:: vell_does_not_see_a_slip [test]
+(((
+A slip is seen only by an awake witness in the car it reaches. Vell is no witness, so she walks on as usual.
+)))
+start: lounge@0 ~ as wren
+do: "Slip to the dining car"
+expect: vell.in(dining)
+
+:: an_echo_sees_vell_where_she_was [test]
+start: lounge@0 ~ as rook
+do: "Go to the dining car"
+do: "Go to the observation lounge"
+expect: vell.in(sleeper)
+do: "Turn your watch back"
+do: "Back one stop"
+expect at: dining@1
+expect: vell.in(dining) ~ ((where she was at stop 1))
+do: "Go to the observation lounge"
+expect text: "You are back in the present."
+expect: vell.in(sleeper)

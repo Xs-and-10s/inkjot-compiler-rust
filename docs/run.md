@@ -142,9 +142,9 @@ takes one move. Dead, detained and `fix`ed NPCs sit it out.
    hidden ways but must respect `one way` and `open when`; `via wide` keeps to
    ways tagged `wide`. Toward a person means toward where they are.
 4. **Reactions come first.** The first reaction whose `when` holds runs its
-   `then`, and that is the NPC's whole turn. `self.heading` is the next place
-   on its route, and `self.leaving` means it is heading for an `offstage`
-   place.
+   `then`, and that is the NPC's whole turn. `self.heading` is the place its
+   goal leads to (while there is a way there), and `self.leaving` means that
+   place is `offstage`.
 5. **Otherwise it walks**: one place a turn, two at `pace dash`, or what its
    `moves N per chronon` says (`moves none`: never). Each step fires `leave`
    and `enter`. On arriving it runs the goal's `then`.
@@ -160,13 +160,48 @@ The words agendas lean on:
   an archetype counts for everything like it: `archetype statue: ~ lifeless`.
 - `alone_with(a, b)`: the two share a place, and no other Linker or awake
   witness is there. Sleepers and NPCs who are not witnesses do not count.
-- `x.last_seen(holding: evidence)`: a character holding a thing with that tag,
-  preferring one in `x`'s place. Sightings are not tracked yet, so this is who
-  holds it now.
+- `x.last_seen(character, holding: evidence)`: whoever of that kind `x`
+  last saw holding a thing with that tag, from the sightings NPCs take at the
+  end of each turn.
 - `x.offstage`: in a place marked `offstage`, or `offstage until` a passage
   not yet seen.
 - `roll standoff`: roll a table and run every row the result falls in.
-- `feign sleep`: `x.asleep` holds while the NPC pretends.
+- `feign sleep`: `x.asleep` holds while the NPC pretends. A pretender still
+  sees everything.
+- `self.saw(dash, toward: self.heading)`: this turn, the NPC saw a dash that
+  reached or passed that place, or ended nearer to it. See below.
+- `dash toward p`, in a reaction: the NPC runs up to two places toward `p`,
+  loudly. Vell's `chase` races a Linker to where she is going.
+- `kill pov.all` kills every pov; `kill each in oubliette` everyone there.
+
+## Sight, sound and sleep
+
+**Seeing a move.** Moves are simultaneous, so an NPC sees a Linker's move
+from where it stood when the move was made, before any NPC moves:
+
+| Move | Seen by NPCs in |
+|---|---|
+| a walk | the place left and the place reached |
+| a loud move (a dash, or along a loud way) | every place left, passed and reached |
+| a quiet move (a slip) | the place reached, and only by an awake `witness` |
+
+A sleeper sees nothing; a pretender (`feign sleep`) sees it all.
+
+**Noise.** A loud move is heard everywhere it went. A loud act (`force`, or
+a Link marked `~ loud`) is heard in its place and the places next to it,
+once its own passage has been shown. An NPC's dash, or its step along a
+loud way (Vell leaving through the vestibule), is loud too.
+
+**Sleep.** `asleep during 2..=4` is the NPC's hours. Noise wakes anyone who
+`wakes on loud`, and the Linkers there read that they wake. Woken at one
+stop, they stay awake through `stays awake n` more, then sleep again if it
+is still their hour: the Colonel, woken at stop 2, is up at stop 3 and
+asleep at stop 4. Without `stays awake`, and after a `wake` effect, they
+stay up for good.
+
+**A Nib's own `moves:`** cuts down how a Linker may leave that cell: `moves:
+walk` in the mail car leaves Wren only her walk. The moves on offer are the
+character's (or the `default moves:`) that the Nib also allows.
 
 ## Several Linkers at once
 
@@ -187,7 +222,8 @@ Within a stop each acts in any order:
   `{claimants}` names the others who reached. Others in the place see the
   winner take it.
 - **Moves end the turn**: `Go to`, `Dash to` and `Slip to` (as far as the
-  act's `steps` and the character's `moves` allow), `Stay`, `Observe`, or
+  act's `steps`, the character's `moves` and the Nib's `moves:` allow),
+  `Stay`, `Observe`, or
   any act marked `ends turn` (which happens first, then the Linker stays).
   A Linker who has moved waits; their Links are gone until the stop
   resolves.
@@ -295,7 +331,8 @@ reset by a checkpoint.
 reach for nothing, change nothing and spend nothing: only `learn`, `say` and
 `play` happen. Each move takes them one stop forward, and the move that
 reaches the present brings them back. The others wait for them, since they
-have not moved yet this stop.
+have not moved yet this stop. An echo sees the NPCs where they stood at
+that stop: Vell is in the dining car again, though she has since moved on.
 
 What a checkpoint resets, or a rewind keeps, is a list of categories:
 
@@ -357,15 +394,11 @@ interpreter does not run it yet.
 It says so, by name, if a story needs one of these. It never guesses.
 
 - Several Linkers in a world without stops (Ex 2 and Ex 3 are solo).
-- Talking between Linkers, the `turn limit` timeout, and a Nib's own
-  `moves:` (Ex 1's mail car allows only walking).
-- Sleepers woken by a loud move (`~ wakes on loud`).
-- NPCs seeing acts: `self.saw(dash)` never holds yet, so Vell never gives
-  chase.
+- Talking between Linkers, and the `turn limit` timeout: both belong to the
+  platform, which runs in real time.
 - `span` and `quiet` on handlers (reserved).
 - Inquests: hidden forks a Linker can ask for (`~ inquest`).
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
-- An echo sees the NPCs where they are now, not where they were then.
 - `once per day` and `needs two to hold it` on a rewind spell.
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.

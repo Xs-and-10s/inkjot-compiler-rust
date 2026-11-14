@@ -11,6 +11,7 @@ mod cohort;
 mod events;
 mod hints;
 mod inputs;
+mod senses;
 pub mod test;
 mod time;
 mod value;
@@ -320,6 +321,8 @@ pub struct Run<'s> {
     heard: hints::Heard,
     /// The Linker has turned hints off.
     no_hints: bool,
+    /// The Linkers' moves each NPC saw this turn.
+    seen: HashMap<String, Vec<senses::SeenMove>>,
 }
 
 impl<'s> Run<'s> {
@@ -369,6 +372,7 @@ impl<'s> Run<'s> {
             tally: Vec::new(),
             heard: Default::default(),
             no_hints: false,
+            seen: HashMap::new(),
         };
         run.init();
         run.place_npcs();
@@ -813,7 +817,10 @@ impl<'s> Run<'s> {
         }
         // A loud act is heard: `force`, `dash`, or a Link marked `~ loud`.
         let act = f(link, "act").as_str().unwrap_or("");
+        // It wakes sleepers once its own passage has been told.
+        let mut noise = None;
         if self.story.has_tag(act, "loud") || f(link, "loud") == &Value::Bool(true) {
+            noise = Some(self.location(&actor));
             self.fire(Event {
                 on: "loud",
                 what: act,
@@ -883,10 +890,16 @@ impl<'s> Run<'s> {
             self.pov = who.to_string();
         }
         match target.as_str() {
-            "here" => self.relist(),
-            "rewind" => self.begin_rewind(),
-            _ => self.enter(&target, params),
+            "here" => self.relist()?,
+            "rewind" => self.begin_rewind()?,
+            _ => self.enter(&target, params)?,
         }
+        if let Some(place) = noise {
+            if self.loud_act(&place) {
+                self.relist()?; // the woken change what is on offer
+            }
+        }
+        Ok(())
     }
 
     /// Does the act succeed? A `check` must hold; a `chance` is rolled.
@@ -1550,33 +1563,30 @@ impl<'s> Run<'s> {
                     .insert(format!("{}.destroyed", word(0)), V::Bool(true));
             }
             "kill" | "detain" | "wake" | "wound" => {
-                // `wound 1` wounds the pov; `wound actor 1` someone else.
-                let who = match args.first() {
-                    Some(a) if !matches!(a, Value::Num(_)) => self.who(a)?,
-                    _ => pov,
-                };
                 let fact = match f(e, "do").as_str() {
                     Some("kill") => "dead",
                     Some("detain") => "detained",
                     Some("wake") => "woken",
                     _ => "wounded",
                 };
-                let already = self
-                    .vals
-                    .get(&format!("{who}.{fact}"))
-                    .is_some_and(V::truthy);
-                self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
-                if fact == "dead" && !already {
-                    if self.story.kind(&who) == Some("character") {
-                        let place = self.location(&who);
-                        self.dying.push((who.clone(), place));
+                for who in self.targets(&args, &pov)? {
+                    let already = self
+                        .vals
+                        .get(&format!("{who}.{fact}"))
+                        .is_some_and(V::truthy);
+                    self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
+                    if fact == "dead" && !already {
+                        if self.story.kind(&who) == Some("character") {
+                            let place = self.location(&who);
+                            self.dying.push((who.clone(), place));
+                        }
+                        self.fire(Event {
+                            on: "death",
+                            what: "",
+                            actor: &who,
+                            before: false,
+                        })?;
                     }
-                    self.fire(Event {
-                        on: "death",
-                        what: "",
-                        actor: &who,
-                        before: false,
-                    })?;
                 }
             }
             "play" => {
@@ -1591,6 +1601,25 @@ impl<'s> Run<'s> {
                     None => pov,
                 };
                 self.vals.insert(format!("{who}.fixed"), V::Bool(true));
+            }
+            // `dash toward self.heading`: an NPC runs, two places, loudly.
+            "dash" => {
+                let npc = match self.locals.get("self") {
+                    Some(Local::Value(V::Id(id))) => id.clone(),
+                    _ => return Err("only an NPC's reaction can `dash`".into()),
+                };
+                let target = args
+                    .iter()
+                    .find(|a| a.as_str() != Some("toward"))
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                let place = match self.eval(&target)?.name() {
+                    Some(id) => self.location(id),
+                    None => return Ok(()), // toward nobody
+                };
+                if !place.is_empty() {
+                    self.npc_dash(&npc, &place)?;
+                }
             }
             // `feign sleep`: an NPC pretends; `x.asleep` believes it.
             "feign" => {
@@ -1734,6 +1763,42 @@ impl<'s> Run<'s> {
     }
 
     /// The id an effect's argument names: `me` is the pov.
+    /// Whom `kill`, `wound`, `wake` or `detain` means: `wound 1` the pov,
+    /// `kill actor` one, `kill pov.all` every pov, `kill each in oubliette`
+    /// every character and NPC there.
+    fn targets(&mut self, args: &[Value], pov: &str) -> R<Vec<String>> {
+        match args.first() {
+            None | Some(Value::Num(_)) => Ok(vec![pov.to_string()]),
+            Some(Value::Str(each)) if each == "each" => {
+                let region = args.get(2).and_then(Value::as_str).unwrap_or("");
+                let mut out = Vec::new();
+                for id in self
+                    .story
+                    .ids_of("character")
+                    .into_iter()
+                    .chain(self.story.ids_of("npc"))
+                {
+                    let at = self.location(&id);
+                    if !at.is_empty() && self.inside(&at, region) {
+                        out.push(id);
+                    }
+                }
+                Ok(out)
+            }
+            Some(a) => {
+                let path = a.get("get").and_then(Value::as_arr);
+                let pov_all = path.is_some_and(|p| {
+                    p.len() == 2 && p[0].as_str() == Some("pov") && p[1].as_str() == Some("all")
+                });
+                if pov_all {
+                    Ok(self.story.povs.clone())
+                } else {
+                    Ok(vec![self.who(a)?])
+                }
+            }
+        }
+    }
+
     fn who(&mut self, arg: &Value) -> R<String> {
         match self.eval(arg)? {
             V::Id(id) | V::Str(id) => Ok(id),
@@ -1964,8 +2029,21 @@ impl<'s> Run<'s> {
                 let tag = named("holding").as_str().unwrap_or("").to_string();
                 self.last_seen(&who, kind, &tag)
             }
-            // NPCs do not see acts yet: `self.saw(dash)` never holds.
-            "saw" => V::Bool(false),
+            // `self.saw(dash, toward: self.heading)`.
+            "saw" => {
+                let who = self.who(&items[0])?;
+                let pace = items
+                    .get(1)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let toward = match named("toward") {
+                    Value::Null => None,
+                    t => self.eval(&t.clone())?.name().map(str::to_string),
+                };
+                let toward = toward.map(|t| place_of(&t).to_string());
+                V::Bool(self.saw(&who, &pace, toward.as_deref())?)
+            }
             other => return Err(format!("`{other}` is not supported by the interpreter yet")),
         })
     }
@@ -2174,6 +2252,12 @@ impl<'s> Run<'s> {
 
     /// Where something is: a character's place, an NPC's, or an item's holder's.
     fn location(&self, id: &str) -> String {
+        // An echo sees the NPCs where they were at the stop it re-lives.
+        if self.in_past() && self.story.kind(id) == Some("npc") {
+            if let Some(then) = self.place_then(id, self.when()) {
+                return then;
+            }
+        }
         if let Some(at) = self.at.get(id) {
             return place_of(at).to_string();
         }

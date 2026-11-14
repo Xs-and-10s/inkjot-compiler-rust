@@ -164,7 +164,7 @@ impl Run<'_> {
     }
 
     /// Show a line to one Linker, whether or not they are being served.
-    fn tell(&mut self, who: &str, line: String) {
+    pub(super) fn tell(&mut self, who: &str, line: String) {
         if who == self.pov {
             self.output.push(line);
         } else if let Some(seat) = self.parked.get_mut(who) {
@@ -255,7 +255,8 @@ impl Run<'_> {
     /// put, and observing.
     pub(super) fn move_links(&mut self) -> R<Vec<Value>> {
         let here = place_of(self.here()).to_string();
-        let moves = self.moves_of(&self.pov.clone());
+        let own = self.moves_of(&self.pov.clone());
+        let moves = self.nib_moves(self.here(), own);
         let mut places: Vec<(String, usize)> = self
             .distances(&here, None, Walker::Linker)?
             .into_iter()
@@ -377,7 +378,7 @@ impl Run<'_> {
     }
 
     /// Everyone playing: the seated cohort, or the one pov.
-    fn linkers(&self) -> Vec<String> {
+    pub(super) fn linkers(&self) -> Vec<String> {
         if self.order.is_empty() {
             vec![self.pov.clone()]
         } else {
@@ -485,8 +486,11 @@ impl Run<'_> {
             moves.push((who, from, to, link, passage));
         }
         self.committed.clear();
+        // What the NPCs see and hear of it, from where they stand now.
+        self.seen.clear();
         for (who, from, to, link, _) in &moves {
             self.echo_move(who, from, to, link);
+            self.witness_move(link, from, to);
         }
 
         // The turn ends: the clock, refills, fuses, then the NPCs.
