@@ -18,11 +18,17 @@ here.
 | 6 | Several Linkers at once: seats, claims and clashes, simultaneous moves; more property tests | #9 |
 | 7 | Checkpoints, rewinds and echoes; comments, `~ choice`, no colon without a value, kind filters | #10 |
 | 8 | The jury (`{accuse}`), `{name input}`, `{choose input}`; the finale | #11 |
+| 9 | `{choice input}` dropped; `alone_with` as specified; `survives death` | #12 |
+| 10 | Text takes double quotes; `'` as a thousands mark; `{ballots}`; the dead drop what they carried | #13 |
+| 11 | Inquests | #14 |
 
 ## Next
 
-1. **Inquests.**
-2. **The rest of the input family**, as stories need them.
+1. **What Ex 1 still needs to play whole**: NPCs who see acts
+   (`self.saw(dash)`, so Vell gives chase), sleepers woken by a loud move
+   (`~ wakes on loud`), a Nib's own `moves:` (the mail car allows only
+   walking), and echoes that see the NPCs where they were then.
+2. **The rest of the input family**, when a story needs one. None does yet.
 3. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
    facts with rules, and `i` beside `me` (see the working doc). Held until
    more ideas are in.

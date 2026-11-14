@@ -1084,6 +1084,11 @@ impl Checker {
             "choice" => self.choice(arg, c.line, arg_col),
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
             "become" | "order" => self.need(arg, &["character"], "character", c.line, arg_col),
+            "inquest" if !self.has("inquests", &["resource"]) => self.err(
+                c.line,
+                c.col,
+                "`~ inquest` spends an Inquest: declare `resource inquests`",
+            ),
             _ => {}
         }
         self.clause_common(c, true);
