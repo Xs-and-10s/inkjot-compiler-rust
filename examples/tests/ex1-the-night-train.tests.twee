@@ -199,3 +199,60 @@ expect: clock.now == 2
 expect: rook.rewinds == 1
 expect: me.knows.two_hands
 
+
+:: the_guest_names_themself [test]
+start: cast
+do: "Someone else"
+expect text: "(Type a name, up to 24 letters.)"
+expect no link: "Board the train"
+answer: "Marguerite Ashdown"
+expect link: "Board the train"
+do: "Board the train"
+expect text: "Marguerite Ashdown. Nobody quite remembers inviting you."
+
+:: the_jury_convicts_with_proof [test]
+start: terminus ~ as ada, rook
+given: gain cufflink
+expect text: "(Vote: who, of Mrs. Cora Ardent, Mr. Crane or Miss Edith Vell; how, of device, poison or fall; and cite your proof.)"
+vote: vell ~ how device ~ proof cufflink
+expect text: "(Your ballot is cast. Waiting for the others.)"
+expect no link: "Hear the verdict"
+as: rook
+vote: vell ~ how device
+expect text: "The ballots are revealed. Miss Edith Vell, by device: 2."
+expect: accusation.done and accusation.correct and accusation.proven
+do: "Hear the verdict"
+expect text: "two constables are waiting"
+
+:: right_but_unproven [test]
+start: terminus ~ as ada, rook
+vote: vell ~ how device
+as: rook
+vote: vell ~ how device
+expect: accusation.correct and not accusation.proven
+do: "Hear the verdict"
+expect text: "Without proof she is free to go"
+
+:: a_hung_jury_votes_once_more [test]
+start: terminus ~ as ada, rook
+vote: vell ~ how device
+as: rook
+vote: crane ~ how poison
+expect text: "The jury is hung. Vote again."
+expect: not accusation.done
+vote: crane ~ how poison
+as: ada
+vote: vell ~ how device
+expect text: "The jury is hung."
+expect: accusation.done and accusation.hung and not accusation.correct
+
+:: the_last_stop_ends_at_the_terminus [test]
+start: lounge@5 ~ as ada, rook
+expect no link: "Go to the dining car"
+do: "Stay"
+as: rook
+do: "Stay"
+expect at: terminus
+expect text: "The night express sighs into Kingsgate at dawn"
+as: ada
+expect at: terminus

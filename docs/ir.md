@@ -64,7 +64,13 @@ insert:
 | `{present}` | `{"insert": "present"}` |
 | `{embed nib: 'x'}` | `{"insert": "embed", "nib": "x"}` |
 | `{list the_list ~ one per line}` | `{"insert": "list", "list": "the_list", "options": ["one per line"]}` |
-| `{name input for: me.name}` | `{"insert": "name input", "args": "…"}` |
+| `{name input for: me.name, max: 24}` | `{"insert": "name input", "args": {"for": {"get": ["me", "name"]}, "max": 24}}` |
+| `{accuse who: suspect, how: scenario.methods, proof: proof_who and proof_how, revote: 1}` | `{"insert": "accuse", "args": {"who": "suspect", "how": {"get": […]}, "proof": {"and": ["proof_who", "proof_how"]}, "revote": 1}}` |
+
+The jury's and the inputs' arguments are typed: a number is a number,
+`'quoted'` text is text, and anything else is an expression. Other inserts
+with arguments (`{reveal link: …}`, `{sound effect: …}`) keep them as text
+for now.
 | `{leo.aka}` | `{"value": {"get": ["leo", "aka"]}}` |
 
 **`modifier`**

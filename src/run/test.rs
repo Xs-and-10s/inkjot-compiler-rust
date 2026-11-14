@@ -18,6 +18,8 @@
 //! | `as: who` | Look through someone else; with several Linkers, serve the one playing `who` |
 //! | `given: effect` | Change the state directly: `given: learn two_hands` |
 //! | `do: "label"` or `do: hall#2` | Take an available Link |
+//! | `answer: "Mara"` / `answer: gust, spark, hush` | Answer the first open input |
+//! | `vote: vell ~ how device ~ proof cufflink, burn_pattern` | Cast a ballot for the jury |
 //! | `expect: expression` | The expression must hold now |
 //! | `expect text: "…"` / `expect no text: "…"` | Text shown since the last `do` does / does not contain this |
 //! | `expect link: "…"` / `expect no link: "…"` | A Link with this label is / is not available |
@@ -150,6 +152,35 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
                         break; // the rest of the script no longer applies
                     }
                 }
+            }
+            "answer" => {
+                collect(&mut run, &mut shown);
+                let words: Vec<String> =
+                    match value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+                        Some(text) => vec![text.to_string()],
+                        None => value.split(',').map(|w| w.trim().to_string()).collect(),
+                    };
+                let result = run.answer(&words);
+                collect(&mut run, &mut shown);
+                result
+            }
+            "vote" => {
+                collect(&mut run, &mut shown);
+                let clause = |word: &str| {
+                    s.clauses[1..]
+                        .iter()
+                        .find_map(|c| c.text.strip_prefix(word))
+                        .map(|t| t.trim().to_string())
+                        .unwrap_or_default()
+                };
+                let proof: Vec<String> = clause("proof ")
+                    .split(',')
+                    .map(|p| p.trim().to_string())
+                    .filter(|p| !p.is_empty())
+                    .collect();
+                let result = run.vote(value, &clause("how "), &proof);
+                collect(&mut run, &mut shown);
+                result
             }
             "expect" => {
                 collect(&mut run, &mut shown);

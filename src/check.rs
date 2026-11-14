@@ -839,6 +839,14 @@ impl Checker {
                 }
             }
             "as" => self.need(value, &["character"], "character", line, vcol),
+            // `vote: vell ~ how device ~ proof cufflink`: a ballot in a test.
+            "vote" => self.need(
+                first_word(value),
+                &["character", "npc"],
+                "suspect",
+                line,
+                vcol,
+            ),
             "seed" => {
                 if value.parse::<u64>().is_err() {
                     self.err(line, vcol, "`seed:` takes a whole number");
@@ -1150,9 +1158,9 @@ impl Checker {
             "reveal" if second == "link:" => {}
             "sound" if second == "effect:" => {}
             "ambient" if second == "sound:" => {}
-            "accuse" => {}
+            "accuse" => self.accuse(&c[first.len()..], line, col),
             "list" => self.need(second, &["list"], "list", line, col + 5),
-            _ if second == "input" => {}
+            _ if second == "input" => self.input(first, c, line, col),
             _ => {
                 self.stats.expressions += 1;
                 let col = col + cols(&content[..content.len() - content.trim_start().len()]);
@@ -1165,6 +1173,120 @@ impl Checker {
                     ),
                 }
             }
+        }
+    }
+
+    /// `{accuse who: suspect, how: scenario.methods, proof: proof_who and
+    /// proof_how, revote: 1}`: the jury.
+    fn accuse(&mut self, args: &str, line: usize, col: usize) {
+        let mut seen = Vec::new();
+        for part in crate::ir::split_args(args) {
+            let Some((key, value)) = part.split_once(':') else {
+                self.err(
+                    line,
+                    col,
+                    format!("`{part}` in `{{accuse}}` needs a name: `who: suspect`"),
+                );
+                continue;
+            };
+            let (key, value) = (key.trim(), value.trim());
+            seen.push(key.to_string());
+            match key {
+                "who" => {
+                    if !self.is_kind_word(value) {
+                        self.err(line, col, format!("`who: {value}` should name a kind of suspect: a tag such as `suspect`, or `npc`"));
+                    }
+                }
+                "how" => self.expression_in(value, line, col),
+                // Tags a conviction must cite: `proof_who and proof_how`.
+                "proof" => {
+                    if let Err((_, why)) = expr::parse(value) {
+                        self.err(line, col, format!("`proof: {value}` does not read ({why})"));
+                    }
+                }
+                "revote" => {
+                    if value.parse::<u32>().is_err() {
+                        self.err(line, col, "`revote` is a number of revotes: `revote: 1`");
+                    }
+                }
+                other => self.err(
+                    line,
+                    col,
+                    format!("`{{accuse}}` takes who, how, proof and revote, not `{other}`"),
+                ),
+            }
+        }
+        if !seen.iter().any(|k| k == "who") {
+            self.err(
+                line,
+                col,
+                "`{accuse}` needs `who:`, the kind of thing the jury may accuse",
+            );
+        }
+    }
+
+    /// `{name input for: me.name, max: 24}`, `{choose input for: words, from:
+    /// cantrip, length: 3}`.
+    fn input(&mut self, kind: &str, c: &str, line: usize, col: usize) {
+        if !INPUTS.contains(&kind) {
+            return self.err(
+                line,
+                col,
+                format!(
+                    "`{kind} input` is not an input; the inputs are: {}",
+                    INPUTS.join(", ")
+                ),
+            );
+        }
+        let args = c.split_once("input").map_or("", |(_, r)| r);
+        let mut has_for = false;
+        for part in crate::ir::split_args(args) {
+            let Some((key, value)) = part.split_once(':') else {
+                self.err(line, col, format!("`{part}` needs a name: `for: me.name`"));
+                continue;
+            };
+            let (key, value) = (key.trim(), value.trim());
+            match key {
+                "for" => has_for = true,
+                "from" => {
+                    if !self.is_kind_word(value) {
+                        self.err(
+                            line,
+                            col,
+                            format!("`from: {value}` should name a kind, a tag or an archetype"),
+                        );
+                    }
+                }
+                "max" | "min" | "length" if value.parse::<u32>().is_err() => {
+                    self.err(line, col, format!("`{key}` is a number"));
+                }
+                _ => {}
+            }
+        }
+        if !has_for && !matches!(kind, "act" | "note") {
+            self.err(
+                line,
+                col,
+                format!("`{kind} input` needs `for:`, the name its answer is kept in"),
+            );
+        }
+    }
+
+    /// Is `word` a kind of thing: a declared kind, a tag on something, or
+    /// an archetype?
+    fn is_kind_word(&self, word: &str) -> bool {
+        is_ident(word)
+            && (DECLS.contains(&word)
+                || ["person", "linker", "living"].contains(&word)
+                || self.has(word, &["archetype"])
+                || self.tags.contains(word))
+    }
+
+    fn expression_in(&mut self, text: &str, line: usize, col: usize) {
+        self.stats.expressions += 1;
+        match expr::parse(text) {
+            Ok(e) => self.resolve(&e, text, line, col),
+            Err((_, why)) => self.err(line, col, format!("`{text}` does not read ({why})")),
         }
     }
 

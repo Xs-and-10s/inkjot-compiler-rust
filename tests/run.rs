@@ -90,6 +90,49 @@ fn a_run_is_deterministic() {
     assert_eq!(play(), play());
 }
 
+/// If an input is open and nothing else can be done (or on a whim), answer
+/// it with something it accepts.
+fn answer_something(run: &mut Run, pick: usize) -> Result<(), String> {
+    let asks = run.asks()?;
+    let stuck = run.choices()?.is_empty();
+    let Some(ask) = asks.first().cloned() else {
+        return Ok(());
+    };
+    if !stuck && !pick.is_multiple_of(3) {
+        return Ok(());
+    }
+    match ask.kind.as_str() {
+        "name input" => run.answer(&["Ash".to_string()]),
+        "choose input" => {
+            let n = ask.length.unwrap_or(1);
+            let words: Vec<String> = (0..n)
+                .map(|i| ask.options[(pick + i * 7) % ask.options.len()].clone())
+                .collect();
+            run.answer(&words)
+        }
+        "accuse" if !ask.voted => {
+            let who = &ask.options[pick % ask.options.len()];
+            let how = ask
+                .methods
+                .get(pick % ask.methods.len().max(1))
+                .cloned()
+                .unwrap_or_default();
+            run.vote(who, &how, &[])
+        }
+        _ => Ok(()),
+    }
+}
+
+/// `accusation.field`, as the story would read it.
+fn accusation(run: &mut Run, field: &str) -> bool {
+    use inkjot::json::Value;
+    let path = Value::obj([(
+        "get",
+        Value::Arr(vec![Value::str("accusation"), Value::str(field)]),
+    )]);
+    run.eval(&path).is_ok_and(|v| v.truthy())
+}
+
 /// Where a random playthrough of each example may begin.
 fn starts() -> Vec<(usize, Option<&'static str>, Option<&'static str>)> {
     vec![
@@ -121,6 +164,7 @@ proptest! {
         let mut steps = || -> Result<(), String> {
             run.start(at, who)?;
             for pick in &picks {
+                answer_something(&mut run, *pick)?;
                 let choices = run.choices()?;
                 if choices.is_empty() {
                     break;
@@ -295,13 +339,25 @@ fn cohort_play(
         return Ok(text);
     }
     for &(seat, pick) in steps {
-        // Whoever can still act this stop.
+        // Whoever can still act this stop; anyone at an open input may
+        // answer it first.
         let mut free = Vec::new();
         for who in run.seated().to_vec() {
             run.sit(&who).unwrap();
+            if let Err(why) = answer_something(&mut run, seat + pick) {
+                prop_assert!(why.contains("not supported"), "{why}");
+            }
             if !run.waiting() && !run.choices().unwrap().is_empty() {
                 free.push(who);
             }
+        }
+        // The jury's verdict hangs together.
+        if accusation(&mut run, "proven") {
+            prop_assert!(accusation(&mut run, "correct"));
+        }
+        if accusation(&mut run, "hung") {
+            prop_assert!(!accusation(&mut run, "correct"));
+            prop_assert!(accusation(&mut run, "done"));
         }
         let Some(who) = free.get(seat % free.len().max(1)).cloned() else {
             break;
@@ -452,4 +508,51 @@ fn an_echo_learns_but_changes_nothing() {
             outcome.transcript.join("\n")
         );
     }
+}
+
+/// Answers the story would not accept are refused, with a reason.
+#[test]
+fn inputs_and_ballots_refuse_what_does_not_fit() {
+    let src = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/examples/ex1-the-night-train.twee"
+    ))
+    .unwrap();
+    let ir = inkjot::build(&src).unwrap();
+    let story = Story::new(&ir).unwrap();
+
+    let mut run = Run::new(&story, 1);
+    run.start(Some("cast"), None).unwrap();
+    let someone = run
+        .choices()
+        .unwrap()
+        .into_iter()
+        .find(|(_, l)| l == "Someone else")
+        .unwrap()
+        .0;
+    run.choose(&someone).unwrap();
+    let long = run
+        .answer(&["Marguerite Ashdown-Featherstonehaugh".into()])
+        .unwrap_err();
+    assert!(long.contains("at most 24"), "{long}");
+    assert!(run
+        .answer(&["  ".into()])
+        .unwrap_err()
+        .contains("cannot be empty"));
+
+    let mut run = Run::new(&story, 1);
+    run.start_cohort(Some("terminus"), &["ada", "rook"])
+        .unwrap();
+    let uncited = run
+        .vote("vell", "device", &["cufflink".into()])
+        .unwrap_err();
+    assert!(uncited.contains("only what you hold or know"), "{uncited}");
+    assert!(run
+        .vote("hobbs", "device", &[])
+        .unwrap_err()
+        .contains("not a suspect"));
+    assert!(run
+        .vote("vell", "candlestick", &[])
+        .unwrap_err()
+        .contains("not one of the methods"));
 }

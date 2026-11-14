@@ -905,7 +905,15 @@
           "type": "prose",
           "paragraphs": [
             [
-              {"insert": "name input", "args": "for: me.name, max: 24"}
+              {
+                "insert": "name input",
+                "args": {
+                  "for": {
+                    "get": ["me", "name"]
+                  },
+                  "max": 24
+                }
+              }
             ]
           ]
         },
@@ -4512,7 +4520,19 @@
           "type": "prose",
           "paragraphs": [
             [
-              {"insert": "accuse", "args": "who: suspect, how: scenario.methods, proof: proof_who and proof_how, revote: 1"}
+              {
+                "insert": "accuse",
+                "args": {
+                  "who": "suspect",
+                  "how": {
+                    "get": ["scenario", "methods"]
+                  },
+                  "proof": {
+                    "and": ["proof_who", "proof_how"]
+                  },
+                  "revote": 1
+                }
+              }
             ]
           ]
         },

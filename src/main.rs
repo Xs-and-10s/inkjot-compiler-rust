@@ -296,6 +296,34 @@ fn play(args: &[String]) -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
+        // An open input: type the answer. `{accuse}`: who, how, then proof.
+        let ask = run
+            .asks()
+            .ok()
+            .and_then(|a| a.into_iter().find(|a| !(a.kind == "accuse" && a.voted)));
+        if let Some(ask) = ask.filter(|a| choices.is_empty() || a.kind == "accuse") {
+            print!("? ");
+            let _ = std::io::stdout().flush();
+            let mut line = String::new();
+            if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 || line.trim() == "q" {
+                return ExitCode::SUCCESS;
+            }
+            let words: Vec<String> = line
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .filter(|w| !w.is_empty())
+                .map(str::to_string)
+                .collect();
+            let answered = match ask.kind.as_str() {
+                "accuse" if words.len() >= 2 => run.vote(&words[0], &words[1], &words[2..]),
+                "accuse" => Err("type who, then how, then any proof: vell device cufflink".into()),
+                "name input" => run.answer(&[line.trim().to_string()]),
+                _ => run.answer(&words),
+            };
+            if let Err(e) = answered {
+                println!("({e})");
+            }
+            continue;
+        }
         if choices.is_empty() {
             println!("(the end)");
             return ExitCode::SUCCESS;

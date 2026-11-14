@@ -45,6 +45,10 @@ expect text: "I told you it was good."
 | `expect link: "…"` | A Link with this label is on offer |
 | `expect no link: "…"` | …is not on offer |
 | `expect at: passage` | The pov is at this passage |
+| `start: passage ~ as a, b` | Begin with several Linkers, one playing each |
+| `answer: "Mara"` | Answer the first open input with text |
+| `answer: gust, spark, hush` | …or with the things chosen |
+| `vote: vell ~ how device ~ proof cufflink` | Cast a ballot for the jury, citing proof |
 
 `inkjot check` checks tests like any other passage, so a misspelled label's
 passage, an undeclared name or a malformed effect is caught before anything
@@ -204,6 +208,46 @@ used:
 A run with one Linker follows the same rules; its claims settle at once,
 since no one else could reach.
 
+## Inputs and the jury
+
+An input asks the Linker for an answer rather than a pick. In a passage's
+**body** it stays open while they are there: they may answer it, and answer
+again, between Links (Ex 1's lobby: the Guest types a name, then boards). In a
+**header** it comes before what follows, so arriving pauses there, with no
+Links, until it is answered (Ex 2's mouth hears three cantrips, then decides).
+
+| Input | Answer | Kept as |
+|---|---|---|
+| `{name input for: me.name, max: 24}` | text, not empty, at most `max` letters | text; `{me.name}` shows it, and a `custom` character's name is empty until then |
+| `{choose input for: words, from: cantrip, length: 3}` | that many of the things of that kind, in order | a list: `words == [gust, spark, hush]` |
+
+The rest of the family (`pick`, `rank`, `number`, `secret`, …) is checked
+but not run yet.
+
+**The jury** (`{accuse who: suspect, how: scenario.methods, proof:
+proof_who and proof_how, revote: 1}`) is a secret ballot. Every Linker votes,
+the dead too, as ghosts: a suspect (anything tagged as `who:` says), a
+method (one of `how:`), and any proof they can cite, which is only what they
+hold or know. When all have voted, the ballots are shown to everyone
+together. The pairing with the most votes wins; a tie is a hung jury, which
+votes again as often as `revote:` allows and then stays hung. Then:
+
+| Lookup | Holds when |
+|---|---|
+| `accusation.done` | the jury has decided, or stayed hung |
+| `accusation.hung` | no pairing won |
+| `accusation.correct` | the winner is the scenario's culprit and method |
+| `accusation.proven` | it is correct, and the proof cited by those who voted for it covers `proof:` (a tag needs something cited that has it; `and`, `or` and `not` combine) |
+| `accusation.who`, `accusation.how` | the winning pairing |
+
+`scenario` is the scenario in play: the only one, or, with several, one the
+dice pick at the start, so the culprit can change from run to run.
+`cohort.size` and `cohort.alive` count the Linkers.
+
+**The finale.** When the clock runs out, the last stop offers `Stay`, and when
+everyone has moved, they all go to the `[finale]` passage no Link leads to
+(Ex 1's `terminus`, not its `verdict`).
+
 ## Time: checkpoints and rewinds
 
 The interpreter keeps a log, as the paper Conductor did: a snapshot of the
@@ -266,5 +310,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - Inquests.
 - An echo sees the NPCs where they are now, not where they were then.
 - `once per day` and `needs two to hold it` on a rewind spell.
-- The jury (`{accuse}`), and inputs (`{name input}`, `{choose input}`).
+- The rest of the input family: `pick`, `rank`, `allocate`, `number`,
+  `target`, `secret`, `roll`, `note`, `act`, `choice`.
 - Anything marked v0.6: the duel, `retell`.

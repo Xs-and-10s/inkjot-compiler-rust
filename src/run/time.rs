@@ -297,6 +297,16 @@ impl Run<'_> {
                 menu.push(rewind_link(&format!("checkpoint:{name}"), &label));
             }
         }
+        if menu.is_empty() {
+            // Nowhere to go back to yet: the charge is not spent.
+            if let Some(n) = self.vals.get(&format!("{actor}.rewinds")).and_then(V::num) {
+                self.vals
+                    .insert(format!("{actor}.rewinds"), V::Num(n + 1.0));
+            }
+            self.output
+                .push("(There is nowhere to go back to yet.)".into());
+            return self.relist();
+        }
         self.links = menu;
         Ok(())
     }
@@ -366,6 +376,7 @@ impl Run<'_> {
     /// already ran, back then.
     fn resume(&mut self) -> R<()> {
         let at = self.here().to_string();
+        self.asking.clear();
         self.locals.clear();
         self.parent_lets(&at)?;
         self.lets_of(&at)?;
