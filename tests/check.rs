@@ -605,3 +605,22 @@ fn text_takes_double_quotes_and_thousands_take_a_mark() {
     assert!(text.contains("\"value\": 1000000"), "{text}");
     assert!(text.contains("1000000]"), "{text}");
 }
+
+#[test]
+fn an_inquest_link_needs_inquests_to_spend() {
+    let ex2 = include_str!("../examples/ex2-the-ninefold-cell.twee");
+    let without = ex2.replace("resource inquests: 3 ~ shared\n", "");
+    let report = inkjot::check(&without);
+    assert!(
+        report
+            .diags
+            .iter()
+            .any(|d| d.msg.contains("declare `resource inquests`")),
+        "{:#?}",
+        report.diags
+    );
+    assert!(inkjot::check(ex2)
+        .diags
+        .iter()
+        .all(|d| !d.msg.contains("inquests")));
+}
