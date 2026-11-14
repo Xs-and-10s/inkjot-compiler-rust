@@ -1134,21 +1134,28 @@ impl Checker {
 
     fn insert(&mut self, content: &str, line: usize, col: usize) {
         let c = content.trim();
+        if let Some(at) = single_quote(c) {
+            return self.err(
+                line,
+                col + cols(&c[..at]),
+                "text takes double quotes: {embed nib: \"name\"}",
+            );
+        }
         let mut words = c.split_whitespace();
         let first = words.next().unwrap_or("");
         let second = words.next().unwrap_or("");
         match first {
-            "present" | "echoes" | "claimants" | "passers" if second.is_empty() => {}
+            "present" | "echoes" | "claimants" | "passers" | "ballots" if second.is_empty() => {}
             "retold" if second.is_empty() => {
                 *self.stretch.entry("{retold}".into()).or_default() += 1
             }
             "embed" if second == "nib:" => {
-                let name = c.split('\'').nth(1).unwrap_or("");
+                let name = c.split('"').nth(1).unwrap_or("");
                 if name.is_empty() {
                     self.err(
                         line,
                         col,
-                        "`embed nib:` needs a passage name in quotes: {embed nib: 'name'}",
+                        "`embed nib:` needs a passage name in quotes: {embed nib: \"name\"}",
                     );
                 } else {
                     self.need_passage(name, "the embedded passage", line, col);
@@ -1358,4 +1365,26 @@ impl Lookup for Checker {
     fn is_kind(&self, name: &str, kind: &str) -> bool {
         self.has(name, &[kind])
     }
+}
+
+/// Where `text` has a `'` used as a quote: outside double quotes, and not
+/// a thousands mark between digits (`1'000`).
+fn single_quote(text: &str) -> Option<usize> {
+    let b = text.as_bytes();
+    let mut in_text = false;
+    for (i, &c) in b.iter().enumerate() {
+        match c {
+            b'"' => in_text = !in_text,
+            b'\'' if !in_text => {
+                let digits = i > 0
+                    && b[i - 1].is_ascii_digit()
+                    && b.get(i + 1).is_some_and(u8::is_ascii_digit);
+                if !digits {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }

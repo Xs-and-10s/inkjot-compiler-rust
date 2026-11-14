@@ -112,6 +112,9 @@ do: "Stay"
 expect: rook.dead
 expect: rook.knows.the_attack
 expect no text: "Your watch fires"
+expect: not rook.holds.notebook ~ ((the dead hold nothing))
+expect: notebook.in(baggage) ~ ((it lies where he fell))
+expect: rook.knows.notebook ~ ((but he knows he had it))
 
 :: two_hands_on_the_cufflink [test]
 start: dining@1 ~ as rook, wren
@@ -219,9 +222,10 @@ expect text: "(Your ballot is cast. Waiting for the others.)"
 expect no link: "Hear the verdict"
 as: rook
 vote: vell ~ how device
-expect text: "The ballots are revealed. Miss Edith Vell, by device: 2."
+expect no text: "The ballots are revealed" ~ ((Ex 1 frames the tally itself))
 expect: accusation.done and accusation.correct and accusation.proven
 do: "Hear the verdict"
+expect text: "The foreman reads out the ballots: 2 for Miss Edith Vell, by device."
 expect text: "two constables are waiting"
 
 :: right_but_unproven [test]
@@ -238,13 +242,14 @@ start: terminus ~ as ada, rook
 vote: vell ~ how device
 as: rook
 vote: crane ~ how poison
-expect text: "The jury is hung. Vote again."
+expect text: "(The jury is hung. Vote again.)"
 expect: not accusation.done
 vote: crane ~ how poison
 as: ada
 vote: vell ~ how device
-expect text: "The jury is hung."
 expect: accusation.done and accusation.hung and not accusation.correct
+do: "Hear the verdict"
+expect text: "The foreman reads out the ballots: 1 for Miss Edith Vell, by device; 1 for Mr. Crane, by poison."
 
 :: the_last_stop_ends_at_the_terminus [test]
 start: lounge@5 ~ as ada, rook
@@ -285,3 +290,18 @@ expect text: "reached for it at the same moment"
 expect: rook.holds.cufflink or wren.holds.cufflink
 expect: not (rook.holds.cufflink and wren.holds.cufflink)
 expect: rook.vults == 2 and wren.vults == 2
+
+:: a_ghost_cites_what_it_once_held [test]
+(((
+Ada finds the cufflink, dies with no charge left, and still convicts Vell
+as a ghost: the cufflink fell where she died, but she knows it.
+)))
+start: terminus ~ as ada, rook
+given: gain cufflink
+given: lower rewinds 2
+given: kill ada
+expect: ada.dead and not ada.holds.cufflink
+vote: vell ~ how device ~ proof cufflink
+as: rook
+vote: vell ~ how device
+expect: accusation.proven

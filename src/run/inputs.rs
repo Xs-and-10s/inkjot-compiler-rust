@@ -355,11 +355,23 @@ impl Run<'_> {
             .filter(|(_, n)| *n == top)
             .map(|(p, _)| p)
             .collect();
-        let shown: Vec<String> = counts
-            .iter()
-            .map(|((who, how), n)| format!("{}, by {how}: {n}", self.label(who)))
+        // Kept for `{ballots}`: most votes first, ties in seating order.
+        let mut sorted = counts.clone();
+        sorted.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+        self.tally = sorted
+            .into_iter()
+            .map(|((who, how), n)| (who, how, n))
             .collect();
-        let mut lines = vec![format!("The ballots are revealed. {}.", shown.join("; "))];
+        // An Inklink that shows `{ballots}` itself frames the tally; one that
+        // does not gets a plain line from the interpreter.
+        let framed = self.story.shows_ballots;
+        let mut lines = Vec::new();
+        if !framed {
+            lines.push(format!(
+                "The ballots are revealed: {}.",
+                self.ballots_text()
+            ));
+        }
 
         let revotes = self
             .vals
@@ -370,7 +382,7 @@ impl Run<'_> {
             self.vals
                 .insert("accusation.revotes".into(), V::Num(revotes - 1.0));
             self.ballots.clear();
-            lines.push("The jury is hung. Vote again.".into());
+            lines.push("(The jury is hung. Vote again.)".into());
             return self.tell_jury(&voters, lines);
         }
         self.vals.insert("accusation.done".into(), V::Bool(true));
@@ -379,7 +391,9 @@ impl Run<'_> {
             self.vals
                 .insert("accusation.correct".into(), V::Bool(false));
             self.vals.insert("accusation.proven".into(), V::Bool(false));
-            lines.push("The jury is hung.".into());
+            if !framed {
+                lines.push("The jury is hung.".into());
+            }
             return self.tell_jury(&voters, lines);
         }
         let (who, how) = leaders[0].clone();
@@ -410,8 +424,20 @@ impl Run<'_> {
             .insert("accusation.correct".into(), V::Bool(correct));
         self.vals
             .insert("accusation.proven".into(), V::Bool(proven));
-        lines.push(format!("The jury accuses {}, by {how}.", self.label(&who)));
+        if !framed {
+            lines.push(format!("The jury accuses {}, by {how}.", self.label(&who)));
+        }
         self.tell_jury(&voters, lines)
+    }
+
+    /// `{ballots}`: the last count, most votes first. "2 for Miss Edith
+    /// Vell, by device; 1 for Mr. Crane, by poison".
+    pub(super) fn ballots_text(&self) -> String {
+        self.tally
+            .iter()
+            .map(|(who, how, n)| format!("{n} for {}, by {how}", self.label(who)))
+            .collect::<Vec<_>>()
+            .join("; ")
     }
 
     /// Does the proof cited cover what `proof:` asks? A tag needs something

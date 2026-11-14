@@ -459,15 +459,15 @@ Click.
 
 :: hall@0
 Hour nothing.
-{embed nib: 'lamp'}
+{embed nib: "lamp"}
 
 :: hall@1
 Hour one.
-{embed nib: 'lamp'}
+{embed nib: "lamp"}
 
 :: hall@2
 Hour two.
-{embed nib: 'lamp'}
+{embed nib: "lamp"}
 
 :: hall@3
 Hour three.

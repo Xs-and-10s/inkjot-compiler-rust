@@ -61,8 +61,10 @@ fn strings<'a>(items: impl IntoIterator<Item = &'a str>) -> Value {
 
 /// A token as a JSON value: a number if it reads as one, else a string.
 fn token(word: &str) -> Value {
-    if !word.is_empty() && word.chars().all(|c| c.is_ascii_digit()) {
-        num(word.trim_start_matches('0').parse::<u64>().unwrap_or(0))
+    // `1'000'000` is a million.
+    let digits = word.replace('\'', "");
+    if !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) && !word.ends_with('\'') {
+        num(digits.trim_start_matches('0').parse::<u64>().unwrap_or(0))
     } else {
         Value::str(word)
     }
@@ -772,9 +774,10 @@ pub(crate) fn insert_args(text: &str) -> Value {
             .filter_map(|part| {
                 let (key, value) = part.split_once(':')?;
                 let value = value.trim();
-                let lowered = match value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')) {
+                let number = value.replace('\'', "");
+                let lowered = match value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
                     Some(text) => Value::str(text),
-                    None if value.parse::<f64>().is_ok() => Value::Num(value.to_string()),
+                    None if number.parse::<f64>().is_ok() => Value::Num(number),
                     None => expression(value),
                 };
                 Some((key.trim().to_string(), lowered))
@@ -789,8 +792,10 @@ pub(crate) fn split_args(text: &str) -> Vec<String> {
     let (mut depth, mut quote, mut cur) = (0i32, None::<char>, String::new());
     for ch in text.chars() {
         match ch {
-            '\'' | '"' if quote == Some(ch) => quote = None,
-            '\'' | '"' if quote.is_none() => quote = Some(ch),
+            // Text is in double quotes; `'` is only an apostrophe or a
+            // thousands mark.
+            '"' if quote == Some(ch) => quote = None,
+            '"' if quote.is_none() => quote = Some(ch),
             '(' | '[' | '{' if quote.is_none() => depth += 1,
             ')' | ']' | '}' if quote.is_none() => depth -= 1,
             ',' if quote.is_none() && depth == 0 => {
@@ -1034,12 +1039,14 @@ fn insert(content: &str) -> Value {
         Value::Obj(pairs)
     };
     match first {
-        "present" | "echoes" | "claimants" | "passers" | "retold" if second.is_empty() => {
+        "present" | "echoes" | "claimants" | "passers" | "ballots" | "retold"
+            if second.is_empty() =>
+        {
             named(first, "")
         }
         "embed" if second == "nib:" => Value::obj([
             ("insert", Value::str("embed")),
-            ("nib", Value::str(c.split('\'').nth(1).unwrap_or(""))),
+            ("nib", Value::str(c.split('"').nth(1).unwrap_or(""))),
         ]),
         "list" => {
             let options = c.split('~').skip(1).map(str::trim);
@@ -1049,10 +1056,14 @@ fn insert(content: &str) -> Value {
                 ("options", strings(options)),
             ])
         }
-        "embed" | "reveal" | "sound" | "ambient" if second.ends_with(':') => {
-            let name = format!("{first} {}", second.trim_end_matches(':'));
-            named(&name, c.split_once(':').map_or("", |(_, r)| r))
-        }
+        // `{reveal link: "Look closer", text: "…"}` → `{"link": …, "text": …}`.
+        "embed" | "reveal" | "sound" | "ambient" if second.ends_with(':') => Value::obj([
+            (
+                "insert",
+                Value::str(format!("{first} {}", second.trim_end_matches(':'))),
+            ),
+            ("args", insert_args(&c[first.len()..])),
+        ]),
         // The jury and the inputs take typed arguments.
         "accuse" => Value::obj([
             ("insert", Value::str("accuse")),

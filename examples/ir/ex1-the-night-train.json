@@ -2096,7 +2096,10 @@
           "type": "prose",
           "paragraphs": [
             [
-              {"insert": "reveal link", "args": "'Look closer at the slanted script', text: 'The corrections are initialed “E.”'"}
+              {
+                "insert": "reveal link",
+                "args": {"link": "Look closer at the slanted script", "text": "The corrections are initialed “E.”"}
+              }
             ]
           ]
         }
@@ -2897,7 +2900,10 @@
           "type": "prose",
           "paragraphs": [
             [
-              {"insert": "sound effect", "args": "'brakes'"}
+              {
+                "insert": "sound effect",
+                "args": {"effect": "brakes"}
+              }
             ]
           ]
         },
@@ -4567,6 +4573,16 @@
       "margin": false,
       "header": [],
       "body": [
+        {
+          "type": "prose",
+          "paragraphs": [
+            [
+              "The foreman reads out the ballots: ",
+              {"insert": "ballots"},
+              "."
+            ]
+          ]
+        },
         {
           "type": "modifier",
           "parts": [

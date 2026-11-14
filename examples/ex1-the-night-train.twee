@@ -260,7 +260,7 @@ You mention the money. He sets the glass down. “Very well. I’m no buyer. I�
 [if attempt.success]
 The key turns without a sound.
 
-{embed nib: 'notebook_page'}
+{embed nib: "notebook_page"}
 
 [else]
 {claimants} got there first.
@@ -269,7 +269,7 @@ The key turns without a sound.
 [if attempt.success]
 The lock gives with a crack that wakes the whole car.
 
-{embed nib: 'notebook_page'}
+{embed nib: "notebook_page"}
 
 [else]
 {claimants} got there first.
@@ -334,7 +334,7 @@ learn two_hands
 --
 The patent drawings for the watch. Every margin carries two hands: his blocky capitals, and a smaller slanted script correcting him.
 
-{reveal link: 'Look closer at the slanted script', text: 'The corrections are initialed “E.”'}
+{reveal link: "Look closer at the slanted script", text: "The corrections are initialed “E.”"}
 
 :: dining_table:cufflink [act]
 [if attempt.success]
@@ -457,7 +457,7 @@ The lights die.
 [after 4s]
 When they return, the Professor lies across the demonstration table. Each of you still wears one of his prototypes, ticking.
 
-{sound effect: 'brakes'}
+{sound effect: "brakes"}
 
 [if me.knows.saw_vell]
 In the dark you are sure of one thing: Miss Vell slipped out a moment before.
@@ -475,8 +475,8 @@ Mr. Crane hasn’t moved from the bar. Miss Vell hurries in from the dining car 
 Planning beat: chat is open, and nobody commits a move until everyone is ready.
 
 [end]
-{embed nib: 'the_body'}
-{embed nib: 'lounge_bar'}
+{embed nib: "the_body"}
+{embed nib: "lounge_bar"}
 > [[Question Miss Vell->lounge@0:vell]] ~ ask ~ cost 2 when me.is(rook)
 
 :: lounge@0:vell [act]
@@ -485,9 +485,9 @@ Planning beat: chat is open, and nobody commits a move until everyone is ready.
 :: sleeper@1 [card:02]
 Fog presses at the windows of the sleeper. Curtained berths line the corridor. At the far end, a brass plate on a locked door: S. ARDENT. Colonel Marsh sits up in a quilted gown, reading by lamplight.
 
-{embed nib: 'compartment'}
-{embed nib: 'colonel'}
-{embed nib: 'pressure'}
+{embed nib: "compartment"}
+{embed nib: "colonel"}
+{embed nib: "pressure"}
 
 :: dining@1 [card:03]
 The dining car smells of spilled claret. A rolled blueprint lies half under Hobbs’s tray. Mrs. Ardent sits very straight, a sealed letter by her plate.
@@ -505,29 +505,29 @@ Your echo stands at the bar, exactly where you remember standing. You keep out o
 {passers} tore through a moment ago; the cutlery is still rattling.
 
 [end]
-{embed nib: 'dining_table'}
-{embed nib: 'pressure'}
+{embed nib: "dining_table"}
+{embed nib: "pressure"}
 
 :: lounge@1 [card:04]
 Hobbs has laid a tablecloth over the Professor. Mr. Crane hasn’t left the bar. He watches the fog slide past the observation glass and orders another brandy.
 
-{embed nib: 'the_body'}
-{embed nib: 'lounge_bar'}
-{embed nib: 'pressure'}
+{embed nib: "the_body"}
+{embed nib: "lounge_bar"}
+{embed nib: "pressure"}
 
 :: baggage@1 [card:05]
 Trunks are strapped to the walls. Behind a brass cage the generator thrums, and your watch hums faintly as you come near. At the rear, the vestibule door rattles in its frame.
 
-{embed nib: 'baggage_car'}
-{embed nib: 'pressure'}
+{embed nib: "baggage_car"}
+{embed nib: "pressure"}
 
 :: mail@1 [card:06]
 moves: walk
 --
 Mail sacks crowd the aisle; there’s no room to run. By the sorting table sits a crate stencilled FRAGILE — PATENT OFFICE, nailed shut.
 
-{embed nib: 'crate'}
-{embed nib: 'pressure'}
+{embed nib: "crate"}
+{embed nib: "pressure"}
 
 :: sleeper@2 [card:07]
 Rain drums on the roof at Coldwater. Somewhere a door to the platform opens, and closes again.
@@ -542,9 +542,9 @@ Colonel Marsh is up in his gown, grumbling about the noise.
 Miss Vell stands at the Professor’s door, trying the handle. She stops when she sees you.
 
 [end]
-{embed nib: 'compartment'}
-{embed nib: 'colonel'}
-{embed nib: 'pressure'}
+{embed nib: "compartment"}
+{embed nib: "colonel"}
+{embed nib: "pressure"}
 
 :: dining@2 [card:08]
 Rain streaks the windows. Hobbs resets the tables as if nothing has happened. Mrs. Ardent has not touched her soup.
@@ -553,22 +553,22 @@ Rain streaks the windows. Hobbs resets the tables as if nothing has happened. Mr
 Something still glints beside the sugar bowl.
 
 [end]
-{embed nib: 'dining_table'}
-{embed nib: 'pressure'}
+{embed nib: "dining_table"}
+{embed nib: "pressure"}
 
 :: lounge@2 [card:09]
 At Coldwater two railway policemen look in, see the cloth over the Professor, and are told it can wait for Kingsgate. Mr. Crane signs something for them with a flourish.
 
-{embed nib: 'the_body'}
-{embed nib: 'lounge_bar'}
-{embed nib: 'pressure'}
+{embed nib: "the_body"}
+{embed nib: "lounge_bar"}
+{embed nib: "pressure"}
 
 :: baggage@2 [card:10]
 Rain hammers the roof. Through the vestibule glass: the Coldwater platform, empty but for a rain barrel under a lamp.
 
 > [[Watch the platform->baggage@2:platform]] ~ examine ~ when not vell.cornered
-{embed nib: 'baggage_car'}
-{embed nib: 'pressure'}
+{embed nib: "baggage_car"}
+{embed nib: "pressure"}
 
 :: baggage@2:platform [act]
 learn coldwater_step
@@ -580,9 +580,9 @@ moves: walk
 --
 New sacks swing aboard at Coldwater. On the sorting table lies a telegram: PROF. S. ARDENT, NIGHT EXPRESS. Unopened.
 
-{embed nib: 'telegram'}
-{embed nib: 'crate'}
-{embed nib: 'pressure'}
+{embed nib: "telegram"}
+{embed nib: "crate"}
+{embed nib: "pressure"}
 
 :: sleeper@3 [card:12]
 The rain has passed. Moonlight slides along the corridor at Merrow, and the curtains sway.
@@ -597,16 +597,16 @@ Miss Vell is curled in a berth, breathing slow and even.
 Ash in the washbasin, and a blackened brass clasp. Someone has burned a book.
 
 [end]
-{embed nib: 'berth'}
-{embed nib: 'colonel'}
-{embed nib: 'compartment'}
-{embed nib: 'pressure'}
+{embed nib: "berth"}
+{embed nib: "colonel"}
+{embed nib: "compartment"}
+{embed nib: "pressure"}
 
 :: dining@3 [card:13]
 Merrow’s single lamp slides past the windows. Hobbs has set out a cold supper no one eats. Mrs. Ardent is writing a second letter.
 
-{embed nib: 'dining_table'}
-{embed nib: 'pressure'}
+{embed nib: "dining_table"}
+{embed nib: "pressure"}
 
 :: lounge@3 [card:14]
 The staff have carried the Professor to the baggage car. The demonstration table is bare, and Mr. Crane has moved one stool closer to it.
@@ -615,25 +615,25 @@ The staff have carried the Professor to the baggage car. The demonstration table
 Where he lay, a ticket stub catches the lamplight.
 
 [end]
-{embed nib: 'ticket'}
-{embed nib: 'lounge_bar'}
-{embed nib: 'pressure'}
+{embed nib: "ticket"}
+{embed nib: "lounge_bar"}
+{embed nib: "pressure"}
 
 :: baggage@3 [card:15]
 The generator thrums. The Professor lies under a tarpaulin by the vestibule door, which rattles at every curve.
 
-{embed nib: 'the_body'}
-{embed nib: 'baggage_car'}
-{embed nib: 'pressure'}
+{embed nib: "the_body"}
+{embed nib: "baggage_car"}
+{embed nib: "pressure"}
 
 :: mail@3 [card:16]
 moves: walk
 --
 Moonlight through the slats. The crate’s label flaps loose: it comes off at Harrow Junction, the next stop.
 
-{embed nib: 'crate'}
-{embed nib: 'telegram'}
-{embed nib: 'pressure'}
+{embed nib: "crate"}
+{embed nib: "telegram"}
+{embed nib: "pressure"}
 
 :: sleeper@4 [card:17]
 A freight train hisses alongside at Harrow Junction, close enough to touch. The corridor shudders. Every curtain is drawn.
@@ -645,16 +645,16 @@ Behind one curtain, Miss Vell breathes slow and even.
 Ash in the washbasin, and a blackened brass clasp.
 
 [end]
-{embed nib: 'berth'}
-{embed nib: 'colonel'}
-{embed nib: 'compartment'}
-{embed nib: 'pressure'}
+{embed nib: "berth"}
+{embed nib: "colonel"}
+{embed nib: "compartment"}
+{embed nib: "pressure"}
 
 :: dining@4 [card:18]
 The freight’s lamps strobe through the dining car. Hobbs steadies the glasses. Mrs. Ardent seals her second letter and asks him for a stamp.
 
-{embed nib: 'dining_table'}
-{embed nib: 'pressure'}
+{embed nib: "dining_table"}
+{embed nib: "pressure"}
 
 :: lounge@4 [card:19]
 Signal lamps change from red to green. Mr. Crane checks his watch, an ordinary one, against the station clock, and frowns.
@@ -663,9 +663,9 @@ Signal lamps change from red to green. Mr. Crane checks his watch, an ordinary o
 A ticket stub still lies by the demonstration table.
 
 [end]
-{embed nib: 'ticket'}
-{embed nib: 'lounge_bar'}
-{embed nib: 'pressure'}
+{embed nib: "ticket"}
+{embed nib: "lounge_bar"}
+{embed nib: "pressure"}
 
 :: baggage@4 [card:20]
 Porters on the Harrow platform shout about the mail. Through the vestibule glass: a freight wagon, and dark fields beyond.
@@ -674,18 +674,18 @@ Porters on the Harrow platform shout about the mail. Through the vestibule glass
 Miss Vell is at the vestibule door, one hand on the latch.
 
 [end]
-{embed nib: 'the_body'}
-{embed nib: 'baggage_car'}
-{embed nib: 'pressure'}
+{embed nib: "the_body"}
+{embed nib: "baggage_car"}
+{embed nib: "pressure"}
 
 :: mail@4 [card:21]
 moves: walk
 --
 Two porters climb aboard for the crate marked PATENT OFFICE. At the end of this stop, it leaves the train.
 
-{embed nib: 'crate'}
-{embed nib: 'telegram'}
-{embed nib: 'pressure'}
+{embed nib: "crate"}
+{embed nib: "telegram"}
+{embed nib: "pressure"}
 
 :: sleeper@5 [card:22]
 Grey light at Fenwick. Colonel Marsh is up, shaving at the basin, braces dangling.
@@ -694,9 +694,9 @@ Grey light at Fenwick. Colonel Marsh is up, shaving at the basin, braces danglin
 Ash in the washbasin, and a blackened brass clasp.
 
 [end]
-{embed nib: 'colonel'}
-{embed nib: 'compartment'}
-{embed nib: 'pressure'}
+{embed nib: "colonel"}
+{embed nib: "compartment"}
+{embed nib: "pressure"}
 
 :: dining@5 [card:23]
 Hobbs lays breakfast for passengers who will not eat it. Mrs. Ardent asks whether anyone has seen Miss Vell.
@@ -705,15 +705,15 @@ Hobbs lays breakfast for passengers who will not eat it. Mrs. Ardent asks whethe
 Miss Vell passes through toward the mail car, gloves on.
 
 [end]
-{embed nib: 'dining_table'}
-{embed nib: 'pressure'}
+{embed nib: "dining_table"}
+{embed nib: "pressure"}
 
 :: lounge@5 [card:24]
 The Fenwick platform clock reads ten to five. Mr. Crane has stopped drinking. “Whoever it was,” he says, “they had better be quick.”
 
-{embed nib: 'ticket'}
-{embed nib: 'lounge_bar'}
-{embed nib: 'pressure'}
+{embed nib: "ticket"}
+{embed nib: "lounge_bar"}
+{embed nib: "pressure"}
 
 :: baggage@5 [card:25]
 The generator winds down for the terminus. Someone has left the vestibule door unlatched.
@@ -722,17 +722,17 @@ The generator winds down for the terminus. Someone has left the vestibule door u
 Miss Vell is at the vestibule door, one hand on the latch.
 
 [end]
-{embed nib: 'the_body'}
-{embed nib: 'baggage_car'}
-{embed nib: 'pressure'}
+{embed nib: "the_body"}
+{embed nib: "baggage_car"}
+{embed nib: "pressure"}
 
 :: mail@5 [card:26]
 moves: walk
 --
 The sorting table is bare. Where the crate stood: a chalk mark, or a splintered, empty crate.
 
-{embed nib: 'telegram'}
-{embed nib: 'pressure'}
+{embed nib: "telegram"}
+{embed nib: "pressure"}
 
 :: terminus [finale card:27]
 The night express sighs into Kingsgate at dawn, and {present} step down onto the platform.
@@ -756,6 +756,8 @@ Deliberate together, then cast your ballots. They are revealed all at once.
 > [[Hear the verdict->verdict]] ~ when accusation.done
 
 :: verdict [finale card:28]
+The foreman reads out the ballots: {ballots}.
+
 [if accusation.proven and not vell.offstage]
 At Kingsgate two constables are waiting. Miss Vell holds out her burned hand for the cuffs, as if offering it to be read.
 
