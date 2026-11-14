@@ -17,11 +17,12 @@ here.
 | 5 | `get` beside `let`; `on` handlers; NPC agendas | #8 |
 | 6 | Several Linkers at once: seats, claims and clashes, simultaneous moves; more property tests | #9 |
 | 7 | Checkpoints, rewinds and echoes; comments, `~ choice`, no colon without a value, kind filters | #10 |
+| 8 | The jury (`{accuse}`), `{name input}`, `{choose input}`; the finale | #11 |
 
 ## Next
 
-1. **The jury and inputs**: `{accuse}`, `{name input}`, `{choose input}`.
-2. **Inquests.**
+1. **Inquests.**
+2. **The rest of the input family**, as stories need them.
 3. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
    facts with rules, and `i` beside `me` (see the working doc). Held until
    more ideas are in.
