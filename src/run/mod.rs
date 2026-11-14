@@ -9,8 +9,8 @@
 mod agenda;
 mod cohort;
 mod events;
+mod hints;
 mod inputs;
-mod inquests;
 pub mod test;
 mod time;
 mod value;
@@ -316,8 +316,10 @@ pub struct Run<'s> {
     ballots: HashMap<String, inputs::Ballot>,
     /// The jury's last count: `(who, how, votes)`, most votes first.
     tally: Vec<(String, String, usize)>,
-    /// Hints bought with Inquests: the player's, so a rewind keeps them.
-    heard: inquests::Heard,
+    /// Hints heard: the player's, so a rewind keeps them.
+    heard: hints::Heard,
+    /// The Linker has turned hints off.
+    no_hints: bool,
 }
 
 impl<'s> Run<'s> {
@@ -366,6 +368,7 @@ impl<'s> Run<'s> {
             ballots: HashMap::new(),
             tally: Vec::new(),
             heard: Default::default(),
+            no_hints: false,
         };
         run.init();
         run.place_npcs();
@@ -622,8 +625,8 @@ impl<'s> Run<'s> {
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
-        // An Inquest is offered only when it would tell something.
-        if f(link, "kind").as_str() == Some("inquest") && !self.may_inquire()? {
+        // A hint is offered only when it would tell something.
+        if f(link, "kind").as_str() == Some("hint") && !self.may_hint()? {
             return Ok(false);
         }
         // An echo may look and learn, but take nothing and reach for nothing.
@@ -866,7 +869,10 @@ impl<'s> Run<'s> {
                 return self.enter(&at, HashMap::new());
             }
             Some("pass") => self.end_turn()?,
-            Some("inquest") => self.inquire()?,
+            Some("hint") => self.give_hint()?,
+            Some("inquest") => {
+                return Err("Inquests are not supported by the interpreter yet".into())
+            }
             _ => {}
         }
         if let Some(who) = f(link, "become").as_str() {

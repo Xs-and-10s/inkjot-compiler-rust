@@ -183,36 +183,36 @@ expect text: "The mouth laughs at you"
 expect: not gate.mouth_seal
 expect: roland.vults == 0
 
-:: an_inquest_buys_the_hint_for_your_wits [test]
+:: a_hint_fits_your_wits [test]
 start: prologue
-expect no link: "Spend an Inquest"
+expect no link: "Ask for a hint"
 do: "Wake as Roland, in the pit"
-expect: inquests == 3
-do: "Spend an Inquest"
+expect: hints == 3
+do: "Ask for a hint"
 expect text: "Look past the grate. On the far door above, something only needs to slide."
 expect no text: "The grate is too heavy"
-expect: inquests == 2
-expect no link: "Spend an Inquest"
+expect: hints == 2
+expect no link: "Ask for a hint"
 do: "Switch to Eldric"
 expect at: chapel
-do: "Spend an Inquest"
+do: "Ask for a hint"
 expect text: "That ring of paint is the trap. Rings can be broken."
-expect: inquests == 1
+expect: hints == 1
 
-:: no_inquest_is_offered_when_none_are_left [test]
+:: no_hint_is_offered_when_none_are_left [test]
 start: oubliette ~ as roland
-given: set inquests: 0
-expect no link: "Spend an Inquest"
+given: set hints: 0
+expect no link: "Ask for a hint"
 
-:: a_rewind_gives_back_neither_the_inquest_nor_the_hint [test]
+:: a_rewind_gives_back_neither_the_request_nor_the_hint [test]
 start: prologue
 do: "Wake as Roland, in the pit"
 do: "End the turn"
-do: "Spend an Inquest"
-expect: inquests == 2
+do: "Ask for a hint"
+expect: hints == 2
 do: "Tie the Backward Knot"
 do: "Back to the start of turn 1"
 expect at: oubliette
 expect: roland.rewinds == 0
-expect: inquests == 2
-expect no link: "Spend an Inquest"
+expect: hints == 2
+expect no link: "Ask for a hint"

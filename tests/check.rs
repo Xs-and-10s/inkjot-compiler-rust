@@ -607,20 +607,38 @@ fn text_takes_double_quotes_and_thousands_take_a_mark() {
 }
 
 #[test]
-fn an_inquest_link_needs_inquests_to_spend() {
+fn a_hint_link_needs_hints_to_spend() {
     let ex2 = include_str!("../examples/ex2-the-ninefold-cell.twee");
-    let without = ex2.replace("resource inquests: 3 ~ shared\n", "");
+    let without = ex2.replace("resource hints: 3 ~ shared\n", "");
     let report = inkjot::check(&without);
     assert!(
         report
             .diags
             .iter()
-            .any(|d| d.msg.contains("declare `resource inquests`")),
+            .any(|d| d.msg.contains("declare `resource hints`")),
         "{:#?}",
         report.diags
     );
     assert!(inkjot::check(ex2)
         .diags
         .iter()
-        .all(|d| !d.msg.contains("inquests")));
+        .all(|d| !d.msg.contains("hints")));
+}
+
+#[test]
+fn an_inquest_is_reserved_not_a_hint() {
+    let ex2 = include_str!("../examples/ex2-the-ninefold-cell.twee");
+    let forked = ex2.replace(
+        "> [[Ask for a hint->here]] ~ hint ~ when hints > 0",
+        "> [[Ask for a hint->here]] ~ hint ~ when hints > 0\n> [[Run for it->gate]] ~ inquest",
+    );
+    let report = inkjot::check(&forked);
+    assert!(report.ok(), "{:#?}", report.diags);
+    assert!(report
+        .diags
+        .iter()
+        .any(|d| d.msg.contains("reserved for Inquests")));
+    // `inquest:` is no longer a header line: hints are `hint:`.
+    let old = ex2.replacen("hint: ", "inquest: ", 1);
+    assert!(!inkjot::check(&old).ok());
 }

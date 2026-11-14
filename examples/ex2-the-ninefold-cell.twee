@@ -69,7 +69,7 @@ way sanctum_stair: threshold - sanctum ~ one way
 
 resource vults: 60 ~ per character ~ refill each chronon
 resource hp: per character ~ refill on checkpoint ~ shown as "wounds left"
-resource inquests: 3 ~ shared
+resource hints: 3 ~ shared
 resource rewinds: 1 ~ per character ~ max 1
 
 rewind: undo
@@ -290,8 +290,8 @@ Solo play: you are both of them. Switch between them at any moment, for free. Ea
 
 :: oubliette [room card:SW]
 item abelard: "a knight’s skeleton in a rotted surcoat" ~ fixed ~ holds bone_pick
-inquest: "The grate is too heavy for anything you can do from down here." ~ wits ..=2
-inquest: "Look past the grate. On the far door above, something only needs to slide." ~ wits 3..
+hint: "The grate is too heavy for anything you can do from down here." ~ wits ..=2
+hint: "Look past the grate. On the far door above, something only needs to slide." ~ wits 3..
 --
 [if me.is(roland) and me.visits == 1]
 You wake on your back at the bottom of a stone throat twelve feet deep. The sky is an iron grate.
@@ -387,8 +387,8 @@ If the chain is down here too, Eldric is alone in the pit with no way up. Should
 :: ossuary [room card:S]
 item sluice: "the sluice lever" ~ like lever
 item portcullis_lever: "a rusted lever by the portcullis" ~ like lever ~ with rusty: yes
-inquest: "Rust can be broken, or it can be eased." ~ wits ..=2
-inquest: "There’s lamp oil in this prison. A rusted lever forced once is forced for good." ~ wits 3..
+hint: "Rust can be broken, or it can be eased." ~ wits ..=2
+hint: "There’s lamp oil in this prison. A rusted lever forced once is forced for good." ~ wits 3..
 --
 Bones line the walls in niches, sorted by size with terrible care. An iron grate is set in the floor. A long sluice lever is propped up by a wooden peg. By the north arch, a rusted lever stands beside a lowered portcullis.
 
@@ -475,8 +475,8 @@ item altar: "an altar of the Dawn, overturned" ~ fixed
 item glyph: "a ring of red sigils across the north threshold" ~ fixed
 ~ fact broken: no
 ~ fact frozen: no
-inquest: "That ring of paint is the trap. Rings can be broken." ~ wits ..=2
-inquest: "The paint’s still wet. Scrape it, or freeze it." ~ wits 3..
+hint: "That ring of paint is the trap. Rings can be broken." ~ wits ..=2
+hint: "The paint’s still wet. Scrape it, or freeze it." ~ wits 3..
 --
 [if eldric.chained and me.is(eldric)]
 You wake against a pillar with your wrists in iron. The chain runs to a ring sunk in the stone, rusted, but as thick as your thumb.
@@ -588,8 +588,8 @@ spot lectern: "the lectern"
 item daybook: "the Host’s day-book, written backwards" ~ at lectern ~ fixed
 item slab: "the lectern’s top, one slab of black stone the size of a coffin lid" ~ at lectern ~ fixed
 learn carpet_sags when me.wits >= 3
-inquest: "Stone that heavy hides something underneath." ~ wits ..=2
-inquest: "The writing runs backwards, like writing in a mirror. And he kept that slab where only a strong man could show it to you." ~ wits 3..
+hint: "Stone that heavy hides something underneath." ~ wits ..=2
+hint: "The writing runs backwards, like writing in a mirror. And he kept that slab where only a strong man could show it to you." ~ wits 3..
 --
 Shelves climb to the ceiling, and the air smells of paper slowly going to dust. A long red carpet runs from the door to a lectern of black stone at the far end. A lamp hangs on a hook by the door.
 
@@ -682,8 +682,8 @@ The door holds. Your shoulder doesn’t thank you.
 :: well [room card:C]
 item well_mirror: "the Great Eye" ~ like mirror
 spot bottom: "the bottom of the well"
-inquest: "Something down there wants fetching. Water can be dived, or let out." ~ wits ..=2
-inquest: "The pit you started in had a pipe. The sluice in the Ossuary decides where this water goes." ~ wits 3..
+hint: "Something down there wants fetching. Water can be dived, or let out." ~ wits ..=2
+hint: "The pit you started in had a pipe. The sluice in the Ossuary decides where this water goes." ~ wits 3..
 --
 The middle room. A round shaft fills most of the floor, with black water a long way down. On the north wall hangs the largest mirror you have ever seen, framed in bone: an eye with no lid. Stairs climb north. A door leads west. To the east, a ledge drops into darkness.
 
@@ -749,8 +749,8 @@ Up the chain, out of the cold.
 item statue_lever: "the statue lever" ~ like lever ~ with rusty: yes
 item planet_lever: "the planet lever" ~ like lever
 item eye_lever: "the eye lever" ~ like lever
-inquest: "Three carvings, three mirrors." ~ wits ..=2
-inquest: "Close the right mirror and something in the Gallery stops being watched." ~ wits 3..
+hint: "Three carvings, three mirrors." ~ wits ..=2
+hint: "Close the right mirror and something in the Gallery stops being watched." ~ wits 3..
 --
 Racks of weapons, rusted to lace. Along the north wall stand three levers, each under a small carving: a statue, a planet, an open eye. The statue lever is red with rust. A spiral stair climbs into the dark. High on the west wall, a ledge overhangs, too high to reach. South, a door to the chapel.
 
@@ -822,8 +822,8 @@ fact crown: 4 ~ of 6
 let hours: ["dawn", "morning", "noon", "dusk", "evening", "midnight"]
 get aligned: orrery.ember == orrery.tide and orrery.tide == orrery.crown
 learn heart_is_life when me.wits >= 3 and orrery_mirror.open
-inquest: "The three planets move at different speeds." ~ wits ..=2
-inquest: "Count how far each planet moves for one turn of the crank." ~ wits 3..
+hint: "The three planets move at different speeds." ~ wits ..=2
+hint: "Count how far each planet moves for one turn of the crank." ~ wits 3..
 --
 A brass orrery fills the room. At its heart hangs a sun the size of a man’s head, gleaming as if lit from inside. A bright rod pierces it top to bottom, and above the sun the rod ends in a short crossbar, like a crown. Three planets ride their rings: red Ember at {hours[orrery.ember]}, blue Tide at {hours[orrery.tide]}, gold Crown at {hours[orrery.crown]}. A crank stands at the rim. A plaque is set in the base.
 
@@ -927,8 +927,8 @@ You get both arms round the sun and heave. The rings bend, the rod bends, and th
 
 :: gallery [room card:N]
 item gallery_mirror: "a tall black mirror facing the statues" ~ like mirror
-inquest: "The statues have moved before. Look at the floor." ~ wits ..=2
-inquest: "They only dance when nothing’s looking. Something is always looking in here." ~ wits 3..
+hint: "The statues have moved before. Look at the floor." ~ wits ..=2
+hint: "They only dance when nothing’s looking. Something is always looking in here." ~ wits 3..
 --
 A long hall of plinths. On two stand statues: a Knight in stone plate, twice the size of a man, and a Widow in a stone veil with her hands half raised. The third plinth is empty. Arches open west and east, and stairs lead down.
 
@@ -992,8 +992,8 @@ retell: "On Roland’s word, and against all sense, Eldric shut his eyes and pus
 fact sun_seal: no
 fact mouth_seal: no
 fact scale_seal: no
-inquest: "Each lock says what it wants." ~ wits ..=2
-inquest: "His heart, his guardian, and what he gave up, in order." ~ wits 3..
+hint: "Each lock says what it wants." ~ wits ..=2
+hint: "His heart, his guardian, and what he gave up, in order." ~ wits 3..
 --
 The door is black iron, twice Eldric’s height, with no handle. Three locks are set in it: a socket shaped like a sun, a stone mouth with parted lips, and, on the floor before it, a great iron pan hung on chains like one side of a scale. Words are cut above each.
 
@@ -1057,7 +1057,7 @@ The mouth laughs at you, and frost comes out of it.
 :: party_bar [lib everywhere]
 > [[Switch to Eldric->here]] ~ switch ~ for roland
 > [[Switch to Roland->here]] ~ switch ~ for eldric
-> [[Spend an Inquest->here]] ~ inquest ~ when inquests > 0
+> [[Ask for a hint->here]] ~ hint ~ when hints > 0
 > [[Tie the Backward Knot->rewind]] ~ backward_knot ~ for roland ~ when roland.rewinds > 0 and eldric.alive
 > [[Pray for the hour back->rewind]] ~ second_dawn ~ for eldric ~ when eldric.rewinds > 0
 > [[End the turn->here]] ~ pass
@@ -1117,7 +1117,7 @@ spell falter ~ then nothing
 encounter hask
 ~ round by round
 ~ countdown 3s per act
-~ plus 2s when inquest
+~ plus 2s when hinted
 ~ timeout stay
 ~ hask casts last
 ~ until hask.wards == 0 or pov.all.down
@@ -1139,8 +1139,8 @@ You know his rhyme, every line. You know what he does first.
 
 :: sanctum:round [round]
 let next: hask.rhyme.next
-inquest: "Watch his hands. They tell you what’s coming." ~ wits ..=2
-inquest: "He’ll do what the rhyme says next. Answer it before he finishes." ~ wits 3..
+hint: "Watch his hands. They tell you what’s coming." ~ wits ..=2
+hint: "He’ll do what the rhyme says next. Answer it before he finishes." ~ wits 3..
 --
 [if next == flame]
 He draws a line of red across the air with one finger.

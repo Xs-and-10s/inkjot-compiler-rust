@@ -77,7 +77,7 @@ pub(crate) const SETTINGS: &[&str] = &[
     "reveal",
     "dialogue",
     "next",
-    "inquest",
+    "hint",
     "observe",
     "timeout",
     "param",
@@ -117,8 +117,8 @@ pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "ret
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
-    "check", "chance", "inquest", "order", "after", "become", "with", "by", "switch", "pass",
-    "release", "requires", "once", "loud", "quiet", "choice",
+    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch",
+    "pass", "release", "requires", "once", "loud", "quiet", "choice",
 ];
 
 /// The input family: `{name input for: me.name}`.

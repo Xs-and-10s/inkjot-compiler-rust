@@ -256,7 +256,7 @@
     },
     {
       "declare": "resource",
-      "id": "inquests",
+      "id": "hints",
       "value": 3,
       "tags": ["shared"]
     },
@@ -1728,7 +1728,7 @@
           ]
         },
         {
-          "inquest": "The grate is too heavy for anything you can do from down here.",
+          "hint": "The grate is too heavy for anything you can do from down here.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -1737,7 +1737,7 @@
           }
         },
         {
-          "inquest": "Look past the grate. On the far door above, something only needs to slide.",
+          "hint": "Look past the grate. On the far door above, something only needs to slide.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -2380,7 +2380,7 @@
           "with": {"rusty": true}
         },
         {
-          "inquest": "Rust can be broken, or it can be eased.",
+          "hint": "Rust can be broken, or it can be eased.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -2389,7 +2389,7 @@
           }
         },
         {
-          "inquest": "There’s lamp oil in this prison. A rusted lever forced once is forced for good.",
+          "hint": "There’s lamp oil in this prison. A rusted lever forced once is forced for good.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -3029,7 +3029,7 @@
           "facts": {"broken": false, "frozen": false}
         },
         {
-          "inquest": "That ring of paint is the trap. Rings can be broken.",
+          "hint": "That ring of paint is the trap. Rings can be broken.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -3038,7 +3038,7 @@
           }
         },
         {
-          "inquest": "The paint’s still wet. Scrape it, or freeze it.",
+          "hint": "The paint’s still wet. Scrape it, or freeze it.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -3828,7 +3828,7 @@
           }
         },
         {
-          "inquest": "Stone that heavy hides something underneath.",
+          "hint": "Stone that heavy hides something underneath.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -3837,7 +3837,7 @@
           }
         },
         {
-          "inquest": "The writing runs backwards, like writing in a mirror. And he kept that slab where only a strong man could show it to you.",
+          "hint": "The writing runs backwards, like writing in a mirror. And he kept that slab where only a strong man could show it to you.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -4528,7 +4528,7 @@
         },
         {"declare": "spot", "id": "bottom", "label": "the bottom of the well"},
         {
-          "inquest": "Something down there wants fetching. Water can be dived, or let out.",
+          "hint": "Something down there wants fetching. Water can be dived, or let out.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -4537,7 +4537,7 @@
           }
         },
         {
-          "inquest": "The pit you started in had a pipe. The sluice in the Ossuary decides where this water goes.",
+          "hint": "The pit you started in had a pipe. The sluice in the Ossuary decides where this water goes.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -4989,7 +4989,7 @@
           "like": "lever"
         },
         {
-          "inquest": "Three carvings, three mirrors.",
+          "hint": "Three carvings, three mirrors.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -4998,7 +4998,7 @@
           }
         },
         {
-          "inquest": "Close the right mirror and something in the Gallery stops being watched.",
+          "hint": "Close the right mirror and something in the Gallery stops being watched.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -5611,7 +5611,7 @@
           }
         },
         {
-          "inquest": "The three planets move at different speeds.",
+          "hint": "The three planets move at different speeds.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -5620,7 +5620,7 @@
           }
         },
         {
-          "inquest": "Count how far each planet moves for one turn of the crank.",
+          "hint": "Count how far each planet moves for one turn of the crank.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -6424,7 +6424,7 @@
           "like": "mirror"
         },
         {
-          "inquest": "The statues have moved before. Look at the floor.",
+          "hint": "The statues have moved before. Look at the floor.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -6433,7 +6433,7 @@
           }
         },
         {
-          "inquest": "They only dance when nothing’s looking. Something is always looking in here.",
+          "hint": "They only dance when nothing’s looking. Something is always looking in here.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -6858,7 +6858,7 @@
         {"declare": "fact", "id": "mouth_seal", "value": false},
         {"declare": "fact", "id": "scale_seal", "value": false},
         {
-          "inquest": "Each lock says what it wants.",
+          "hint": "Each lock says what it wants.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -6867,7 +6867,7 @@
           }
         },
         {
-          "inquest": "His heart, his guardian, and what he gave up, in order.",
+          "hint": "His heart, his guardian, and what he gave up, in order.",
           "stats": {
             "wits": {
               "range": [3, null],
@@ -7370,9 +7370,9 @@
           "type": "link",
           "id": "party_bar#3",
           "lib": "party_bar",
-          "label": "Spend an Inquest",
+          "label": "Ask for a hint",
           "target": "here",
-          "kind": "inquest",
+          "kind": "hint",
           "act": null,
           "arg": null,
           "cost": [],
@@ -7382,7 +7382,7 @@
           "check": null,
           "choice": null,
           "when": {
-            ">": ["inquests", 0]
+            ">": ["hints", 0]
           },
           "hidden_until": null,
           "for": null,
@@ -7659,7 +7659,7 @@
       "tags": ["encounter"],
       "margin": false,
       "header": [
-        {"stretch": "encounter", "source": "encounter hask ~ round by round ~ countdown 3s per act ~ plus 2s when inquest ~ timeout stay ~ hask casts last ~ until hask.wards == 0 or pov.all.down"},
+        {"stretch": "encounter", "source": "encounter hask ~ round by round ~ countdown 3s per act ~ plus 2s when hinted ~ timeout stay ~ hask casts last ~ until hask.wards == 0 or pov.all.down"},
         {
           "declare": "item",
           "id": "east_mirror",
@@ -7806,7 +7806,7 @@
           "when": null
         },
         {
-          "inquest": "Watch his hands. They tell you what’s coming.",
+          "hint": "Watch his hands. They tell you what’s coming.",
           "stats": {
             "wits": {
               "range": [null, 2],
@@ -7815,7 +7815,7 @@
           }
         },
         {
-          "inquest": "He’ll do what the rhyme says next. Answer it before he finishes.",
+          "hint": "He’ll do what the rhyme says next. Answer it before he finishes.",
           "stats": {
             "wits": {
               "range": [3, null],

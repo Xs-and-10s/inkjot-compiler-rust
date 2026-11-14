@@ -18,7 +18,7 @@
 //! **An undo rewind** (`rewind: undo`) takes a Link to `rewind`, spends a
 //! charge, and offers every visited turn and reached checkpoint. Going back
 //! restores *everything* except what it keeps, and what the player owns
-//! rather than the characters (charges and Inquests).
+//! rather than the characters (charges and hints).
 //!
 //! **An echo** (`rewind: echo`, and every death of a Linker with a charge
 //! left when no checkpoint catches it) sends one Linker back a stop or two
@@ -48,7 +48,7 @@ use crate::json::Value;
 
 /// Resources that belong to the player, not the character: a rewind never
 /// gives them back.
-const META: &[&str] = &["rewinds", "inquests"];
+const META: &[&str] = &["rewinds", "hints", "inquests"];
 
 /// The whole world at one moment.
 #[derive(Clone, Default)]
@@ -649,7 +649,7 @@ mod tests {
             wander(&mut run, &second);
             run.undo(then.clone()).unwrap();
             for (key, value) in &then.vals {
-                let charge = key.ends_with(".rewinds") || key == "inquests";
+                let charge = key.ends_with(".rewinds") || key == "hints";
                 if !charge {
                     prop_assert_eq!(run.vals.get(key), Some(value), "{}", key);
                 }

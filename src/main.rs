@@ -11,6 +11,7 @@ usage:
   inkjot play <file.twee>...    play the story in the terminal
       --as a,b                  several Linkers at one keyboard, one per character
       --at passage              begin at this passage
+      --no-hints                never offer a hint
   inkjot --version
   inkjot --help
 
@@ -231,6 +232,7 @@ fn play(args: &[String]) -> ExitCode {
     let mut paths = Vec::new();
     let mut cast: Vec<String> = Vec::new();
     let mut at: Option<String> = None;
+    let mut hints = true;
     let mut words = args.iter();
     while let Some(word) = words.next() {
         match word.as_str() {
@@ -239,6 +241,7 @@ fn play(args: &[String]) -> ExitCode {
                 cast = names.split(',').map(|n| n.trim().to_string()).collect();
             }
             "--at" => at = words.next().cloned(),
+            "--no-hints" => hints = false,
             _ => paths.push(word.clone()),
         }
     }
@@ -260,6 +263,9 @@ fn play(args: &[String]) -> ExitCode {
         }
     };
     let mut run = inkjot::run::Run::new(&story, 1);
+    if !hints {
+        run.turn_off_hints();
+    }
     let started = if cast.len() > 1 {
         let who: Vec<&str> = cast.iter().map(String::as_str).collect();
         run.start_cohort(at.as_deref(), &who)

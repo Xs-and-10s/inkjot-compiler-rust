@@ -57,7 +57,7 @@ pub const BUILTINS: &[&str] = &[
     // v0.6 stretch: the duel.
     "cast",
     "absorbed",
-    "inquest",
+    "hinted",
 ];
 
 /// Every bare name an expression reads, in order. `a.b(c)` reads `a` and `c`.

@@ -115,7 +115,7 @@ left out of the IR.
 |---|---|
 | `id` | The passage name, `#`, and the Link's position in it, counting from 1 |
 | `lib` | Present when the Link lives in a `[lib]` passage that cells embed |
-| `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `inquest`, `release` |
+| `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `inquest` (reserved), `release` |
 | `act`, `arg` | The act or combo, and its argument (`take cufflink`) |
 | `cost` | The act's costs, then the Link's. **The last entry whose `when` holds applies.** `vults` is a number or `"rest"`; `per` and `from` appear when written |
 | `scope`, `capacity`, `check`, `ends_turn` | The Link's own value, else the act's |
@@ -140,7 +140,7 @@ A statement is an object whose first key says what it is. Statements are
 | `setting` | `cohort: 2..=5 ~ best 3..=4` | `{"setting": "cohort", "value": {range}, "best": {range}}` |
 | `goal`, `reaction` | `goal flee: ~ toward platform ~ weight 6` | `{"goal": "flee", "toward": "platform", "weight": 6}` |
 | `checkpoint` | `checkpoint cells: ~ on death in prison` | `{"checkpoint": "cells", "on_death_in": "prison", …}` |
-| `inquest` | `inquest: "…" ~ wits 3..` | `{"inquest": "…", "stats": {"wits": {range}}}` |
+| `hint` | `hint: "…" ~ wits 3..` | `{"hint": "…", "stats": {"wits": {range}}}` |
 | `effect` | `learn secret` | the effect; `clauses` if it has any |
 | `let` | `let ready: me.knows.secret` | `value` (an expression, or `{"roll": "d6"}`), `when` |
 | `expect` | `expect always: …` | `always`, `else` |
@@ -277,7 +277,7 @@ Insert arguments for inputs, `accuse`, `reveal` and sounds are still text in
 
 - Declarations and settings are typed fields instead of `clauses` and `words`.
 - Statements are sparse: absent fields are left out.
-- Goals, reactions, checkpoints and inquests have their own first key.
+- Goals, reactions, checkpoints and hints have their own first key.
 - Indexing (`hours[i]`) is `{"index": …}`, so `at` is free for the method
   `who.at(spot)`.
 - `[test]` passages are left out.
