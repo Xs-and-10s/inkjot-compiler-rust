@@ -136,6 +136,7 @@ fn a_link_is_expanded_with_its_acts_defaults() {
         "capacity": null,
         "clash": "none",
         "check": null,
+        "choice": null,
         "when": null,
         "hidden_until": {"knows": ["me", "two_hands"]},
         "for": null,

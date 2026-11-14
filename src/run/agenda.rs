@@ -428,22 +428,36 @@ impl Run<'_> {
             .all(|id| id == a || id == b)
     }
 
-    /// `x.last_seen(holding: evidence)`: the character `x` most recently
-    /// saw holding a thing with the tag. NPCs look at the end of each turn
-    /// (see [`Run::look`]), so this is who ended a stop in their place.
-    /// Only characters count for now: whether an NPC may hunt an NPC, and
-    /// how to say so, is an open question.
-    pub(super) fn last_seen(&self, who: &str, tag: &str) -> V {
+    /// `x.last_seen(character, holding: evidence)`: whoever of that kind
+    /// `x` most recently saw holding a thing with the tag. With no kind,
+    /// anyone. NPCs look at the end of each turn (see [`Run::look`]), so
+    /// this is someone who ended a stop in their place.
+    pub(super) fn last_seen(&self, who: &str, kind: Option<&str>, tag: &str) -> V {
         let log = self.sightings.get(who).map(Vec::as_slice).unwrap_or(&[]);
         for (_, seen) in log.iter().rev() {
             for (person, held) in seen {
-                let character = self.story.kind(person) == Some("character");
-                if character && held.iter().any(|item| self.tagged(item, tag)) {
+                let fits = kind.is_none_or(|k| self.is_kind(person, k));
+                if fits && held.iter().any(|item| self.tagged(item, tag)) {
                     return V::Id(person.clone());
                 }
             }
         }
         V::Null
+    }
+
+    /// Is `id` of this kind? A declared kind (`character`, `npc`, `item`),
+    /// a tag (`suspect`), `person` (a character or an NPC) or `linker`
+    /// (a character someone is playing).
+    pub(super) fn is_kind(&self, id: &str, kind: &str) -> bool {
+        match kind {
+            "person" => matches!(self.story.kind(id), Some("character" | "npc")),
+            "linker" => self.story.povs.iter().any(|p| p == id) || self.at.contains_key(id),
+            _ => {
+                self.story.kind(id) == Some(kind)
+                    || self.tagged(id, kind)
+                    || self.story.field(id, "like").as_str() == Some(kind)
+            }
+        }
     }
 
     /// `roll standoff`: roll the table's dice and run every row that matches.

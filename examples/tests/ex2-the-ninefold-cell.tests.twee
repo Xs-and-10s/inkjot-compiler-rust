@@ -121,3 +121,46 @@ expect: knight.in(gate) and widow.in(gate)
 expect: gate.scale_seal
 expect: knight.fixed
 expect: not roland.dead
+
+:: here_has_takes_a_kind [test]
+start: gallery ~ as eldric
+expect: here.has(statue)
+expect: here.has(knight)
+expect link: "Watch the statues"
+as: roland
+expect: not here.has(statue)
+
+:: a_death_in_the_prison_starts_the_cells_again [test]
+start: prologue
+do: "Wake as Roland, in the pit"
+do: "Look up through the grate"
+do: "Tug the bolt across the room"
+expect: bolted_door.open
+given: kill roland
+expect text: "You wake where you began"
+expect text: "Again! From the top!"
+expect: not roland.dead
+expect: not bolted_door.open
+expect: eldric.chained
+expect: me.knows.far_bolt
+expect at: oubliette
+expect: hask.deaths == 1
+
+:: the_backward_knot_undoes_a_turn [test]
+start: prologue
+do: "Wake as Roland, in the pit"
+do: "Look up through the grate"
+do: "End the turn"
+do: "Tug the bolt across the room"
+expect: bolted_door.open
+expect: roland.rewinds == 1
+do: "Tie the Backward Knot"
+expect link: "Back to the start of turn 1"
+expect link: "Back to the start of turn 0"
+do: "Back to the start of turn 1"
+expect: not bolted_door.open
+expect: me.knows.far_bolt
+expect: roland.rewinds == 0
+expect: clock.now == 1
+expect at: oubliette
+expect no link: "Tie the Backward Knot"

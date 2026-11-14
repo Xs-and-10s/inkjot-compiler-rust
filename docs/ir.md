@@ -40,6 +40,10 @@ current.
 `header` holds statements. `body` holds nodes. A margin passage (`[npc]`,
 `[character]`, `[place]`, `[archetype]`) is all header.
 
+A passage with a doc comment (a `(((…)))` block straight after its `::`
+line) has a `doc` field after `tags`, for Inkwell. Other comments, `((…))`,
+never reach the IR.
+
 ## Body nodes
 
 Each node has a `type`.
@@ -139,6 +143,8 @@ A statement is an object whose first key says what it is. Statements are
 
 ### What follows a declaration's colon
 
+When there is no value, there is no colon: `archetype statue ~ lifeless`.
+
 | Declares | Field |
 |---|---|
 | most things | `label`, from the quoted text |
@@ -177,6 +183,8 @@ repeats, lists extend and objects merge.
 | `requires …` | `requires` (lowered words) |
 | `ends turn`, `one way`, `on tap` | `ends_turn`, `one_way`, `on_tap`: `true` |
 | `learned from clue X`, `once per day` | `learned_from`, `once_per` |
+| `choice proactive` (`reactive`, `inactive`) | `choice` |
+| `back 1..=2` (on `rewind: echo`) | `back` |
 | `moves a, b` / `moves none` / `moves 2 per chronon` | `moves` (list; `[]` for none) / `speed` |
 | `asleep during R`, `wakes on loud`, `stays awake n` | `asleep_during`, `wakes_on`, `stays_awake` |
 | `toward E`, `via X`, `pace X` | `toward`, `via`, `pace` |

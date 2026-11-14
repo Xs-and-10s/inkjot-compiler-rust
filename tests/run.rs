@@ -363,3 +363,93 @@ proptest! {
         prop_assert_eq!(first, second);
     }
 }
+
+/// A tiny world of stops with a watch: an echo may learn, but whatever else
+/// its acts would do does not happen.
+const ECHO: &str = r#":: StoryTitle
+Echo
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall@0"}
+
+:: Inklink [config]
+kind: story
+mode: cohort
+cohort: 1..=2
+clock: 0..=3 ~ shown as "hour"
+place hall: "the hall"
+resource vults: 3 ~ refill each chronon
+resource rewinds: 1 ~ max 1
+rewind: echo
+~ back 1..=2
+~ keeps knows
+act walk: cost 1 ~ steps 1 ~ ends turn
+act fiddle: cost 1 ~ private
+character ann: "Ann" ~ playable
+fact lamp: no
+clue lamp_works: "The lamp works."
+
+:: watch [lib everywhere]
+> [[Turn back->rewind]] ~ when me.rewinds > 0 and not me.past
+
+:: lamp [lib]
+> [[Light the lamp->lamp:light]] ~ fiddle
+
+:: lamp:light [act]
+set lamp: yes
+learn lamp_works
+--
+Click.
+
+:: hall@0
+Hour nothing.
+{embed nib: 'lamp'}
+
+:: hall@1
+Hour one.
+{embed nib: 'lamp'}
+
+:: hall@2
+Hour two.
+{embed nib: 'lamp'}
+
+:: hall@3
+Hour three.
+
+:: echo [test]
+start: hall@0 ~ as ann
+do: "Stay"
+do: "Stay"
+expect: clock.now == 2
+do: "Turn back"
+do: "Back 2 hours"
+expect at: hall@0
+expect: me.past and clock.now == 0
+do: "Light the lamp"
+expect text: "Click."
+expect: me.knows.lamp_works
+expect: not lamp
+expect: ann.vults == 3
+do: "Stay"
+expect at: hall@1
+expect: me.past
+do: "Stay"
+expect at: hall@2
+expect: not me.past
+expect: clock.now == 2
+expect: ann.rewinds == 0
+"#;
+
+#[test]
+fn an_echo_learns_but_changes_nothing() {
+    let ir = inkjot::build(ECHO).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    for outcome in run_all(ECHO, &ir).unwrap() {
+        assert!(
+            outcome.passed(),
+            "{}: {:#?}\n{}",
+            outcome.name,
+            outcome.failures,
+            outcome.transcript.join("\n")
+        );
+    }
+}

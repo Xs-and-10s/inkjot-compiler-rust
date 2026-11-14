@@ -77,11 +77,11 @@ rewind: undo
 ~ to any visited turn or checkpoint
 ~ keeps knows, trust
 ~ unseen by hask
-checkpoint cells: ~ on death in prison
+checkpoint cells ~ on death in prison
 ~ resets world, held, trust, hp
-~ keeps knows
+~ keeps knows, hask
 ~ to oubliette for roland, chapel for eldric
-checkpoint threshold: ~ on death in sanctum
+checkpoint threshold ~ on death in sanctum
 ~ resets sanctum, hp
 ~ keeps knows, held, trust
 ~ to threshold
@@ -112,14 +112,14 @@ act strike: cost 20
 act guard: cost 20
 act together: cost 30 from each ~ requires pov.all here
 
-archetype sword: ~ weapon
-archetype lever: ~ fixed
+archetype sword ~ weapon
+archetype lever ~ fixed
 ~ fact rusty: no
 ~ fact oiled: no
 ~ fact snapped: no
 ~ fact mended: no
-archetype statue: ~ lifeless
-archetype mirror: ~ fixed
+archetype statue ~ lifeless
+archetype mirror ~ fixed
 ~ fact open: yes
 ~ watches here when self.open
 
@@ -257,13 +257,13 @@ on turn when collapse.lit
 --
 moves: 1 per chronon
 
-goal stalk:
+goal stalk
 ~ toward nearest(living)
 ~ via wide
 ~ weight 1
 ~ when not self.watched
 
-reaction strike:
+reaction strike
 ~ when not self.watched and count(living, in: here) >= 1
 ~ then kill one(living, in: here)
 
@@ -949,7 +949,7 @@ The Knight’s plinth stands empty.
 ~ order eldric
 ~ push
 ~ when me.knows.statue_rule and eldric.here and here.has(knight)
-> [[Watch the statues->gallery]] ~ observe ~ when here.has(knight) or here.has(widow)
+> [[Watch the statues->gallery]] ~ observe ~ when here.has(statue)
 
 :: gallery:floor [act]
 learn statue_rule when me.is(roland)
@@ -1111,7 +1111,7 @@ spell sunfall: at pov.all ~ then kill target
 ~ blocked by shield, absorb
 spell recall: at holder ~ then take heart
 ~ blocked by shield, absorb, guard
-spell falter: ~ then nothing
+spell falter ~ then nothing
 
 :: sanctum [encounter]
 encounter hask

@@ -36,16 +36,19 @@ way vestibule: baggage - platform
 
 resource vults: 3 ~ refill each chronon ~ shown as "minutes"
 resource rewinds: 2 ~ max 3 ~ shown as "charges"
+rewind: echo
+~ back 1..=2
+~ keeps knows
 
 act walk: cost 2 ~ steps 1 ~ ends turn
 act dash: requires full vults ~ cost 1 per step ~ steps 1..=2 ~ ends turn ~ loud
 act slip: cost 3 ~ steps 1 ~ ends turn ~ quiet
-act observe: cost rest ~ min 1 ~ ends turn
+act observe: cost rest ~ min 1 ~ ends turn ~ choice inactive
 act take: cost 1 ~ shared ~ capacity 1
 act force: cost 2 ~ shared ~ capacity 1 ~ loud
 act examine: cost 1 ~ private
 act ask: cost 1 ~ private
-act confront: cost 1 ~ shared ~ capacity many
+act confront: cost 1 ~ shared ~ capacity many ~ choice proactive
 act wind: cost rest ~ min 1 ~ private ~ ends turn
 
 item compartment_key: "a brass key on a fob stamped S.A." ~ held by wren
@@ -86,7 +89,7 @@ npc marsh: "Colonel Marsh" ~ witness ~ moves none ~ in sleeper
 ~ wakes on loud
 ~ stays awake 1
 
-scenario night_one:
+scenario night_one
 ~ culprit vell
 ~ method device
 ~ methods device, poison, fall
@@ -99,7 +102,7 @@ fact cornered: no
 fact shoes_seen: no
 fact shown_cufflink: no
 fact exposed: no
-let target: self.last_seen(holding: evidence)
+let target: self.last_seen(character, holding: evidence)
 let blocker: one(linker, in: here)
 let bonus: 0
 let bonus: 1 when blocker.is(rook)
@@ -107,43 +110,43 @@ let bonus: 1 when blocker.is(rook)
 starts: lounge@0
 ties: first
 
-goal flee:
+goal flee
 ~ toward platform
 ~ weight 6
 ~ pace dash
 ~ when self.cornered
 
-goal silence:
+goal silence
 ~ toward target
 ~ weight 5
 ~ then teach target the_attack when alone_with(self, target)
 ~ then kill target when alone_with(self, target)
 
-goal burn_notebook:
+goal burn_notebook
 ~ toward sleeper
 ~ weight 4
 ~ when notebook.exists and not notebook.secured
 ~ then destroy notebook
 
-goal lie_low:
+goal lie_low
 ~ toward sleeper
 ~ weight 3
 ~ when clock.now in 2..=4
 ~ then feign sleep
 
-goal guard_model:
+goal guard_model
 ~ toward mail
 ~ weight 2
 
-reaction chase:
+reaction chase
 ~ when self.saw(dash, toward: self.heading)
 ~ then dash toward self.heading
 
-reaction surrender:
+reaction surrender
 ~ when self.leaving and count(linker, in: here) >= 2
 ~ then detain vell
 
-reaction standoff:
+reaction standoff
 ~ when self.leaving and count(linker, in: here) == 1
 ~ then roll standoff
 
@@ -384,6 +387,13 @@ Miss Vell’s ticket, never punched. It must have been under him since the light
 
 [else]
 {claimants} got to it first.
+
+:: watch [lib everywhere]
+(((
+The Professor's prototype. Before acting at a stop, a charge throws you back
+a stop or two, to re-live it: look and learn, but change nothing.
+)))
+> [[Turn your watch back->rewind]] ~ when me.rewinds > 0 and me.vults == 3 and not me.past
 
 :: baggage_car [lib]
 let can_wind: me.rewinds < 3 and not me.wound_watch

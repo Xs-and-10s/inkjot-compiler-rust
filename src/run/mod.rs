@@ -10,6 +10,7 @@ mod agenda;
 mod cohort;
 mod events;
 pub mod test;
+mod time;
 mod value;
 
 use events::Event;
@@ -55,6 +56,10 @@ pub struct Story {
     handlers: Vec<(Value, Option<String>)>,
     /// `default moves: walk, dash`, `default clash: random_winner`.
     defaults: HashMap<String, Value>,
+    /// Every `checkpoint name ~ on death in …` declaration.
+    checkpoints: Vec<Value>,
+    /// The `rewind:` setting, if the Inklink has one.
+    rewind: Option<Value>,
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -83,6 +88,8 @@ impl Story {
             ways: Vec::new(),
             handlers: Vec::new(),
             defaults: HashMap::new(),
+            checkpoints: Vec::new(),
+            rewind: None,
         };
         let config = ir
             .get("config")
@@ -114,6 +121,11 @@ impl Story {
         for s in stmts {
             if s.get("on").is_some() {
                 self.handlers.push((s.clone(), home.map(str::to_string)));
+            }
+            // `checkpoint cells ~ on death in prison …` declares one;
+            // `checkpoint threshold` in a passage reaches it.
+            if s.get("checkpoint").is_some() && s.get("on_death_in").is_some() {
+                self.checkpoints.push(s.clone());
             }
             if f(s, "declare").as_str() == Some("way") {
                 let id = f(s, "id").as_str().unwrap_or("").to_string();
@@ -148,7 +160,10 @@ impl Story {
                 Some("pov") => self.povs = strs(f(s, "value")),
                 Some("clock") => {
                     self.defaults.insert("clock".into(), f(s, "value").clone());
+                    self.defaults
+                        .insert("clock_shown_as".into(), f(s, "shown_as").clone());
                 }
+                Some("rewind") => self.rewind = Some(s.clone()),
                 Some("default") => {
                     if let Some(of) = f(s, "of").as_str() {
                         self.defaults.insert(of.to_string(), f(s, "value").clone());
@@ -272,6 +287,20 @@ pub struct Run<'s> {
     verdict: Option<(bool, bool)>,
     /// What each NPC saw at the end of each turn: who, holding what.
     sightings: HashMap<String, Vec<Sighting>>,
+    /// The world at the start of every turn, oldest first.
+    history: Vec<time::Snapshot>,
+    /// Each checkpoint's snapshot: from the start, or from when it was reached.
+    saved: HashMap<String, time::Snapshot>,
+    /// The checkpoints reached so far, in order.
+    reached: Vec<String>,
+    /// Linkers re-living an earlier stop, and which.
+    past: HashMap<String, u32>,
+    /// Who dashed through each place, by the stop it was: `here.passed`.
+    passed: HashMap<(u32, String), Vec<String>>,
+    /// Characters who died during this Link, and where.
+    dying: Vec<(String, String)>,
+    /// While a rewind is announced: whose handlers do not see it.
+    unseen_by: Vec<String>,
 }
 
 impl<'s> Run<'s> {
@@ -308,9 +337,17 @@ impl<'s> Run<'s> {
             claimants: String::new(),
             verdict: None,
             sightings: HashMap::new(),
+            history: Vec::new(),
+            saved: HashMap::new(),
+            reached: Vec::new(),
+            past: HashMap::new(),
+            passed: HashMap::new(),
+            dying: Vec::new(),
+            unseen_by: Vec::new(),
         };
         run.init();
         run.place_npcs();
+        run.start_the_log();
         run
     }
 
@@ -460,7 +497,10 @@ impl<'s> Run<'s> {
                 before: false,
             })?;
         }
-        self.enter(&passage, HashMap::new())
+        self.enter(&passage, HashMap::new())?;
+        // The log begins where play does.
+        self.history = vec![self.snapshot()];
+        Ok(())
     }
 
     /// The text shown since this was last called.
@@ -510,10 +550,15 @@ impl<'s> Run<'s> {
         if !self.available(&link)? {
             return Err(format!("the Link `{id}` is not available"));
         }
-        self.take(&link)
+        self.take(&link)?;
+        self.settle_deaths()
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
+        // An echo may look and learn, but take nothing and reach for nothing.
+        if self.in_past() && (self.is_claim(link) || f(link, "act").as_str() == Some("take")) {
+            return Ok(false);
+        }
         // Already reached for, and waiting to be settled.
         if self.claimed(link) {
             return Ok(false);
@@ -608,6 +653,13 @@ impl<'s> Run<'s> {
     /// committed, a shared act with limited room is claimed, and anything
     /// else happens at once.
     fn take(&mut self, link: &Value) -> R<()> {
+        if f(link, "kind").as_str() == Some("rewind") {
+            return self.rewind_to(link);
+        }
+        // An echo moves through the past, one stop at a time.
+        if self.in_past() && self.ends_turn(link) {
+            return self.echo_moves(link);
+        }
         if self.story.field("walk", "ends_turn") == &Value::Bool(true) && self.ends_turn(link) {
             if matches!(f(link, "kind").as_str(), Some("walk" | "stay")) {
                 return self.commit(link, false);
@@ -626,6 +678,9 @@ impl<'s> Run<'s> {
 
     /// Pay what a Link costs, from whoever acts.
     fn pay(&mut self, link: &Value) -> R<()> {
+        if self.in_past() {
+            return Ok(()); // the past is already paid for
+        }
         let actor = f(link, "order")
             .as_str()
             .map_or(self.pov.clone(), str::to_string);
@@ -754,7 +809,7 @@ impl<'s> Run<'s> {
         }
         match target.as_str() {
             "here" => self.relist(),
-            "rewind" => Err("rewinds are not supported by the interpreter yet".into()),
+            "rewind" => self.begin_rewind(),
             _ => self.enter(&target, params),
         }
     }
@@ -825,6 +880,7 @@ impl<'s> Run<'s> {
         // note who they saw.
         self.agendas()?;
         self.look();
+        self.history.push(self.snapshot());
         Ok(())
     }
 
@@ -864,7 +920,8 @@ impl<'s> Run<'s> {
             })?;
         }
         // A cell, `dining@2`, is a place at a time: being there means it is stop 2.
-        if let Some(n) = passage.rsplit_once('@').and_then(|(_, n)| n.parse().ok()) {
+        let cell_time = passage.rsplit_once('@').and_then(|(_, n)| n.parse().ok());
+        if let Some(n) = cell_time.filter(|_| !self.in_past()) {
             self.chronon = n;
         }
         self.locals = params
@@ -904,7 +961,7 @@ impl<'s> Run<'s> {
     /// chronon it will be by then, or the place's own passage.
     fn arrival(&self, place: &str) -> Option<String> {
         let ends_turn = self.story.field("walk", "ends_turn") == &Value::Bool(true);
-        self.arrival_at(place, self.chronon + u32::from(ends_turn))
+        self.arrival_at(place, self.when() + u32::from(ends_turn))
     }
 
     /// The passage for being at `place` at stop `when`: its cell, or the
@@ -970,6 +1027,10 @@ impl<'s> Run<'s> {
     fn standing_links(&mut self) -> R<Vec<Value>> {
         let story = self.story;
         let mut links = Vec::new();
+        // In a lobby, before anyone is anyone, nothing stands everywhere.
+        if self.pov.is_empty() {
+            return Ok(links);
+        }
         let mut libs: Vec<&String> = story
             .passages
             .iter()
@@ -1043,6 +1104,8 @@ impl<'s> Run<'s> {
         } else if let Some(effect) = s.get("effect") {
             let clauses = f(s, "clauses").as_arr().unwrap_or(&[]).to_vec();
             self.apply(effect, &clauses)?;
+        } else if let (Some(name), None) = (f(s, "checkpoint").as_str(), s.get("on_death_in")) {
+            self.reach_checkpoint(name);
         } else if f(s, "setting").as_str() == Some("next") {
             return Ok(f(s, "value").as_str().map(str::to_string));
         } else if let Some(check) = s.get("expect") {
@@ -1179,6 +1242,18 @@ impl<'s> Run<'s> {
                     linkers.extend(who);
                     text.push_str(&linkers.join(", "));
                 }
+                "passers" => {
+                    let key = (self.when(), place_of(self.here()).to_string());
+                    let names: Vec<String> = self
+                        .passed
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|w| self.label(w))
+                        .collect();
+                    text.push_str(&names.join(" and "));
+                }
                 "claimants" => {
                     let names = if self.claimants.is_empty() {
                         String::from("Someone")
@@ -1247,6 +1322,9 @@ impl<'s> Run<'s> {
     fn apply(&mut self, e: &Value, clauses: &[Value]) -> R<()> {
         if e.get("stretch").is_some() {
             return Ok(()); // a v0.6 effect, not run yet
+        }
+        if self.in_past() && !self.echo_may(e) {
+            return Ok(()); // an echo changes nothing
         }
         let when = f(e, "when");
         if *when != Value::Null && !self.eval(when)?.truthy() {
@@ -1386,6 +1464,10 @@ impl<'s> Run<'s> {
                     .is_some_and(V::truthy);
                 self.vals.insert(format!("{who}.{fact}"), V::Bool(true));
                 if fact == "dead" && !already {
+                    if self.story.kind(&who) == Some("character") {
+                        let place = self.location(&who);
+                        self.dying.push((who.clone(), place));
+                    }
                     self.fire(Event {
                         on: "death",
                         what: "",
@@ -1674,7 +1756,19 @@ impl<'s> Run<'s> {
                     V::Bool(wanted.iter().all(|w| entries.iter().any(|en| en.id == *w)))
                 } else {
                     let thing = self.who(&items[1])?;
-                    V::Bool(self.location(&thing) == place_of(&target))
+                    let place = place_of(&target).to_string();
+                    // `here.has(knight)` is one thing; `here.has(statue)`,
+                    // anything of that kind.
+                    if matches!(self.story.kind(&thing), Some("character" | "npc" | "item")) {
+                        V::Bool(self.location(&thing) == place)
+                    } else {
+                        let any = self
+                            .story
+                            .decls
+                            .keys()
+                            .any(|id| self.is_kind(id, &thing) && self.location(id) == place);
+                        V::Bool(any)
+                    }
                 }
             }
             "in" => {
@@ -1760,8 +1854,9 @@ impl<'s> Run<'s> {
             }
             "last_seen" => {
                 let who = self.who(&items[0])?;
+                let kind = items.get(1).and_then(Value::as_str);
                 let tag = named("holding").as_str().unwrap_or("").to_string();
-                self.last_seen(&who, &tag)
+                self.last_seen(&who, kind, &tag)
             }
             // NPCs do not see acts yet: `self.saw(dash)` never holds.
             "saw" => V::Bool(false),
@@ -1864,7 +1959,7 @@ impl<'s> Run<'s> {
         };
         let story = self.story;
         Ok(match (id.as_str(), m) {
-            ("clock", "now") => V::Num(f64::from(self.chronon)),
+            ("clock", "now") => V::Num(f64::from(self.when())),
             ("pov", _) => {
                 return Err(format!(
                     "`pov.{m}` needs a method after it, such as `pov.{m}.in(place)`"
@@ -1894,7 +1989,14 @@ impl<'s> Run<'s> {
                     V::Bool(self.eval(&cond)?.truthy())
                 }
             },
-            (_, "past" | "passed") => V::Bool(false),
+            (_, "alive") => V::Bool(!self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)),
+            // `me.past`: re-living an earlier stop, as an echo.
+            (_, "past") => V::Bool(self.past.contains_key(&id)),
+            // `here.passed`: someone dashed through this stop.
+            (_, "passed") => V::Bool(
+                self.passed
+                    .contains_key(&(self.when(), place_of(&id).to_string())),
+            ),
             (_, "watched") => V::Bool(self.watched(&id)?),
             (_, "offstage") => V::Bool(self.offstage(&id)?),
             // `x.here`: is x where the pov is?
@@ -1960,6 +2062,13 @@ impl<'s> Run<'s> {
     fn location(&self, id: &str) -> String {
         if let Some(at) = self.at.get(id) {
             return place_of(at).to_string();
+        }
+        // A place, or a passage that is not someone's margin, is where it
+        // is: `here.in(prison)`.
+        let thing = matches!(self.story.kind(id), Some("character" | "npc" | "item"));
+        if !thing && (self.story.passages.contains_key(id) || self.story.kind(id) == Some("place"))
+        {
+            return place_of(id).to_string();
         }
         if let Some(p) = self.place.get(id) {
             return p.clone();

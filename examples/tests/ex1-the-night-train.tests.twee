@@ -95,8 +95,23 @@ do: "Go to the baggage car"
 expect: vell.in(baggage)
 expect: not rook.dead
 do: "Stay"
+expect text: "Your watch fires"
+expect: not rook.dead
+expect: rook.knows.the_attack
+expect: rook.rewinds == 1
+expect: me.past
+expect: clock.now == 1
+expect at: baggage@1
+
+:: with_no_charge_left_vell_s_victim_stays_dead [test]
+start: lounge@0 ~ as rook
+given: gain notebook
+given: lower rewinds 2
+do: "Go to the baggage car"
+do: "Stay"
 expect: rook.dead
 expect: rook.knows.the_attack
+expect no text: "Your watch fires"
 
 :: two_hands_on_the_cufflink [test]
 start: dining@1 ~ as rook, wren
@@ -156,3 +171,31 @@ expect no link: "Slip to the observation lounge"
 as: wren
 expect link: "Dash to the baggage car"
 expect link: "Slip to the observation lounge"
+
+:: turning_the_watch_back_re_lives_a_stop [test]
+start: lounge@0 ~ as rook
+do: "Go to the dining car"
+do: "Go to the observation lounge"
+expect: clock.now == 2
+expect link: "Turn your watch back"
+do: "Turn your watch back"
+expect link: "Back one stop"
+expect link: "Back 2 stops"
+do: "Back one stop"
+expect at: dining@1
+expect: me.past
+expect: clock.now == 1
+expect text: "Your echo stands at the bar"
+expect no link: "Pocket the glint"
+expect no link: "Turn your watch back"
+do: "Unroll the blueprint"
+expect: me.knows.two_hands
+expect: rook.vults == 3
+do: "Go to the observation lounge"
+expect text: "You are back in the present."
+expect: not me.past
+expect at: lounge@2
+expect: clock.now == 2
+expect: rook.rewinds == 1
+expect: me.knows.two_hands
+

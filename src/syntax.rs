@@ -116,8 +116,11 @@ pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "ret
 pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
     "check", "chance", "inquest", "order", "after", "become", "with", "by", "switch", "pass",
-    "release", "requires", "once", "loud", "quiet",
+    "release", "requires", "once", "loud", "quiet", "choice",
 ];
+
+/// What kind of choice an act or Link is: `~ choice proactive`.
+pub(crate) const CHOICES: &[&str] = &["proactive", "reactive", "inactive"];
 
 pub(crate) const EVENTS: &[&str] = &[
     "start", "enter", "leave", "cross", "take", "learn", "act", "turn", "death", "rewind", "out",

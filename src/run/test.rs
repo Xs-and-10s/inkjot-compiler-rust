@@ -124,7 +124,7 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
             }
             "given" => {
                 let effect = crate::ir::effect(value);
-                run.apply(&effect, &[])
+                run.apply(&effect, &[]).and_then(|()| run.settle_deaths())
             }
             "do" => {
                 if !started {
