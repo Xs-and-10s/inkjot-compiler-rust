@@ -158,7 +158,8 @@ The words agendas lean on:
   goal's `via`), other than itself and its own kind.
 - `living`: characters and NPCs not dead and not tagged `lifeless`. A tag on
   an archetype counts for everything like it: `archetype statue: ~ lifeless`.
-- `alone_with(a, b)`: the two share a place with no other living thing.
+- `alone_with(a, b)`: the two share a place, and no other Linker or awake
+  witness is there. Sleepers and NPCs who are not witnesses do not count.
 - `x.last_seen(holding: evidence)`: a character holding a thing with that tag,
   preferring one in `x`'s place. Sightings are not tracked yet, so this is who
   holds it now.
@@ -254,6 +255,9 @@ The interpreter keeps a log, as the paper Conductor did: a snapshot of the
 whole world at the start of every turn, and one for each checkpoint (taken
 at the start, and again whenever a passage says `checkpoint name`).
 
+A fact marked `survives death` (`fact deaths: 0 ~ survives death`) is never
+reset by a checkpoint.
+
 **A death** is settled after the Link that caused it:
 
 1. If a checkpoint covers the place (`checkpoint cells ~ on death in
@@ -311,5 +315,5 @@ It says so, by name, if a story needs one of these. It never guesses.
 - An echo sees the NPCs where they are now, not where they were then.
 - `once per day` and `needs two to hold it` on a rewind spell.
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
-  `target`, `secret`, `roll`, `note`, `act`, `choice`.
+  `target`, `secret`, `roll`, `note`, `act`.
 - Anything marked v0.6: the duel, `retell`.

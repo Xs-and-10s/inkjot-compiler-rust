@@ -123,8 +123,8 @@ pub(crate) const LINK_CLAUSES: &[&str] = &[
 
 /// The input family: `{name input for: me.name}`.
 pub(crate) const INPUTS: &[&str] = &[
-    "name", "choose", "act", "choice", "pick", "rank", "allocate", "number", "target", "secret",
-    "roll", "note",
+    "name", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret", "roll",
+    "note",
 ];
 
 /// What kind of choice an act or Link is: `~ choice proactive`.

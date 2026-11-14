@@ -1914,16 +1914,7 @@ impl<'s> Run<'s> {
             }
             "asleep" => {
                 let who = self.who(&items[1])?;
-                let during = self.constant(self.story.field(&who, "asleep_during"));
-                let woken = self
-                    .vals
-                    .get(&format!("{who}.woken"))
-                    .is_some_and(V::truthy);
-                let feigning = self
-                    .vals
-                    .get(&format!("{who}.feigning"))
-                    .is_some_and(V::truthy);
-                V::Bool((V::Num(f64::from(self.chronon)).within(&during) || feigning) && !woken)
+                V::Bool(self.is_asleep(&who))
             }
             "nearest" => {
                 let tag = items.first().and_then(Value::as_str).unwrap_or("");
