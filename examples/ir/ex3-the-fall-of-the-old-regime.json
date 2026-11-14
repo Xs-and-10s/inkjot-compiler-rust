@@ -996,7 +996,10 @@
           "type": "prose",
           "paragraphs": [
             [
-              {"insert": "sound effect", "args": "'treat bag'"}
+              {
+                "insert": "sound effect",
+                "args": {"effect": "treat bag"}
+              }
             ]
           ]
         },

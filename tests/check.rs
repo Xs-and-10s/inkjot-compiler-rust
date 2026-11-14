@@ -565,3 +565,43 @@ fn a_choice_is_proactive_reactive_or_inactive() {
     let ir = inkjot::build(&fine).unwrap_or_else(|r| panic!("{:#?}", r.diags));
     assert!(ir.to_string().contains("\"choice\": \"proactive\""));
 }
+
+#[test]
+fn text_takes_double_quotes_and_thousands_take_a_mark() {
+    // `'` around text is refused, with a hint.
+    let src = COMMENTED.replace(
+        "The lamp is {both}.",
+        "The lamp is {sound effect: 'click'}.",
+    );
+    let report = inkjot::check(&src);
+    assert!(
+        report
+            .diags
+            .iter()
+            .any(|d| d.msg.contains("text takes double quotes")),
+        "{:#?}",
+        report.diags
+    );
+    // `"…"` is fine, and an apostrophe inside it is just an apostrophe.
+    let src = COMMENTED.replace(
+        "The lamp is {both}.",
+        "The lamp is {sound effect: \"Ann's click\"}.",
+    );
+    let errors: Vec<_> = inkjot::check(&src)
+        .diags
+        .into_iter()
+        .filter(|d| d.severity == inkjot::Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    // `1'000'000` is a million, in a declaration and in an expression.
+    let src = COMMENTED
+        .replace("fact lit: no", "fact lit: no\nfact big: 1'000'000")
+        .replace(
+            "let both: not ((lit or lit) and lit)",
+            "let both: big == 1'000'000",
+        );
+    let ir = inkjot::build(&src).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    let text = ir.to_string();
+    assert!(text.contains("\"value\": 1000000"), "{text}");
+    assert!(text.contains("1000000]"), "{text}");
+}

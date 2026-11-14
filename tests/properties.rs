@@ -551,3 +551,21 @@ proptest! {
         prop_assert!(before == after, "the IR changed");
     }
 }
+
+proptest! {
+    /// A thousands mark never changes a number: `1'234'567` is `1234567`.
+    #[test]
+    fn thousands_marks_change_nothing(n in 0..u64::MAX / 2, every in 1..4usize) {
+        let plain = n.to_string();
+        let mut marked = String::new();
+        for (i, ch) in plain.chars().enumerate() {
+            if i > 0 && (plain.len() - i) % every == 0 {
+                marked.push('\'');
+            }
+            marked.push(ch);
+        }
+        let a = expr::parse(&format!("{plain} + 1")).unwrap();
+        let b = expr::parse(&format!("{marked} + 1")).unwrap();
+        prop_assert_eq!(a, b, "{}", marked);
+    }
+}

@@ -179,7 +179,12 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
         }
         let start = i;
         if c.is_ascii_digit() {
-            while i < b.len() && b[i].is_ascii_digit() {
+            // `1'000'000`: a `'` between digits separates thousands.
+            let digit_or_mark = |i: usize| {
+                b[i].is_ascii_digit()
+                    || (b[i] == b'\'' && i + 1 < b.len() && b[i + 1].is_ascii_digit())
+            };
+            while i < b.len() && digit_or_mark(i) {
                 i += 1;
             }
             // A decimal point only if a digit follows, so `2..=4` stays a range.
@@ -189,7 +194,7 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
                     i += 1;
                 }
             }
-            out.push((start, Tok::Num(src[start..i].to_string())));
+            out.push((start, Tok::Num(src[start..i].replace('\'', ""))));
         } else if c.is_ascii_alphabetic() || c == b'_' {
             while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
                 i += 1;
@@ -215,6 +220,8 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
         } else if let Some(op) = OPS.iter().find(|op| src[i..].starts_with(**op)) {
             i += op.len();
             out.push((start, Tok::Op(op)));
+        } else if c == b'\'' {
+            return Err((start, "text takes double quotes: \"like this\"".into()));
         } else {
             let ch = src[i..].chars().next().unwrap_or('?');
             return Err((start, format!("unexpected `{ch}` in an expression")));
