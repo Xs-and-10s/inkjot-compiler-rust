@@ -377,3 +377,137 @@ proptest! {
         }
     }
 }
+
+// ------------------------------------------------------- `let`, `get` and cycles
+
+/// A tiny story with one room whose header is `header`, a body, and one act
+/// that raises `a`.
+fn room_story(header: &str, body: &str, act: &str) -> String {
+    format!(
+        ":: StoryTitle\nRoom\n\n:: StoryData\n{{\"ifid\": \"x\", \"format\": \"Inkjot\", \"format-version\": \"0.5.0\", \"start\": \"room\"}}\n\n\
+:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ playable\nfact a: 0\nfact b: 0\nfact c: 0\n\n\
+:: room\n{header}--\n{body}\n> [[Bump->room:bump]]\n\n:: room:bump [act]\nraise a 1\n--\n{act}\n"
+    )
+}
+
+/// Gets that read each other: `deps[i]` lists the gets `g{i}` reads.
+fn dependencies() -> impl Strategy<Value = Vec<Vec<usize>>> {
+    (1..7usize)
+        .prop_flat_map(|n| proptest::collection::vec(proptest::collection::vec(0..n, 0..3), n))
+}
+
+/// The reference: does the graph have a cycle? (Depth-first search with
+/// three colours.)
+fn has_cycle(deps: &[Vec<usize>]) -> bool {
+    fn visit(i: usize, deps: &[Vec<usize>], colour: &mut [u8]) -> bool {
+        colour[i] = 1;
+        for &j in &deps[i] {
+            if colour[j] == 1 || (colour[j] == 0 && visit(j, deps, colour)) {
+                return true;
+            }
+        }
+        colour[i] = 2;
+        false
+    }
+    let mut colour = vec![0; deps.len()];
+    (0..deps.len()).any(|i| colour[i] == 0 && visit(i, deps, &mut colour))
+}
+
+/// A small arithmetic expression over the facts `a`, `b`, `c`, fully
+/// parenthesized, with its value as a function of `(a, b, c)`.
+#[derive(Debug, Clone)]
+enum Arith {
+    Num(i64),
+    Fact(usize),
+    Op(char, Box<Arith>, Box<Arith>),
+}
+
+impl Arith {
+    fn source(&self) -> String {
+        match self {
+            Arith::Num(n) => n.to_string(),
+            Arith::Fact(i) => ["a", "b", "c"][*i].to_string(),
+            Arith::Op(op, l, r) => format!("({} {op} {})", l.source(), r.source()),
+        }
+    }
+
+    fn value(&self, facts: [i64; 3]) -> i64 {
+        match self {
+            Arith::Num(n) => *n,
+            Arith::Fact(i) => facts[*i],
+            Arith::Op('+', l, r) => l.value(facts) + r.value(facts),
+            Arith::Op('-', l, r) => l.value(facts) - r.value(facts),
+            Arith::Op(_, l, r) => l.value(facts) * r.value(facts),
+        }
+    }
+}
+
+fn arith() -> impl Strategy<Value = Arith> {
+    let leaf = prop_oneof![
+        (0..10i64).prop_map(Arith::Num),
+        (0..3usize).prop_map(Arith::Fact)
+    ];
+    leaf.prop_recursive(3, 12, 2, |inner| {
+        (
+            prop::sample::select(vec!['+', '-', '*']),
+            inner.clone(),
+            inner,
+        )
+            .prop_map(|(op, l, r)| Arith::Op(op, Box::new(l), Box::new(r)))
+    })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(128))]
+
+    /// `inkjot check` reports a `get` that depends on itself exactly when the
+    /// gets form a cycle, and the cycle it names is real: each `get` in it
+    /// reads the next.
+    #[test]
+    fn get_cycles_are_found_exactly(deps in dependencies()) {
+        let mut header = String::new();
+        for (i, reads) in deps.iter().enumerate() {
+            let mut terms: Vec<String> = reads.iter().map(|j| format!("g{j}")).collect();
+            terms.push("a".into());
+            header.push_str(&format!("get g{i}: {}\n", terms.join(" + ")));
+        }
+        let src = room_story(&header, "Here.", "Bumped.");
+        let report = check(&src);
+        let cycles: Vec<&str> = report.diags.iter()
+            .map(|d| d.msg.as_str())
+            .filter(|m| m.contains("depends on itself"))
+            .collect();
+        prop_assert_eq!(!cycles.is_empty(), has_cycle(&deps), "{:?}", cycles);
+        for msg in cycles {
+            // "… depends on itself: g0 → g2 → g0"
+            let path: Vec<usize> = msg.rsplit(": ").next().unwrap_or("")
+                .split(" → ")
+                .filter_map(|g| g.trim().trim_start_matches('g').parse().ok())
+                .collect();
+            prop_assert!(path.len() >= 2 && path.first() == path.last(), "{}", msg);
+            for pair in path.windows(2) {
+                prop_assert!(deps[pair[0]].contains(&pair[1]), "g{} does not read g{}: {}", pair[0], pair[1], msg);
+            }
+        }
+    }
+
+    /// A `let` and a `get` of the same expression agree on arrival. After
+    /// the act raises `a`, the `let` still has the old value and the `get`
+    /// the new one.
+    #[test]
+    fn let_keeps_and_get_follows(e in arith()) {
+        let header = format!("let x: {0}\nget y: {0}\n", e.source());
+        let src = room_story(&header, "Then: {x} and {y}.", "Now: {x} and {y}.");
+        let ir = inkjot::build(&src).map_err(|r| TestCaseError::fail(format!("{:?}", r.diags)))?;
+        let outcomes = inkjot::run::test::run_all(
+            &format!("{src}\n:: t [test]\nstart: room\ndo: \"Bump\"\n"), &ir,
+        ).unwrap();
+        let text = outcomes[0].transcript.join("\n");
+        let before = e.value([0, 0, 0]);
+        let after = e.value([1, 0, 0]);
+        let then_line = format!("Then: {before} and {before}.");
+        let now_line = format!("Now: {before} and {after}.");
+        prop_assert!(text.contains(&then_line), "{}\n{}", e.source(), text);
+        prop_assert!(text.contains(&now_line), "{}\n{}", e.source(), text);
+    }
+}

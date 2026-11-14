@@ -485,3 +485,88 @@ impl Run<'_> {
                 .any(|t| t == "offstage"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Walker;
+    use crate::run::{Run, Story};
+    use proptest::prelude::*;
+    use std::collections::{HashMap, VecDeque};
+
+    /// A story that is nothing but `n` places and the given ways.
+    fn map(n: usize, ways: &[(usize, usize, bool)]) -> String {
+        let mut src = String::from(
+            ":: StoryTitle\nMap\n\n:: StoryData\n{\"ifid\": \"x\", \"format\": \"Inkjot\", \"format-version\": \"0.5.0\", \"start\": \"p0\"}\n\n:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ playable\n",
+        );
+        for i in 0..n {
+            src.push_str(&format!("place p{i}: \"p{i}\"\n"));
+        }
+        for (k, (a, b, one_way)) in ways.iter().enumerate() {
+            let tail = if *one_way { " ~ one way" } else { "" };
+            src.push_str(&format!("way w{k}: p{a} - p{b}{tail}\n"));
+        }
+        src.push_str("\n:: p0\nHere.\n");
+        src
+    }
+
+    /// The reference answer: breadth-first search over the ways as given.
+    fn shortest(n: usize, ways: &[(usize, usize, bool)], from: usize) -> Vec<Option<usize>> {
+        let mut dist = vec![None; n];
+        dist[from] = Some(0);
+        let mut queue = VecDeque::from([from]);
+        while let Some(at) = queue.pop_front() {
+            for &(a, b, one_way) in ways {
+                for (x, y) in [(a, b), (b, a)] {
+                    if (x, y) == (b, a) && one_way {
+                        continue;
+                    }
+                    if x == at && dist[y].is_none() {
+                        dist[y] = Some(dist[at].unwrap() + 1);
+                        queue.push_back(y);
+                    }
+                }
+            }
+        }
+        dist
+    }
+
+    fn graphs() -> impl Strategy<Value = (usize, Vec<(usize, usize, bool)>)> {
+        (2..8usize).prop_flat_map(|n| {
+            let way = (0..n, 0..n, any::<bool>()).prop_filter("no loops", |(a, b, _)| a != b);
+            (Just(n), proptest::collection::vec(way, 0..12))
+        })
+    }
+
+    proptest! {
+        /// A route exists exactly when the place is reachable; it is as
+        /// short as the shortest path; and every step follows a way, in a
+        /// direction the way allows.
+        #[test]
+        fn routes_are_shortest_and_follow_the_ways((n, ways) in graphs(), to in 0..8usize) {
+            let to = to % n;
+            let ir = crate::build(&map(n, &ways)).map_err(|r| TestCaseError::fail(format!("{:?}", r.diags)))?;
+            let story = Story::new(&ir).unwrap();
+            let mut run = Run::new(&story, 1);
+            let want = shortest(n, &ways, 0);
+            let route = run.route("p0", &format!("p{to}"), None, Walker::Npc).unwrap();
+            match (route, want[to]) {
+                (None, None) => {}
+                (Some(path), Some(d)) => {
+                    prop_assert_eq!(path.len(), d);
+                    let mut at = String::from("p0");
+                    for next in path {
+                        let step_ok = story.ways.iter().any(|(_, a, b)| *a == at && *b == next);
+                        prop_assert!(step_ok, "no way from {} to {}", at, next);
+                        at = next;
+                    }
+                }
+                (got, want) => prop_assert!(false, "route {:?}, but the shortest path is {:?}", got, want),
+            }
+            // Distances agree with the reference everywhere.
+            let found: HashMap<String, usize> = run.distances("p0", None, Walker::Npc).unwrap();
+            for (i, d) in want.iter().enumerate() {
+                prop_assert_eq!(found.get(&format!("p{i}")).copied(), *d);
+            }
+        }
+    }
+}

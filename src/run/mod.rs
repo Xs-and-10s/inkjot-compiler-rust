@@ -146,6 +146,9 @@ impl Story {
             }
             match f(s, "setting").as_str() {
                 Some("pov") => self.povs = strs(f(s, "value")),
+                Some("clock") => {
+                    self.defaults.insert("clock".into(), f(s, "value").clone());
+                }
                 Some("default") => {
                     if let Some(of) = f(s, "of").as_str() {
                         self.defaults.insert(of.to_string(), f(s, "value").clone());
@@ -191,6 +194,10 @@ impl Story {
         strs(self.field(id, "tags")).iter().any(|t| t == tag)
     }
 }
+
+/// What an NPC saw at the end of one turn: the turn, and each person in
+/// its place with what they held.
+type Sighting = (u32, Vec<(String, Vec<String>)>);
 
 /// A name bound in a passage.
 #[derive(Debug, Clone)]
@@ -264,7 +271,7 @@ pub struct Run<'s> {
     /// ...and how it came out for this Linker: `(success, clashed)`.
     verdict: Option<(bool, bool)>,
     /// What each NPC saw at the end of each turn: who, holding what.
-    sightings: HashMap<String, Vec<(u32, Vec<(String, Vec<String>)>)>>,
+    sightings: HashMap<String, Vec<Sighting>>,
 }
 
 impl<'s> Run<'s> {
@@ -459,6 +466,16 @@ impl<'s> Run<'s> {
     /// The text shown since this was last called.
     pub fn take_output(&mut self) -> Vec<String> {
         std::mem::take(&mut self.output)
+    }
+
+    /// The stop it is: `clock.now`.
+    pub fn now(&self) -> u32 {
+        self.chronon
+    }
+
+    /// Shared acts reached for and not yet settled.
+    pub fn open_claims(&self) -> usize {
+        self.claims.len()
     }
 
     /// Where the pov is.
@@ -770,7 +787,21 @@ impl<'s> Run<'s> {
             actor: &actor,
             before: false,
         })?;
-        self.chronon += 1;
+        // The clock stops at its last stop: `clock: 0..=5`.
+        let last = match self.story.defaults.get("clock") {
+            Some(range) => match self.constant(range) {
+                V::Range {
+                    hi: Some(hi),
+                    inclusive,
+                    ..
+                } => Some(if inclusive { hi as u32 } else { hi as u32 - 1 }),
+                _ => None,
+            },
+            None => None,
+        };
+        if last.is_none_or(|last| self.chronon < last) {
+            self.chronon += 1;
+        }
         let story = self.story;
         for id in story.ids_of("resource") {
             if story.field(&id, "refill").as_str() == Some("chronon") {
@@ -882,6 +913,9 @@ impl<'s> Run<'s> {
         let cell = format!("{place}@{when}");
         if self.story.passages.contains_key(&cell) {
             Some(cell)
+        } else if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
+            // In a world of stops, you arrive at a time: a cell or nothing.
+            None
         } else if self.story.passages.contains_key(place) {
             Some(place.to_string())
         } else {
