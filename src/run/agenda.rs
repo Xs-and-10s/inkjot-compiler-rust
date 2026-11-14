@@ -36,6 +36,13 @@ use std::collections::{HashMap, VecDeque};
 use super::{f, place_of, strs, Event, Local, Run, R, V};
 use crate::json::Value;
 
+/// Who is finding a way: NPCs and Linkers may use different ways.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Walker {
+    Npc,
+    Linker,
+}
+
 /// An NPC's agenda: its own margin, then its archetype's.
 struct Agenda {
     statements: Vec<Value>,
@@ -160,7 +167,8 @@ impl Run<'_> {
         let route = match goal {
             Some(goal) => {
                 let via = f(goal, "via").as_str();
-                self.route(&here, &target, via)?.unwrap_or_default()
+                self.route(&here, &target, via, Walker::Npc)?
+                    .unwrap_or_default()
             }
             None => Vec::new(),
         };
@@ -259,64 +267,69 @@ impl Run<'_> {
         Ok(())
     }
 
-    /// The places an NPC passes through from `from` to `to`, not counting
-    /// `from`: the shortest route along open ways. `via wide` keeps to ways
-    /// tagged `wide`. `None` if there is no route.
+    /// The places passed through from `from` to `to`, not counting `from`:
+    /// a shortest route along the ways `who` may use. `via wide` keeps to
+    /// ways tagged `wide`. `None` if there is no route.
     pub(super) fn route(
         &mut self,
         from: &str,
         to: &str,
         via: Option<&str>,
+        who: Walker,
     ) -> R<Option<Vec<String>>> {
-        let distances = self.distances(from, via)?;
-        if !distances.contains_key(to) {
+        let (_, parent) = self.search(from, via, who)?;
+        if from != to && !parent.contains_key(to) {
             return Ok(None);
         }
-        // Walk back from `to`, always to a place one step nearer.
-        let mut path = vec![to.to_string()];
+        // Follow the breadcrumbs back from `to`.
+        let mut path = Vec::new();
         let mut at = to.to_string();
         while at != from {
-            let d = distances[&at];
-            let back = self
-                .story
-                .ways
-                .iter()
-                .find(|(_, a, b)| *b == at && distances.get(a) == Some(&(d - 1)))
-                .map(|(_, a, _)| a.clone());
-            match back {
-                Some(prev) => {
-                    if prev != from {
-                        path.push(prev.clone());
-                    }
-                    at = prev;
-                }
-                None => return Ok(None),
-            }
+            path.push(at.clone());
+            at = parent[&at].clone();
         }
         path.reverse();
         Ok(Some(path))
     }
 
-    /// How many steps each place is from `from`, by breadth-first search
-    /// along the ways an NPC may use.
-    pub(super) fn distances(&mut self, from: &str, via: Option<&str>) -> R<HashMap<String, usize>> {
+    /// How many steps each place is from `from`, along the ways `who` may use.
+    pub(super) fn distances(
+        &mut self,
+        from: &str,
+        via: Option<&str>,
+        who: Walker,
+    ) -> R<HashMap<String, usize>> {
+        Ok(self.search(from, via, who)?.0)
+    }
+
+    /// Breadth-first search from `from`: each reachable place's distance,
+    /// and the place it was first reached from.
+    fn search(
+        &mut self,
+        from: &str,
+        via: Option<&str>,
+        who: Walker,
+    ) -> R<(HashMap<String, usize>, HashMap<String, String>)> {
         let mut seen = HashMap::from([(from.to_string(), 0)]);
+        let mut parent = HashMap::new();
         let mut queue = VecDeque::from([from.to_string()]);
         while let Some(at) = queue.pop_front() {
             for (way, a, b) in self.story.ways.clone() {
-                if a != at || seen.contains_key(&b) || !self.npc_may_use(&way, via)? {
+                if a != at || seen.contains_key(&b) || !self.may_use(&way, via, who)? {
                     continue;
                 }
                 seen.insert(b.clone(), seen[&at] + 1);
+                parent.insert(b.clone(), at.clone());
                 queue.push_back(b);
             }
         }
-        Ok(seen)
+        Ok((seen, parent))
     }
 
-    /// May an NPC use this way now? It must be open, and tagged `via` if a
-    /// goal asks for that. NPCs know the hidden ways.
-    fn npc_may_use(&mut self, way: &str, via: Option<&str>) -> R<bool> {
+    /// May `who` use this way now? It must be open, and tagged `via` if a
+    /// goal asks for that. NPCs know the hidden ways; Linkers must find
+    /// them, and may not use a way `for npc`.
+    fn may_use(&mut self, way: &str, via: Option<&str>, who: Walker) -> R<bool> {
         if let Some(via) = via {
             if !self.story.has_tag(way, via) {
                 return Ok(false);
@@ -324,6 +337,18 @@ impl Run<'_> {
         }
         if way.is_empty() {
             return Ok(true); // a step of a `route`
+        }
+        if who == Walker::Linker {
+            if strs(self.story.field(way, "for"))
+                .iter()
+                .any(|w| w == "npc")
+            {
+                return Ok(false);
+            }
+            let hidden = self.story.field(way, "hidden_until").clone();
+            if hidden != Value::Null && !self.eval(&hidden)?.truthy() {
+                return Ok(false);
+            }
         }
         Ok(match self.story.field(way, "open_when").clone() {
             Value::Null => true,
@@ -377,7 +402,7 @@ impl Run<'_> {
         };
         let like = self.story.field(&me, "like").clone();
         let via = self.via.clone();
-        let distances = self.distances(&self.location(&me), via.as_deref())?;
+        let distances = self.distances(&self.location(&me), via.as_deref(), Walker::Npc)?;
         let mut best: Option<(usize, String)> = None;
         for id in self.things(tag, None) {
             if id == me || (like != Value::Null && *self.story.field(&id, "like") == like) {
@@ -403,24 +428,22 @@ impl Run<'_> {
             .all(|id| id == a || id == b)
     }
 
-    /// `x.last_seen(holding: evidence)`: a character holding a thing with
-    /// the tag, preferring one in `x`'s place. NPCs keep an eye on the
-    /// characters, not on each other. (The interpreter does not track
-    /// sightings yet, so this is who holds it now.)
+    /// `x.last_seen(holding: evidence)`: the character `x` most recently
+    /// saw holding a thing with the tag. NPCs look at the end of each turn
+    /// (see [`Run::look`]), so this is who ended a stop in their place.
+    /// Only characters count for now: whether an NPC may hunt an NPC, and
+    /// how to say so, is an open question.
     pub(super) fn last_seen(&self, who: &str, tag: &str) -> V {
-        let place = self.location(who);
-        let mut holders: Vec<String> = self
-            .things(tag, None)
-            .iter()
-            .filter_map(|item| self.holder.get(item))
-            .filter(|h| self.story.kind(h) == Some("character") && *h != who)
-            .cloned()
-            .collect();
-        holders.sort();
-        holders.dedup();
-        let near = holders.iter().find(|h| self.location(h) == place);
-        near.or(holders.first())
-            .map_or(V::Null, |h| V::Id(h.clone()))
+        let log = self.sightings.get(who).map(Vec::as_slice).unwrap_or(&[]);
+        for (_, seen) in log.iter().rev() {
+            for (person, held) in seen {
+                let character = self.story.kind(person) == Some("character");
+                if character && held.iter().any(|item| self.tagged(item, tag)) {
+                    return V::Id(person.clone());
+                }
+            }
+        }
+        V::Null
     }
 
     /// `roll standoff`: roll the table's dice and run every row that matches.

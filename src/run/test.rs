@@ -14,7 +14,8 @@
 //! |---|---|
 //! | `seed: n` | Seed the run's dice and shuffles (first, if at all; default 1) |
 //! | `start: passage ~ as who` | Begin there, looking through `who` |
-//! | `as: who` | Look through someone else |
+//! | `start: passage ~ as a, b` | Begin with several Linkers, one playing each |
+//! | `as: who` | Look through someone else; with several Linkers, serve the one playing `who` |
 //! | `given: effect` | Change the state directly: `given: learn two_hands` |
 //! | `do: "label"` or `do: hall#2` | Take an available Link |
 //! | `expect: expression` | The expression must hold now |
@@ -25,6 +26,8 @@
 //! A failed `do` ends the test, since the rest of the script no longer
 //! describes what is on screen. A failed `expect` is recorded and the test
 //! goes on, so one run reports every broken expectation.
+
+use std::collections::HashMap;
 
 use super::{Run, Story};
 use crate::json::Value;
@@ -79,8 +82,8 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
     };
     let mut run = Run::new(story, 1);
     let mut started = false;
-    // Text shown since the last `do`.
-    let mut shown: Vec<String> = Vec::new();
+    // Text shown to each Linker since their last `do`.
+    let mut shown: HashMap<String, Vec<String>> = HashMap::new();
 
     for (i, s) in stmts.iter().enumerate() {
         let head = &s.clauses[0];
@@ -98,16 +101,26 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
             }
             "seed" => Err("`seed:` must be the first line of a test".to_string()),
             "start" => {
-                let who = s.clauses[1..]
+                let who: Vec<&str> = s.clauses[1..]
                     .iter()
                     .find_map(|c| c.text.strip_prefix("as "))
-                    .map(str::trim);
+                    .map(|w| w.split(',').map(str::trim).collect())
+                    .unwrap_or_default();
                 started = true;
-                run.start(Some(value), who)
+                if who.len() > 1 {
+                    run.start_cohort(Some(value), &who)
+                } else {
+                    run.start(Some(value), who.first().copied())
+                }
             }
             "as" => {
-                run.pov = value.to_string();
-                Ok(())
+                collect(&mut run, &mut shown);
+                if run.seated().is_empty() {
+                    run.pov = value.to_string();
+                    Ok(())
+                } else {
+                    run.sit(value)
+                }
             }
             "given" => {
                 let effect = crate::ir::effect(value);
@@ -121,12 +134,15 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
                         break;
                     }
                 }
-                shown.extend(run.take_output());
-                out.transcript.append(&mut shown);
+                collect(&mut run, &mut shown);
+                let tag = seat_tag(&run);
+                let mine = shown.remove(&run.pov).unwrap_or_default();
+                out.transcript
+                    .extend(mine.into_iter().map(|l| format!("{tag}{l}")));
                 match take(&mut run, value) {
                     Ok(label) => {
-                        out.transcript.push(format!("> {label}"));
-                        shown = run.take_output();
+                        out.transcript.push(format!("{tag}> {label}"));
+                        collect(&mut run, &mut shown);
                         Ok(())
                     }
                     Err(e) => {
@@ -136,8 +152,9 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
                 }
             }
             "expect" => {
-                shown.extend(run.take_output());
-                expect(&mut run, how, value, &shown)
+                collect(&mut run, &mut shown);
+                let mine = shown.get(&run.pov).cloned().unwrap_or_default();
+                expect(&mut run, how, value, &mine)
             }
             other => Err(format!("`{other}:` is not a test statement")),
         };
@@ -149,9 +166,38 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
                 .push((at, format!("the story's own check failed: {failure}")));
         }
     }
-    shown.extend(run.take_output());
-    out.transcript.append(&mut shown);
+    // Whatever each Linker was last shown.
+    let served = run.pov.clone();
+    let mut everyone = run.seated().to_vec();
+    if everyone.is_empty() {
+        everyone.push(served.clone());
+    }
+    for who in everyone {
+        if run.sit(&who).is_ok() {
+            collect(&mut run, &mut shown);
+            let tag = seat_tag(&run);
+            let mine = shown.remove(&who).unwrap_or_default();
+            out.transcript
+                .extend(mine.into_iter().map(|l| format!("{tag}{l}")));
+        }
+    }
+    let _ = run.sit(&served);
     out
+}
+
+/// Move what the served Linker has been shown into their pile.
+fn collect(run: &mut Run, shown: &mut HashMap<String, Vec<String>>) {
+    let lines = run.take_output();
+    shown.entry(run.pov.clone()).or_default().extend(lines);
+}
+
+/// With several Linkers, transcript lines say whose they are: `[rook] `.
+fn seat_tag(run: &Run) -> String {
+    if run.seated().is_empty() {
+        String::new()
+    } else {
+        format!("[{}] ", run.pov)
+    }
 }
 
 /// Take the Link named by `do:`, by quoted label or by id.

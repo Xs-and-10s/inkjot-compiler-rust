@@ -7,3 +7,4 @@
 cc bbdba549203349e65d18f5ed62e6d9fbee6f94fe13c70d3a65d0c7d995334205 # shrinks to start = 0, seed = 1, picks = [0, 0, 3, 17, 10, 17, 3, 2, 3, 0, 0, 0, 0, 0, 7, 13]
 cc b677e0f893a78f27508bdd37dceabe602a6bb9ade0817ef70eaf85a056fe884c # shrinks to start = 5, seed = 1, picks = [3, 7, 4, 3, 7, 9, 9]
 cc 2050f9620341787b519029ae4de71f5ddea2bf42ab491a081957cf6921306c12 # shrinks to start = 4, seed = 452, picks = [10, 0, 10, 10, 9, 13, 9, 17, 15, 0, 0]
+cc 747844282dacb9f5fd432299d975e39ab17cdab6c7ee9207b2ffba0dc364f3b3 # shrinks to start = 0, seed = 1, picks = [3, 13, 3, 7, 1, 8, 3, 2, 9]
