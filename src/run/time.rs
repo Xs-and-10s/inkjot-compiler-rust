@@ -157,9 +157,27 @@ impl Run<'_> {
             let charges = self.vals.get(&format!("{who}.rewinds")).and_then(V::num);
             if charges.is_some_and(|n| n > 0.0) {
                 self.pull_back(&who)?;
+            } else {
+                self.drop_everything(&who, &place);
             }
         }
         Ok(())
+    }
+
+    /// The dead hold nothing: what they carried falls where they died, for
+    /// anyone to find (unless it `survives death`, like a ghost's locket).
+    fn drop_everything(&mut self, who: &str, place: &str) {
+        let carried: Vec<String> = self
+            .holder
+            .iter()
+            .filter(|(_, h)| h.as_str() == who)
+            .map(|(item, _)| item.clone())
+            .collect();
+        for item in carried {
+            if *self.story.field(&item, "survives") == Value::Null {
+                self.holder.insert(item, place.to_string());
+            }
+        }
     }
 
     /// A checkpoint catches a death: reset what it names, bring the dead

@@ -241,6 +241,17 @@ votes again as often as `revote:` allows and then stays hung. Then:
 | `accusation.proven` | it is correct, and the proof cited by those who voted for it covers `proof:` (a tag needs something cited that has it; `and`, `or` and `not` combine) |
 | `accusation.who`, `accusation.how` | the winning pairing |
 
+**`{ballots}`** shows the last count, most votes first, ties in seating
+order: "2 for Miss Edith Vell, by device; 1 for Mr. Crane, by poison". An
+Inklink that shows `{ballots}` anywhere frames the tally itself, and the
+interpreter then adds nothing but the prompt to vote again after a tie. One
+that does not gets plain lines: the ballots, and whom the jury accuses.
+
+**The dead hold nothing.** A Linker who dies for good drops what they carried
+where they fell, for anyone to find, unless the item `survives death`.
+Holding something teaches you it (`me.knows.cufflink`), so a ghost can still
+cite it to the jury.
+
 `scenario` is the scenario in play: the only one, or, with several, one the
 dice pick at the start, so the culprit can change from run to run.
 `cohort.size` and `cohort.alive` count the Linkers.

@@ -1039,7 +1039,9 @@ fn insert(content: &str) -> Value {
         Value::Obj(pairs)
     };
     match first {
-        "present" | "echoes" | "claimants" | "passers" | "retold" if second.is_empty() => {
+        "present" | "echoes" | "claimants" | "passers" | "ballots" | "retold"
+            if second.is_empty() =>
+        {
             named(first, "")
         }
         "embed" if second == "nib:" => Value::obj([

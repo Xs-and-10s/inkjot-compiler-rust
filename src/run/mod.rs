@@ -62,6 +62,8 @@ pub struct Story {
     checkpoints: Vec<Value>,
     /// The `rewind:` setting, if the Inklink has one.
     rewind: Option<Value>,
+    /// Does any passage show `{ballots}`? Then the Inker frames the tally.
+    shows_ballots: bool,
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -92,6 +94,7 @@ impl Story {
             defaults: HashMap::new(),
             checkpoints: Vec::new(),
             rewind: None,
+            shows_ballots: false,
         };
         let config = ir
             .get("config")
@@ -115,6 +118,7 @@ impl Story {
                 },
             );
         }
+        story.shows_ballots = ir.to_string().contains("\"insert\": \"ballots\"");
         Ok(story)
     }
 
@@ -309,6 +313,8 @@ pub struct Run<'s> {
     paused: Option<inputs::Paused>,
     /// The jury's ballots, by voter, until the jury decides.
     ballots: HashMap<String, inputs::Ballot>,
+    /// The jury's last count: `(who, how, votes)`, most votes first.
+    tally: Vec<(String, String, usize)>,
 }
 
 impl<'s> Run<'s> {
@@ -355,6 +361,7 @@ impl<'s> Run<'s> {
             asking: Vec::new(),
             paused: None,
             ballots: HashMap::new(),
+            tally: Vec::new(),
         };
         run.init();
         run.place_npcs();
@@ -392,7 +399,8 @@ impl<'s> Run<'s> {
                         .or(field("held_by").as_str())
                         .or(d.home.as_deref());
                     if let Some(home) = home {
-                        self.holder.insert(id.clone(), home.to_string());
+                        let home = home.to_string();
+                        self.hold(id, &home);
                     }
                     // Facts come from the archetype first, then the item, then `with`.
                     let like = field("like").as_str().unwrap_or("");
@@ -783,7 +791,7 @@ impl<'s> Run<'s> {
                     self.pov = pov;
                     return self.relist();
                 }
-                self.holder.insert(item.to_string(), actor.clone());
+                self.hold(item, &actor);
                 self.fire(Event {
                     on: "take",
                     what: item,
@@ -1338,6 +1346,7 @@ impl<'s> Run<'s> {
                         text.push_str(&prompt);
                     }
                 }
+                "ballots" => text.push_str(&self.ballots_text()),
                 "claimants" => {
                     let names = if self.claimants.is_empty() {
                         String::from("Someone")
@@ -1446,12 +1455,10 @@ impl<'s> Run<'s> {
                 let who = self.who(&args[0])?;
                 self.knows.entry(who).or_default().insert(word(1));
             }
-            "gain" => {
-                self.holder.insert(word(0), pov);
-            }
+            "gain" => self.hold(&word(0), &pov),
             "give" => {
                 let who = self.who(args.last().unwrap_or(&Value::Null))?;
-                self.holder.insert(word(0), who);
+                self.hold(&word(0), &who);
             }
             "lose" => {
                 let key = format!("{pov}.{}", word(0));
@@ -1700,6 +1707,18 @@ impl<'s> Run<'s> {
             }
         }
         Ok(())
+    }
+
+    /// `who` now holds `item`, wherever it was. Holding something teaches
+    /// you it: a ghost can still cite what it once held.
+    fn hold(&mut self, item: &str, who: &str) {
+        self.holder.insert(item.to_string(), who.to_string());
+        if matches!(self.story.kind(who), Some("character" | "npc")) {
+            self.knows
+                .entry(who.to_string())
+                .or_default()
+                .insert(item.to_string());
+        }
     }
 
     /// The id an effect's argument names: `me` is the pov.

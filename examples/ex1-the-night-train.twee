@@ -756,6 +756,8 @@ Deliberate together, then cast your ballots. They are revealed all at once.
 > [[Hear the verdict->verdict]] ~ when accusation.done
 
 :: verdict [finale card:28]
+The foreman reads out the ballots: {ballots}.
+
 [if accusation.proven and not vell.offstage]
 At Kingsgate two constables are waiting. Miss Vell holds out her burned hand for the cuffs, as if offering it to be read.
 

@@ -4574,6 +4574,16 @@
       "header": [],
       "body": [
         {
+          "type": "prose",
+          "paragraphs": [
+            [
+              "The foreman reads out the ballots: ",
+              {"insert": "ballots"},
+              "."
+            ]
+          ]
+        },
+        {
           "type": "modifier",
           "parts": [
             {

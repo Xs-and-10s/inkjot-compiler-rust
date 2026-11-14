@@ -106,7 +106,8 @@ fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
             }
         }
         Expr::Member(target, member) => {
-            // `who.knows.x` wants a clue; `who.holds.x` wants an item.
+            // `who.knows.x` wants a clue, or an item (holding something
+            // teaches you it); `who.holds.x` wants an item.
             // `who.holds.any(tag)` is a call, not an item named `any`.
             if let Expr::Member(_, verb) = target.as_ref() {
                 let kind = match verb.as_str() {
@@ -115,7 +116,8 @@ fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
                     _ => None,
                 };
                 if let Some(kind) = kind {
-                    if !lookup.is_kind(member, kind) {
+                    let known_item = kind == "clue" && lookup.is_kind(member, "item");
+                    if !lookup.is_kind(member, kind) && !known_item {
                         out.push(Problem {
                             at: root(e),
                             name: member.clone(),

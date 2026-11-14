@@ -1145,7 +1145,7 @@ impl Checker {
         let first = words.next().unwrap_or("");
         let second = words.next().unwrap_or("");
         match first {
-            "present" | "echoes" | "claimants" | "passers" if second.is_empty() => {}
+            "present" | "echoes" | "claimants" | "passers" | "ballots" if second.is_empty() => {}
             "retold" if second.is_empty() => {
                 *self.stretch.entry("{retold}".into()).or_default() += 1
             }
