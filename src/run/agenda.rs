@@ -172,7 +172,13 @@ impl Run<'_> {
             }
             None => Vec::new(),
         };
-        let heading = route.first().cloned().unwrap_or_default();
+        // `self.heading`: the place the goal leads to, while there is a
+        // way there. `self.leaving`: that place is offstage.
+        let heading = if route.is_empty() {
+            String::new()
+        } else {
+            target.clone()
+        };
         let leaving = !heading.is_empty() && self.story.has_tag(&target, "offstage");
         self.vals.insert(format!("{npc}.heading"), V::Id(heading));
         self.vals.insert(format!("{npc}.leaving"), V::Bool(leaving));
@@ -193,13 +199,12 @@ impl Run<'_> {
         let Some(goal) = goal else {
             return Ok(());
         };
-        let steps = if f(goal, "pace").as_str() == Some("dash") {
-            2
-        } else {
-            self.speed(npc, agenda)
-        };
+        let dashing = f(goal, "pace").as_str() == Some("dash");
+        let steps = if dashing { 2 } else { self.speed(npc, agenda) };
         for place in route.iter().take(steps) {
+            let from = self.location(npc);
             self.step(npc, place)?;
+            self.npc_noise(&from, place, dashing);
         }
         if !target.is_empty() && self.location(npc) == target {
             self.locals
@@ -249,7 +254,7 @@ impl Run<'_> {
     }
 
     /// Move an NPC one place, and tell any handlers.
-    fn step(&mut self, npc: &str, to: &str) -> R<()> {
+    pub(super) fn step(&mut self, npc: &str, to: &str) -> R<()> {
         let from = self.location(npc);
         self.place.insert(npc.to_string(), to.to_string());
         self.fire(Event {
@@ -433,12 +438,14 @@ impl Run<'_> {
         })
     }
 
-    /// Asleep now: during the hours `asleep during` says, or pretending,
-    /// and not woken.
+    /// Asleep, as far as anyone can tell: truly asleep (see
+    /// [`Run::sleeping`]), or pretending and not woken.
     pub(super) fn is_asleep(&self, who: &str) -> bool {
-        let during = self.constant(self.story.field(who, "asleep_during"));
-        let flag = |f: &str| self.vals.get(&format!("{who}.{f}")).is_some_and(V::truthy);
-        (V::Num(f64::from(self.chronon)).within(&during) || flag("feigning")) && !flag("woken")
+        let feigning = self
+            .vals
+            .get(&format!("{who}.feigning"))
+            .is_some_and(V::truthy);
+        self.sleeping(who) || (feigning && !self.woken(who))
     }
 
     /// `x.last_seen(character, holding: evidence)`: whoever of that kind

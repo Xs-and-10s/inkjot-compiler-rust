@@ -22,17 +22,14 @@ here.
 | 10 | Text takes double quotes; `'` as a thousands mark; `{ballots}`; the dead drop what they carried | #13 |
 | 11 | Hints, first built under the name Inquests | #14 |
 | 12 | Inquests renamed to hints; `~ inquest` reserved for true Inquests; hints can be turned off | #15 |
+| 13 | Sight, sound and sleep: NPCs see moves (`self.saw`), noise wakes sleepers, a Nib's own `moves:`, echoes see NPCs where they were; `kill pov.all` and `kill each in` | #16 |
 
 ## Next
 
-1. **What Ex 1 still needs to play whole**: NPCs who see acts
-   (`self.saw(dash)`, so Vell gives chase), sleepers woken by a loud move
-   (`~ wakes on loud`), a Nib's own `moves:` (the mail car allows only
-   walking), and echoes that see the NPCs where they were then.
-2. **Inquests**: a Linker asks the story to diverge from its canon where
+1. **Inquests**: a Linker asks the story to diverge from its canon where
    the Inker hid a fork (`~ inquest`). Designed in the working doc first.
-3. **The rest of the input family**, when a story needs one. None does yet.
-4. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
+2. **The rest of the input family**, when a story needs one. None does yet.
+3. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
    facts with rules, and `i` beside `me` (see the working doc). Held until
    more ideas are in.
 

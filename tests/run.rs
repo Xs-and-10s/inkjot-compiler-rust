@@ -133,6 +133,16 @@ fn accusation(run: &mut Run, field: &str) -> bool {
     run.eval(&path).is_ok_and(|v| v.truthy())
 }
 
+/// `here.asleep(who)`, as the story would read it, wherever `who` is.
+fn asleep(run: &mut Run, who: &str) -> bool {
+    use inkjot::json::Value;
+    let e = Value::obj([(
+        "asleep",
+        Value::Arr(vec![Value::str("here"), Value::str(who)]),
+    )]);
+    run.eval(&e).is_ok_and(|v| v.truthy())
+}
+
 /// Where a random playthrough of each example may begin.
 fn starts() -> Vec<(usize, Option<&'static str>, Option<&'static str>)> {
     vec![
@@ -364,6 +374,23 @@ fn cohort_play(
         };
         run.sit(&who).unwrap();
         let choices = run.choices().unwrap();
+        // The mail car allows only walking.
+        if run.here().starts_with("mail@") {
+            prop_assert!(
+                choices
+                    .iter()
+                    .all(|(_, l)| !l.starts_with("Dash to") && !l.starts_with("Slip to")),
+                "a dash or slip offered in the mail car: {choices:?}"
+            );
+        }
+        // The Colonel sleeps only in his hours, stops 2 to 4.
+        if !(2..=4).contains(&run.now()) {
+            prop_assert!(
+                !asleep(&mut run, "marsh"),
+                "Marsh asleep at stop {}",
+                run.now()
+            );
+        }
         let (id, label) = choices[pick % choices.len()].clone();
         let before = run.now();
         text.push(format!("[{who}] > {label}"));
