@@ -174,6 +174,24 @@ The words agendas lean on:
   loudly. Vell's `chase` races a Linker to where she is going.
 - `kill pov.all` kills every pov; `kill each in oubliette` everyone there.
 
+## What an act asks first
+
+An act's own clauses are checked before its Link is offered:
+
+- `requires lockpick`: the actor holds that item, or one tagged so.
+  `requires pov.all here`: every pov is alive and in the actor's place.
+  `requires pov.all alive`: every pov is alive, wherever they are.
+  `requires full vults`: the actor has every vult.
+- `cost 30 from each`: every pov pays, so every pov must be able to.
+- `once`: each character may do it once a reading. `once per turn` (or
+  `per chronon`, or the clock's own word): once a turn. `once per day`:
+  once a day, where `clock: … ~ day 6` makes six turns a day; `inkjot
+  check` refuses `once per day` on a clock without days.
+
+The uses of an act that rewinds belong to the player, like its charges: going
+back does not untie the knot that took you there. Other uses belong to the
+world, so a rewind takes them back.
+
 ## Sight, sound and sleep
 
 **Seeing a move.** Moves are simultaneous, so an NPC sees a Linker's move
@@ -399,7 +417,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - `span` and `quiet` on handlers (reserved).
 - Inquests: hidden forks a Linker can ask for (`~ inquest`).
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
-- `once per day` and `needs two to hold it` on a rewind spell.
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.
 - Anything marked v0.6: the duel, `retell`.

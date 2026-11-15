@@ -183,7 +183,7 @@ combo frostglass: chill, gust ~ spell ~ "rimes a mirror over until it shows noth
 combo thunderclap: hush, gust, spark ~ spell ~ "a swallowed sound, carried, then let go at once"
 ~ interrupts flame, frost
 combo backward_knot: mend, hush, tug, mend ~ spell ~ "ties the hour back on itself"
-~ rewind ~ once per day ~ needs two to hold it
+~ rewind ~ once per turn ~ requires pov.all alive
 
 act lodestone: cost 30 ~ spell ~ learned from clue lodestone
 ~ "makes one thing very, very heavy, for one breath"

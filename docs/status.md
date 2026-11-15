@@ -23,15 +23,20 @@ here.
 | 11 | Hints, first built under the name Inquests | #14 |
 | 12 | Inquests renamed to hints; `~ inquest` reserved for true Inquests; hints can be turned off | #15 |
 | 13 | Sight, sound and sleep: NPCs see moves (`self.saw`), noise wakes sleepers, a Nib's own `moves:`, echoes see NPCs where they were; `kill pov.all` and `kill each in` | #16 |
+| 14 | v0.5 closed: `requires`, `cost … from each`, `once` and `once per turn \| day` on acts; IR version 2 frozen; release v0.5.0 | #17 |
 
 ## Next
 
-1. **Inquests**: a Linker asks the story to diverge from its canon where
-   the Inker hid a fork (`~ inquest`). Designed in the working doc first.
-2. **The rest of the input family**, when a story needs one. None does yet.
-3. **Inkjot v0.6**: decided so far are `state` / `fact` / `clue`, structured
-   facts with rules, and `i` beside `me` (see the working doc). Held until
-   more ideas are in.
+The plan agreed on 14 Nov 2026:
+
+1. **Ex 4**, a `story` Inklink built around Inquests (flow D, forks with
+   `~ inquest for <id>`, optional Link ids, a MonkeyPaw or Storyteller fork,
+   several endings, ratings), and **Ex 5**, a `game` or `story-game` that
+   leans on structured facts and rules. Written first, as Ex 1 to 3 were.
+2. **The platform** (Phoenix, Datastar, Dstar), in its own conversation.
+3. **The bridge** between the platform and this interpreter (a Rustler NIF
+   or a separate service), then **the event log**, then **Inkjot v0.6**.
+4. **The rest of the input family**, when a story needs one. None does yet.
 
 ## How to resume
 

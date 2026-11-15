@@ -131,6 +131,7 @@ const PATTERNS: &[Pattern] = &[
     // The clock, the pov, and reveal.
     p(&["best"], "best", Shape::Expr),
     p(&["advance"], "advance", Shape::Token),
+    p(&["day"], "day", Shape::Token),
     p(&["turn", "limit"], "turn_limit", Shape::Token),
     p(&["turn", "ends", "when"], "turn_ends_when", Shape::Expr),
     p(&["switch"], "switch", Shape::Token),

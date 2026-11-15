@@ -3,9 +3,10 @@
 `inkjot build story.twee -o story.json` compiles an Inklink to one JSON file.
 A runtime reads that file and never parses Inkjot itself.
 
-This describes IR format version `"2"`. The three files under `examples/ir/`
-are the compiler's real output for the three examples, and a test keeps them
-current.
+This describes IR format version `"2"`, frozen with the compiler's v0.5.0
+release. Any change to it from here on is IR version `"3"`. The three files
+under `examples/ir/` are the compiler's real output for the three examples,
+and a test keeps them current.
 
 ## Top level
 
@@ -188,7 +189,7 @@ repeats, lists extend and objects merge.
 | `cost …`, `check E`, `min n`, `steps R`, `capacity n` | `cost` (list), `check`, `min`, `steps`, `capacity` |
 | `requires …` | `requires` (lowered words) |
 | `ends turn`, `one way`, `on tap` | `ends_turn`, `one_way`, `on_tap`: `true` |
-| `learned from clue X`, `once per day` | `learned_from`, `once_per` |
+| `learned from clue X`, `once per turn` / `once per day` | `learned_from`, `once_per`: `"turn"` / `"day"` |
 | `choice proactive` (`reactive`, `inactive`) | `choice` |
 | `back 1..=2` (on `rewind: echo`) | `back` |
 | `moves a, b` / `moves none` / `moves 2 per chronon` | `moves` (list; `[]` for none) / `speed` |
@@ -197,7 +198,7 @@ repeats, lists extend and objects merge.
 | `max n`, `per character`, `refill each chronon` / `refill on checkpoint` | `max`, `per`, `refill`: `"chronon"` / `"checkpoint"` |
 | `part of X`, `after X` | `part_of`, `after` |
 | `culprit X`, `method X`, `methods a, b` | `culprit`, `method`, `methods` |
-| `best R`, `advance x`, `turn limit 24h`, `turn ends when E` | `best`, `advance`, `turn_limit`, `turn_ends_when` |
+| `best R`, `advance x`, `turn limit 24h`, `turn ends when E`, `day n` | `best`, `advance`, `turn_limit`, `turn_ends_when`, `day` |
 | `switch freely`, `lead X`, `order each other within earshot` | `switch`, `lead`, `order_within` |
 | `timed 40ms`, `beat 1s`, `shows visited` | `timed`, `beat`, `shows` |
 | `on death in X`, `keeps a, b`, `resets a, b` | `on_death_in`, `keeps`, `resets` |
