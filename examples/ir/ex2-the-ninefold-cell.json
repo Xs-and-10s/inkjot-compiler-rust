@@ -1147,12 +1147,12 @@
           "acts": ["mend", "hush", "tug", "mend"],
           "tags": ["spell", "rewind"],
           "label": "ties the hour back on itself",
-          "once_per": "day",
-          "other": [
+          "once_per": "turn",
+          "requires": [
             {
-              "text": "needs two to hold it",
-              "words": ["needs", "two", "to", "hold", "it"]
-            }
+              "get": ["pov", "all"]
+            },
+            "alive"
           ]
         },
         {

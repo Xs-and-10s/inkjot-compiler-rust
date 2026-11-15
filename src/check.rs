@@ -497,6 +497,45 @@ impl Checker {
                 "the config needs `kind: story | game | story-game`",
             );
         }
+        // `once per turn | day`: a day needs the clock to say how long it is.
+        let clock = stmts.iter().find(|s| s.kw == "clock");
+        let has_day =
+            clock.is_some_and(|s| s.clauses[1..].iter().any(|c| c.text.starts_with("day ")));
+        let word = clock
+            .and_then(|s| {
+                s.clauses[1..]
+                    .iter()
+                    .find_map(|c| c.text.strip_prefix("shown as "))
+            })
+            .map(|w| w.trim_matches('"').to_string());
+        for p in passages {
+            let mut scratch = Vec::new();
+            let (stmts, _) = gather(p, &mut scratch);
+            for st in &stmts {
+                for c in &st.clauses[1..] {
+                    let Some(period) = c.text.strip_prefix("once per ") else {
+                        continue;
+                    };
+                    let period = period.trim();
+                    let col = c.col + cols("once per ");
+                    match period {
+                        "turn" | "chronon" => {}
+                        p if word.as_deref() == Some(p) => {}
+                        "day" if has_day => {}
+                        "day" => self.err(
+                            c.line,
+                            col,
+                            "`once per day` needs days on the clock: `clock: … ~ day n`",
+                        ),
+                        _ => self.err(
+                            c.line,
+                            col,
+                            "`once per` takes `turn`, `day`, or the clock's own word",
+                        ),
+                    }
+                }
+            }
+        }
         let cohort = value("cohort");
         match (value("mode"), cohort) {
             (Some((m, ..)), Some((_, line, col))) if m == "solo" => {

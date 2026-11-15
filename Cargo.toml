@@ -1,6 +1,6 @@
 [package]
 name = "inkjot"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
 description = "Compiler for Inkjot, the Twee 3 dialect behind Inklinks"
 license = "MIT"

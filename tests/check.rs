@@ -642,3 +642,25 @@ fn an_inquest_is_reserved_not_a_hint() {
     let old = ex2.replacen("hint: ", "inquest: ", 1);
     assert!(!inkjot::check(&old).ok());
 }
+
+#[test]
+fn once_per_day_needs_days_on_the_clock() {
+    let ex2 = include_str!("../examples/ex2-the-ninefold-cell.twee");
+    let per_day = ex2.replace("~ rewind ~ once per turn", "~ rewind ~ once per day");
+    let report = inkjot::check(&per_day);
+    assert!(
+        report
+            .diags
+            .iter()
+            .any(|d| d.msg.contains("needs days on the clock")),
+        "{:#?}",
+        report.diags
+    );
+    let with_days = per_day.replace(
+        "clock: 0.. ~ shown as \"turn\"",
+        "clock: 0.. ~ shown as \"turn\" ~ day 6",
+    );
+    assert!(inkjot::check(&with_days).ok());
+    let odd = ex2.replace("~ rewind ~ once per turn", "~ rewind ~ once per fortnight");
+    assert!(!inkjot::check(&odd).ok());
+}

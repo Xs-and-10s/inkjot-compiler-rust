@@ -583,3 +583,87 @@ fn inputs_and_ballots_refuse_what_does_not_fit() {
         .unwrap_err()
         .contains("not one of the methods"));
 }
+
+/// Two friends, a lock and some limits: what an act requires, and how often.
+const LIMITS: &str = r#":: StoryTitle
+Limits
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "yard"}
+
+:: Inklink [config]
+kind: game
+mode: solo
+pov: ann, bo
+clock: 0.. ~ shown as "turn" ~ day 2
+start: yard for ann, yard for bo
+character ann: "Ann" ~ playable
+character bo: "Bo" ~ playable
+place yard: "the yard"
+place shed: "the shed"
+resource vults: 10 ~ per character ~ refill each chronon
+item pin: "a hairpin" ~ lockpick ~ in yard
+fact count: 0
+act take: cost 0
+act pick: cost 1 ~ requires lockpick
+act heave: cost 4 from each ~ requires pov.all here
+act wish: cost 0 ~ once
+act nap: cost 0 ~ once per turn
+act feast: cost 0 ~ once per day
+act wait: cost 0
+
+:: yard
+--
+> [[Take the pin->here]] ~ take pin
+> [[Pick the lock->here]] ~ pick ~ then raise count 1
+> [[Heave the cart->here]] ~ heave
+> [[Make a wish->here]] ~ wish
+> [[Nap->here]] ~ nap
+> [[Feast->here]] ~ feast
+> [[Wait->here]] ~ wait ~ pass
+> [[Switch->here]] ~ switch
+
+:: shed
+Nothing here.
+
+:: limits [test]
+start: yard ~ as ann
+expect no link: "Pick the lock" ~ ((nothing to pick it with))
+do: "Take the pin"
+do: "Pick the lock"
+expect: count == 1
+do: "Make a wish"
+expect no link: "Make a wish" ~ ((once a reading))
+do: "Nap"
+expect no link: "Nap"
+do: "Feast"
+expect no link: "Feast"
+do: "Wait"
+expect: clock.now == 1
+expect link: "Nap" ~ ((a new turn))
+expect no link: "Feast" ~ ((the same day: two turns a day))
+expect no link: "Make a wish"
+do: "Wait"
+expect: clock.now == 2
+expect link: "Feast" ~ ((a new day))
+do: "Heave the cart"
+expect: ann.vults == 6 and bo.vults == 6 ~ ((each pays))
+
+:: heaving_needs_everyone_here [test]
+start: yard ~ as ann
+given: move bo to shed
+expect no link: "Heave the cart"
+"#;
+
+#[test]
+fn acts_ask_what_they_require_and_how_often() {
+    let ir = inkjot::build(LIMITS).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    for outcome in run_all(LIMITS, &ir).unwrap() {
+        assert!(
+            outcome.passed(),
+            "{:#?}\n{}",
+            outcome.failures,
+            outcome.transcript.join("\n")
+        );
+    }
+}

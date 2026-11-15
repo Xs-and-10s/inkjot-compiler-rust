@@ -11,6 +11,7 @@ mod cohort;
 mod events;
 mod hints;
 mod inputs;
+mod limits;
 mod senses;
 pub mod test;
 mod time;
@@ -170,6 +171,8 @@ impl Story {
                     self.defaults.insert("clock".into(), f(s, "value").clone());
                     self.defaults
                         .insert("clock_shown_as".into(), f(s, "shown_as").clone());
+                    self.defaults
+                        .insert("clock_day".into(), f(s, "day").clone());
                 }
                 Some("rewind") => self.rewind = Some(s.clone()),
                 Some("default") => {
@@ -323,6 +326,8 @@ pub struct Run<'s> {
     no_hints: bool,
     /// The Linkers' moves each NPC saw this turn.
     seen: HashMap<String, Vec<senses::SeenMove>>,
+    /// Uses of acts that rewind: the player's, so a rewind keeps them.
+    player_uses: HashMap<String, V>,
 }
 
 impl<'s> Run<'s> {
@@ -373,6 +378,7 @@ impl<'s> Run<'s> {
             heard: Default::default(),
             no_hints: false,
             seen: HashMap::new(),
+            player_uses: HashMap::new(),
         };
         run.init();
         run.place_npcs();
@@ -666,6 +672,13 @@ impl<'s> Run<'s> {
                 return Ok(false);
             }
         }
+        // What the act requires, and how often it may be done.
+        let doer = f(link, "order")
+            .as_str()
+            .map_or(self.pov.clone(), str::to_string);
+        if !self.act_allowed(link, &doer)? {
+            return Ok(false);
+        }
         // `take x` is offered only while x is within reach.
         if f(link, "act").as_str() == Some("take") {
             if let Some(item) = f(link, "arg").as_str() {
@@ -690,10 +703,29 @@ impl<'s> Run<'s> {
                 return Ok(false);
             }
         }
+        let payers = if self.paid_by_each(link)? {
+            self.story.povs.clone()
+        } else {
+            vec![actor]
+        };
         match self.cost(link)? {
-            Some(cost) => Ok(self.vults(&actor).is_none_or(|have| have >= cost)),
+            Some(cost) => Ok(payers
+                .iter()
+                .all(|p| self.vults(p).is_none_or(|have| have >= cost))),
             None => Ok(true),
         }
+    }
+
+    /// `cost 30 from each`: does the cost that applies fall on every pov?
+    fn paid_by_each(&mut self, link: &Value) -> R<bool> {
+        let mut each = false;
+        for entry in f(link, "cost").as_arr().unwrap_or(&[]) {
+            let when = f(entry, "when");
+            if *when == Value::Null || self.eval(when)?.truthy() {
+                each = f(entry, "from").as_str() == Some("each");
+            }
+        }
+        Ok(each)
     }
 
     /// What a Link costs in vults: the last cost entry whose condition holds.
@@ -763,6 +795,14 @@ impl<'s> Run<'s> {
             .as_str()
             .map_or(self.pov.clone(), str::to_string);
         if let Some(cost) = self.cost(link)? {
+            if self.paid_by_each(link)? {
+                for p in self.story.povs.clone() {
+                    if let Some(have) = self.vults(&p) {
+                        self.vals.insert(format!("{p}.vults"), V::Num(have - cost));
+                    }
+                }
+                return Ok(());
+            }
             if f(link, "cost")
                 .as_arr()
                 .and_then(|c| c.last())
@@ -783,6 +823,10 @@ impl<'s> Run<'s> {
             self.pay(link)?;
         }
         let pov = self.pov.clone();
+        if !self.in_past() {
+            let doer = f(link, "order").as_str().unwrap_or(&pov).to_string();
+            self.record_use(link, &doer);
+        }
         // An order: the other character acts, with the pov's ideas.
         if let Some(actor) = f(link, "order").as_str() {
             self.pov = actor.to_string();
