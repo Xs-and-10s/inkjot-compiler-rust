@@ -60,14 +60,18 @@ What it asks of v0.6, beyond Ex 4's list:
 | Learnable rules | `rule mirror: … ~ learned from pip_lore` |
 | One value per subject | `verb gets ~ one value`, so `observe` replaces what it replaces |
 | Changing the garden | `assert {{ here composted }}`, `retract {{ here soil ? }}`, `assert … until next chronon` |
-| Asking each truth | `{{ c blessed }}` (the garden), `me.knows {{ P suits here }}` (the almanac), `any P: me.knows {{ P thrives }} and not {{ P thrives }}` |
+| Asking each truth | `{{ c blessed }}` (the garden), `me.knows {{ P suits here }}` (the almanac), `some P: you.know {{ P thrives }} and not {{ P thrives }}` |
 | Showing the almanac | `{known about: here}` |
 | Seasons | `clock: 0..=8 ~ season 3 ~ seasons spring, summer, autumn`, `on season summer`, `clock.season` |
-| After the NPCs move | `on dawn` (where `turn` comes before them) |
+| The moments of a turn | `on turn begins` (after the NPCs move), `on turn ends` (before) |
 | Making things | `recipe lantern: jam_jar, candle_end ~ make` |
 | A margin for rules | `:: garden_rules [rules]` |
-| A relation with every member of a kind | `relation trust: you, each gnome`, `trust with self` |
+| A relation with every member of a kind | `relation trust: gardener, each gnome`, `trust with self` |
 | Picking a place by a rule | `one(bed, unwatched, where: {{ it has plant }})` |
+
+**Decided 16 Nov 2026** and applied here: the rules language is Inklog;
+quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
+`where:` in kind filters; `you` is a reserved name for the pov.
 
 **Found while writing it.** `inkjot check` 0.5 reads `{{ P in B }}` in a
 margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.

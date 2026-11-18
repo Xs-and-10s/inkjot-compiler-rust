@@ -21,19 +21,22 @@ The garden runs on every rule, applied to what is true. Your almanac runs
 only on the rules you know, applied only to what you have seen. You plant
 by the almanac. When it is wrong, you have learned something.
 
+Written in the second person, so the code says `you` for the pov (v0.6
+reserves it beside `i` and `me`); the gardener is declared by name.
+
 The story stays light: one fragment for each gnome who comes to trust you.
 )))
 kind: story-game
 tags: cozy ~ garden ~ deduction ~ folklore
 ages: 9..
 mode: solo
-pov: you
+pov: gardener
 clock: 0..=8 ~ shown as "month"
 ~ season 3 ~ seasons spring, summer, autumn
 start: cottage
 default moves: walk
 
-character you: "the new gardener" ~ playable ~ custom
+character gardener: "the new gardener" ~ playable ~ custom
 resource daylight: 6 ~ per character ~ refill each chronon ~ shown as "hours of daylight"
 resource hints: 3
 
@@ -69,7 +72,7 @@ act dig: cost 3 ~ loud
 act make: cost 2
 
 stat green_thumb: 0..=5 ~ shown as "green thumb"
-relation trust: you, each gnome ~ 0..=3 ~ shown as "trust"
+relation trust: gardener, each gnome ~ 0..=3 ~ shown as "trust"
 
 state lantern_lit: no ~ belongs to world
 state nibbled: nothing
@@ -111,16 +114,16 @@ Your almanac shows what it knows about a bed with `{known about: here}`:
 the facts you have learned, and what the rules you know derive from them.
 )))
 
-item rose_seed: "a twist of rose seed" ~ seed ~ held by you ~ grows rose
-item lavender_seed: "a paper of lavender seed" ~ seed ~ held by you ~ grows lavender
-item foxglove_seed: "a pinch of foxglove seed" ~ seed ~ held by you ~ grows foxglove
-item marigold_seed: "an envelope of marigold seed" ~ seed ~ held by you ~ grows marigold
-item pumpkin_seed: "three fat pumpkin seeds" ~ seed ~ held by you ~ grows pumpkin
+item rose_seed: "a twist of rose seed" ~ seed ~ held by gardener ~ grows rose
+item lavender_seed: "a paper of lavender seed" ~ seed ~ held by gardener ~ grows lavender
+item foxglove_seed: "a pinch of foxglove seed" ~ seed ~ held by gardener ~ grows foxglove
+item marigold_seed: "an envelope of marigold seed" ~ seed ~ held by gardener ~ grows marigold
+item pumpkin_seed: "three fat pumpkin seeds" ~ seed ~ held by gardener ~ grows pumpkin
 item mirror_lily_seed: "a seed like a pearl" ~ seed ~ held by pip ~ grows mirror_lily
 item shadebell_seed: "a seed like a drop of ink" ~ seed ~ held by sorrel ~ grows shadebell
 item thundercap_seed: "a pinch of grey spores in a walnut shell" ~ seed ~ held by mallow ~ grows thundercap
 item moonbloom_seed: "a seed that is cold to the touch" ~ seed ~ grows moonbloom
-item watering_can: "a dented watering can" ~ tool ~ held by you
+item watering_can: "a dented watering can" ~ tool ~ held by gardener
 item mattock: "Hester’s mattock" ~ tool ~ in shed
 item compost: "a barrow of black compost" ~ in shed
 item jam_jar: "an empty jam jar" ~ in cottage
@@ -130,7 +133,7 @@ item honey: "a spoon of honey in a twist of paper" ~ offering ~ in cottage
 item buttons: "a tin of odd buttons" ~ offering ~ in cottage
 item crusts: "bread crusts" ~ offering ~ in cottage
 item thimble: "a silver thimble" ~ offering ~ in shed
-item almanac: "Hester’s almanac" ~ held by you
+item almanac: "Hester’s almanac" ~ held by gardener
 item thistle: "a thistle taller than you are" ~ fixed ~ in c ~ watches here ~ means {{ thistle in c }}
 
 recipe lantern: jam_jar, candle_end ~ make ~ "A jar, a candle stub, a bit of wire for a handle."
@@ -174,7 +177,7 @@ on season autumn
 Weather: a red sky one month is rain the next. Watch the sky at evening
 and you can plan for it.
 )))
-on turn
+on turn ends
 ~ then retract {{ sky rains }}
 ~ then assert {{ sky rains }} when {{ sky reddens }}
 ~ then retract {{ sky reddens }}
@@ -183,10 +186,10 @@ on turn
 ~ then set nibbled: nothing
 
 (((
-`dawn` fires after the NPCs have moved, so the morning can say what the
-night did. `turn` fires before them.
+`turn begins` fires after the NPCs have moved, so the morning can say what
+the night did. `turn ends` fires before them.
 )))
-on dawn
+on turn begins
 ~ then play morning
 
 table weather: roll d6
@@ -535,7 +538,7 @@ THE UNDERWICK HARVEST FAIR. At the end of autumn, on the green. Prizes for any m
 
 :: morning [interlude]
 (((
-Played at dawn each month, after the gnomes have been abroad.
+Played as each month begins, after the gnomes have been abroad.
 )))
 [if clock.now in [3, 6]]
 It is {clock.season} now.
@@ -552,7 +555,7 @@ The offering you left is gone. In its place, in the soil, the print of a very sm
 [if nibbled != nothing]
 Something has been at the {nibbled}. Nibbled to the stalk.
 
-[if any P: me.knows {{ P thrives }} and not {{ P thrives }}]
+[if some P: you.know {{ P thrives }} and not {{ P thrives }}]
 Your almanac said something here would thrive. It hasn’t. The almanac is wrong, somewhere, and you are going to have to find out where.
 
 [end]
