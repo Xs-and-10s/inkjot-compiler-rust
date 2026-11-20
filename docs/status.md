@@ -28,6 +28,7 @@ here.
 | 15 | The engine API (`src/engine.rs`, `docs/engine.md`): states as values, replay from a log, errors as data, a step limit, `ENGINE_VERSION`; ordered maps throughout; code dual-licensed MIT OR Apache-2.0, examples CC BY 4.0 | #23 |
 | 16 | Engine events: `nib_shown`, `ending_reached`, `reading_finished`, and the interpreter's checkpoints, deaths, rewinds, echoes and turns; `replay_all`; `[finale]` is an ending (Ex 2 and Ex 3 retagged); the platform's handoff in `docs/platform/` | #24 |
 | 17 | The NIF: `native/inkjot_nif` (Rustler) and `Inkjot.Engine` (`mix.exs` at the root, Elixir under `elixir/`), with StreamData properties; history snapshots shared behind `Arc`s (a Link 300 in to Ex 1: 25 ms to 0.5 ms); `build` through the NIF | #25 |
+| 18a | v0.6 foundations: `state`, `fact`, `clue`; `inkjot migrate` (Ex 1 to 3 migrated); names for the pov; `[fix]`; reserved words; IR 3's core: stable Link ids, passage titles, typed state | #26 |
 
 ## Next
 
@@ -110,8 +111,6 @@ breaking change.
   `tone`, `reveals`). They never change play.
 - `~ track` marks values whose changes the engine reports on its events
   (`platform/events.md` §9.8).
-- **Relations name both ends:** `raise trust between me and self 1`, read
-  as `trust between me and pip` or `me.trust(pip)`.
 - §1, Inquests: `~ inquest`, `~ inquest for <id>`, `~ inquest from
   <passage>`, `~ inquest by <role> ~ rejoin …`; the `inquest` field
   (`stands_in_for`, `from`, `credit`, `pending`); `brief` declarations as a
@@ -144,7 +143,10 @@ breaking change.
   `clock.season`, `on season begins summer`.
 - Kind filters: `where:` with `it` for each candidate; `|` for
   alternatives; `{present linker}`.
-- Relations among a kind: `relation trust: you, each gnome ~ 0..=3`.
+- Relations among a kind: `relation trust: you, each gnome ~ 0..=3`,
+  naming both ends: `raise trust between me and self 1`, read as `trust
+  between me and pip` or `me.trust(pip)`. (v0.5's relations are one pair,
+  so nothing breaks waiting for this.)
 - The dice language and random tables (one `table`, no `matrix`).
 - Decks, piles, melds, card effects, one Link per thing with `~ for each`.
 - `[if …; then …]`, in place of automatic forks.
