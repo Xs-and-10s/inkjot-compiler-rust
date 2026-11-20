@@ -27,6 +27,7 @@ here.
 | — | Ex 5 *Thistledown* and the rummy sketch drafted for v0.6; Ex 4 withdrawn | #18 to #22 |
 | 15 | The engine API (`src/engine.rs`, `docs/engine.md`): states as values, replay from a log, errors as data, a step limit, `ENGINE_VERSION`; ordered maps throughout; code dual-licensed MIT OR Apache-2.0, examples CC BY 4.0 | #23 |
 | 16 | Engine events: `nib_shown`, `ending_reached`, `reading_finished`, and the interpreter's checkpoints, deaths, rewinds, echoes and turns; `replay_all`; `[finale]` is an ending (Ex 2 and Ex 3 retagged); the platform's handoff in `docs/platform/` | #24 |
+| 17 | The NIF: `native/inkjot_nif` (Rustler) and `Inkjot.Engine` (`mix.exs` at the root, Elixir under `elixir/`), with StreamData properties; history snapshots shared behind `Arc`s (a Link 300 in to Ex 1: 25 ms to 0.5 ms); `build` through the NIF | #25 |
 
 ## Next
 
@@ -34,9 +35,9 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
 
 1. **Milestone 15, the engine API.** Done.
 2. **Milestone 16, engine events.** Done.
-3. **Milestone 17, the Rustler NIF.** A workspace of two crates: `inkjot`
-   (no dependencies) and `inkjot_nif` (Rustler). States as `ResourceArc`s;
-   `load` and `replay` on dirty schedulers. See `docs/engine.md`.
+3. **Milestone 17, the Rustler NIF.** Done. The platform's side:
+   `Inklinks.Engine.Rust` over `Inkjot.Engine`, its Ex 3 scenarios run
+   against it, and the stub kept as an oracle (follow-up 4).
 4. **Milestone 18, IR 3 and the first part of v0.6.** IR 3: unknown fields
    ignored; an `inquest` field on forks (`stands_in_for`, `from`, `credit`,
    `pending`), retiring `kind: "inquest"`; stable ids; styled text runs and
@@ -73,7 +74,8 @@ Smaller things noted on the way:
 The platform's handoff of 20 Nov 2026 is in `docs/platform/`. Of its
 follow-ups (`platform/compiler-followups.md`): 1 (`finale` and `epilogue`)
 was settled in milestone 16; 8 and 9 (the engine and its events) in 15 and
-16; 4 (the stub as an oracle) belongs to milestone 17; 2, 3, 5, 7 and 10
+16; 4 (the stub as an oracle) is the platform's, now that milestone 17 gives
+it the NIF; 2, 3, 5, 7 and 10
 (emphasis, `shown_as`, Inquest forks, "offered Links", `aka` policies) to
 milestone 18.
 
@@ -87,6 +89,7 @@ Library; a public rewrite can serve both).
 
 ```
 cargo test                                   # everything should pass
+mix test                                     # the NIF (Elixir 1.15+)
 for ex in examples/*.twee; do                # the stories' own tests
   inkjot test "$ex" "examples/tests/$(basename "$ex" .twee).tests.twee"
 done

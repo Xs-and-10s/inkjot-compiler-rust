@@ -96,6 +96,19 @@ cargo build --release
 cargo test
 ```
 
+### The engine for Elixir
+
+`Inkjot.Engine` puts the engine inside the BEAM, as a NIF, for the
+Inklinks platform. The Elixir code is under `elixir/`, the Rustler crate
+under `native/inkjot_nif/`, and `mix.exs` at the root, so a Mix project can
+depend on this repository directly. It needs Elixir 1.15 or later and a Rust
+toolchain. See [`docs/engine.md`](docs/engine.md), "The NIF".
+
+```
+mix deps.get
+mix test
+```
+
 ## Testing
 
 Five kinds of test, all run by `cargo test`:
@@ -152,6 +165,9 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
 | `src/engine/mod.rs` | The engine: the interpreter as the platform calls it |
 | `src/engine/events.rs` | The engine's events, and their catalogue |
+| `native/inkjot_nif/` | The engine as a NIF (Rustler) |
+| `elixir/lib/inkjot/engine.ex` | `Inkjot.Engine`, the NIF's Elixir face |
+| `elixir/test/` | The NIF's tests (ExUnit, StreamData) |
 | `src/run/mod.rs` | The interpreter over the IR |
 | `src/run/value.rs` | Values while a story runs |
 | `src/run/events.rs` | `on` handlers: what happens when something happens |

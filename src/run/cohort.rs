@@ -22,6 +22,7 @@
 //! [`Run::sit`] swaps them, like a context switch.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use super::agenda::Walker;
 use super::{f, place_of, strs, Local, Run, R, V};
@@ -118,7 +119,7 @@ impl Run {
             self.start(passage, Some(w))?;
         }
         // The log begins with everyone seated.
-        self.history = vec![self.snapshot()];
+        self.history = vec![Arc::new(self.snapshot())];
         self.sit(who[0])
     }
 

@@ -42,6 +42,7 @@
 //! hask` puts every lock back but leaves the Host his count of deaths.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use super::{f, num, place_of, str_or_null, strs, Entry, Event, Run, Sighting, R, V};
 use crate::json::Value;
@@ -114,7 +115,7 @@ impl Run {
 
     /// The first snapshot, and every declared checkpoint set to it.
     pub(super) fn start_the_log(&mut self) {
-        let first = self.snapshot();
+        let first = Arc::new(self.snapshot());
         for cp in &self.story.checkpoints {
             if let Some(name) = f(cp, "checkpoint").as_str() {
                 self.saved.insert(name.to_string(), first.clone());
@@ -129,7 +130,8 @@ impl Run {
             "checkpoint_reached",
             Value::obj([("checkpoint", Value::str(name))]),
         );
-        self.saved.insert(name.to_string(), self.snapshot());
+        self.saved
+            .insert(name.to_string(), Arc::new(self.snapshot()));
         if !self.reached.iter().any(|r| r == name) {
             self.reached.push(name.to_string());
         }
@@ -199,7 +201,11 @@ impl Run {
     /// back, and send everyone where it says.
     fn fall_back(&mut self, cp: &Value, who: &str) -> R<()> {
         let name = f(cp, "checkpoint").as_str().unwrap_or("");
-        let saved = self.saved.get(name).cloned().unwrap_or_default();
+        let saved = self
+            .saved
+            .get(name)
+            .map(|s| (**s).clone())
+            .unwrap_or_default();
         self.note_rewound(who, saved.chronon, Some(name), false, "death");
         let resets = strs(f(cp, "resets"));
         let keeps = strs(f(cp, "keeps"));
@@ -375,10 +381,14 @@ impl Run {
         }
         let checkpoint = to.strip_prefix("checkpoint:");
         let snap = if let Some(name) = checkpoint {
-            self.saved.get(name).cloned()
+            self.saved.get(name).map(|s| (**s).clone())
         } else {
             let n: u32 = to.trim_start_matches("turn:").parse().unwrap_or(0);
-            self.history.iter().rev().find(|s| s.chronon == n).cloned()
+            self.history
+                .iter()
+                .rev()
+                .find(|s| s.chronon == n)
+                .map(|s| (**s).clone())
         };
         let snap = snap.ok_or_else(|| format!("there is no time `{to}` to go back to"))?;
         self.note_rewound(&who, snap.chronon, checkpoint, false, "rewind");

@@ -330,9 +330,9 @@ pub struct Run {
     /// What each NPC saw at the end of each turn: who, holding what.
     sightings: BTreeMap<String, Vec<Sighting>>,
     /// The world at the start of every turn, oldest first.
-    history: Vec<time::Snapshot>,
+    history: Vec<Arc<time::Snapshot>>,
     /// Each checkpoint's snapshot: from the start, or from when it was reached.
-    saved: BTreeMap<String, time::Snapshot>,
+    saved: BTreeMap<String, Arc<time::Snapshot>>,
     /// The checkpoints reached so far, in order.
     reached: Vec<String>,
     /// Linkers re-living an earlier stop, and which.
@@ -605,7 +605,7 @@ impl Run {
         }
         self.enter(&passage, BTreeMap::new())?;
         // The log begins where play does.
-        self.history = vec![self.snapshot()];
+        self.history = vec![Arc::new(self.snapshot())];
         Ok(())
     }
 
@@ -1108,7 +1108,7 @@ impl Run {
         // note who they saw.
         self.agendas()?;
         self.look();
-        self.history.push(self.snapshot());
+        self.history.push(Arc::new(self.snapshot()));
         Ok(())
     }
 
