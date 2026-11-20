@@ -109,6 +109,8 @@ struct Checker {
     locals: HashSet<String>,
     stretch: BTreeMap<String, usize>,
     stats: Stats,
+    /// The Inker's Link ids in the passage being checked: `~ id burn`.
+    link_ids: HashSet<String>,
 }
 
 impl Checker {
@@ -417,6 +419,7 @@ impl Checker {
             }
         }
         self.locals = self.scope_of(&p.name);
+        self.link_ids.clear();
         let mut diags = std::mem::take(&mut self.diags);
         let (stmts, body) = gather(p, &mut diags);
         self.diags = diags;
@@ -812,6 +815,16 @@ impl Checker {
             None => ("", rest_col),
         };
         match kw {
+            // A passage's own title, for the Linker: `title: "The Millpond"`.
+            "title" => {
+                if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
+                    self.err(
+                        line,
+                        vcol,
+                        "a title is quoted text: `title: \"The Millpond\"`",
+                    );
+                }
+            }
             "kind" => {
                 if !["story", "game", "story-game"].contains(&value) {
                     self.err(line, vcol, "`kind` is one of: story, game, story-game");
@@ -1143,6 +1156,17 @@ impl Checker {
         let arg_col = c.col + cols(word) + 1;
         match word {
             "choice" => self.choice(arg, c.line, arg_col),
+            "id" => {
+                if !is_ident(arg) || c.text.split_whitespace().count() != 2 {
+                    self.err(c.line, c.col, "a Link id is one name: `~ id burn_the_book`");
+                } else if !self.link_ids.insert(arg.to_string()) {
+                    self.err(
+                        c.line,
+                        arg_col,
+                        format!("two Links in this passage have the id `{arg}`"),
+                    );
+                }
+            }
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
             "become" | "order" => self.need(arg, &["character"], "character", c.line, arg_col),
             "hint" if !self.has("hints", &["resource"]) => self.err(

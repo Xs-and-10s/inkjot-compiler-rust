@@ -19,7 +19,7 @@ use crate::syntax::*;
 use crate::twee::{self, Line, Passage};
 
 /// Version of the IR format itself, bumped when its shape changes.
-pub const IR_VERSION: &str = "2";
+pub const IR_VERSION: &str = "3";
 
 /// Compile Inkjot source to its IR. Source with errors is not compiled:
 /// the report says what to fix.
@@ -376,8 +376,16 @@ impl Builder {
     }
 
     fn passage(&self, p: &Passage) -> Value {
-        let (stmts, body) = gather(p, &mut Vec::new());
+        let (mut stmts, body) = gather(p, &mut Vec::new());
         let margin = p.tags.iter().any(|t| MARGIN_TAGS.contains(&t.as_str()));
+        // `title: "The Millpond"` is the passage's, not a header statement.
+        let title = stmts.iter().position(|s| s.kw == "title").map(|i| {
+            let s = stmts.remove(i);
+            let text = s.clauses[0].text["title".len()..]
+                .trim_start_matches(':')
+                .trim();
+            Value::str(quoted(text).unwrap_or(text))
+        });
         let mut pairs = vec![
             ("name".to_string(), Value::str(&p.name)),
             (
@@ -394,6 +402,9 @@ impl Builder {
         // A `(((…)))` doc comment, for Inkwell. Only passages that have one.
         if let Some(doc) = &p.doc {
             pairs.insert(2, ("doc".to_string(), Value::str(doc)));
+        }
+        if let Some(title) = title {
+            pairs.insert(1, ("title".to_string(), title));
         }
         Value::Obj(pairs)
     }
@@ -574,7 +585,8 @@ impl Builder {
 
     fn body(&self, p: &Passage, lines: &[Line]) -> Vec<Value> {
         let mut out: Vec<Value> = Vec::new();
-        let mut links = 0;
+        // Derived Link ids seen so far: `ch2->ch3` twice is `ch2->ch3#2`.
+        let mut derived: HashMap<String, usize> = HashMap::new();
         let mut i = 0;
         // An author's note runs from `[note]` to the next modifier. It is
         // for the Inker, so it never reaches the IR.
@@ -593,8 +605,7 @@ impl Builder {
             if t.is_empty() {
                 continue;
             } else if t.starts_with('>') {
-                links += 1;
-                out.push(self.link(p, links, t, &more));
+                out.push(self.link(p, t, &more, &mut derived));
             } else if t.starts_with('[') && !t.starts_with("[[") && t.ends_with(']') {
                 in_note = t[1..]
                     .split([';', ']'])
@@ -638,7 +649,13 @@ impl Builder {
     }
 
     /// One Link, expanded with the defaults of the act it uses.
-    fn link(&self, p: &Passage, n: usize, line: &str, more: &[&str]) -> Value {
+    fn link(
+        &self,
+        p: &Passage,
+        line: &str,
+        more: &[&str],
+        derived: &mut HashMap<String, usize>,
+    ) -> Value {
         let open = line.find("[[").map_or(0, |i| i + 2);
         let close = line.find("]]").unwrap_or(line.len());
         let inner = line.get(open..close).unwrap_or("");
@@ -663,6 +680,7 @@ impl Builder {
         let mut kind = "go";
         let mut extra: Vec<(String, Value)> = Vec::new();
         let mut overrides: Vec<&str> = Vec::new();
+        let mut inker_id: Option<String> = None;
 
         for c in &clauses {
             let text = c.text.as_str();
@@ -684,6 +702,7 @@ impl Builder {
                 "check" => check_ = Some(expression(rest)),
                 "choice" => choice = Some(rest.to_string()),
                 "with" => extra.push(("with".into(), parameters(rest))),
+                "id" => inker_id = Some(rest.to_string()),
                 "switch" | "pass" | "hint" | "inquest" | "release" => kind = word,
                 "become" | "order" | "by" | "chance" | "after" | "requires" => {
                     let mut values = words(rest);
@@ -741,9 +760,22 @@ impl Builder {
             _ => Value::obj([("and", Value::Arr(whens))]),
         };
 
+        // The Inker's id, else one from the passage and the target, which
+        // survives reordering; a second Link to the same target gets `#2`.
+        let (id, id_from) = match inker_id {
+            Some(id) => (id, "inker"),
+            None => {
+                let base = format!("{}->{}", p.name, target.trim());
+                let n = derived.entry(base.clone()).or_default();
+                *n += 1;
+                let id = if *n == 1 { base } else { format!("{base}#{n}") };
+                (id, "target")
+            }
+        };
         let mut pairs: Vec<(String, Value)> = vec![
             ("type".into(), Value::str("link")),
-            ("id".into(), Value::str(format!("{}#{n}", p.name))),
+            ("id".into(), Value::str(&id)),
+            ("id_from".into(), Value::str(id_from)),
             ("label".into(), Value::str(label.trim())),
             ("target".into(), Value::str(target.trim())),
             ("kind".into(), Value::str(kind)),
@@ -780,7 +812,7 @@ impl Builder {
             ("overrides".into(), strings(overrides)),
         ];
         if p.has_tag("lib") {
-            pairs.insert(2, ("lib".into(), Value::str(&p.name)));
+            pairs.insert(3, ("lib".into(), Value::str(&p.name)));
         }
         pairs.extend(extra);
         Value::Obj(pairs)

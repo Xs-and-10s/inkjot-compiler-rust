@@ -120,11 +120,12 @@ fn a_link_is_expanded_with_its_acts_defaults() {
         .and_then(Value::as_arr)
         .unwrap()
         .iter()
-        .find(|n| n.get("id").and_then(Value::as_str) == Some("dining_table#4"))
+        .find(|n| n.get("id").and_then(Value::as_str) == Some("dining_table->dining_table:letter"))
         .unwrap();
     let expected = r#"{
         "type": "link",
-        "id": "dining_table#4",
+        "id": "dining_table->dining_table:letter",
+        "id_from": "target",
         "lib": "dining_table",
         "label": "Ask Mrs. Ardent about her letter",
         "target": "dining_table:letter",
@@ -277,5 +278,151 @@ fn stats_on_characters_and_list_entries_are_typed() {
     assert_eq!(
         holds[4],
         json::parse(r#"{"id": "leo", "mark": "pending"}"#).unwrap()
+    );
+}
+
+/// A small v0.6 story for the IR 3 fields.
+const IR3: &str = r#":: StoryTitle
+The Ford
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "ford"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: ann
+character ann: "Ann" ~ playable
+state crossed: no
+state coins: 3
+state toll: 1.5
+state name: "Ann"
+state ferryman: nothing
+fact deep: "The ford is deeper than it looks." ~ clue
+
+:: ford
+title: "The Ford"
+--
+The river is brown and slow.
+> [[Pay the ferryman->far_bank]] ~ id pay
+> [[Wade across->far_bank]]
+> [[Swim across->far_bank]]
+> [[Wait->ford]]
+
+:: far_bank
+The far bank.
+"#;
+
+fn links_of(p: &Value) -> Vec<(String, String)> {
+    p.get("body")
+        .and_then(Value::as_arr)
+        .unwrap()
+        .iter()
+        .filter(|n| n.get("type").and_then(Value::as_str) == Some("link"))
+        .map(|n| {
+            let s = |k| n.get(k).and_then(Value::as_str).unwrap().to_string();
+            (s("id"), s("id_from"))
+        })
+        .collect()
+}
+
+/// A Link's id is the Inker's `~ id`, else its passage and target, with a
+/// suffix only when two Links share both. Reordering keeps every id.
+#[test]
+fn link_ids_survive_reordering() {
+    let ir = build(IR3).unwrap();
+    assert_eq!(ir.get("ir").and_then(Value::as_str), Some("3"));
+    let ford = passage(&ir, "ford");
+    let ids = links_of(ford);
+    let expected: Vec<(String, String)> = [
+        ("pay", "inker"),
+        ("ford->far_bank", "target"),
+        ("ford->far_bank#2", "target"),
+        ("ford->ford", "target"),
+    ]
+    .iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+    assert_eq!(ids, expected);
+
+    // Move the Inker's Link and the wait: no id changes.
+    let moved = IR3.replace(
+        "> [[Pay the ferryman->far_bank]] ~ id pay\n> [[Wade across->far_bank]]\n> [[Swim across->far_bank]]\n> [[Wait->ford]]",
+        "> [[Wait->ford]]\n> [[Wade across->far_bank]]\n> [[Swim across->far_bank]]\n> [[Pay the ferryman->far_bank]] ~ id pay",
+    );
+    let mut again = links_of(passage(&build(&moved).unwrap(), "ford"));
+    again.sort();
+    let mut before = ids.clone();
+    before.sort();
+    assert_eq!(again, before);
+}
+
+#[test]
+fn a_passage_title_and_typed_state() {
+    let ir = build(IR3).unwrap();
+    let ford = passage(&ir, "ford");
+    assert_eq!(ford.get("title").and_then(Value::as_str), Some("The Ford"));
+    assert!(ford
+        .get("header")
+        .and_then(Value::as_arr)
+        .unwrap()
+        .is_empty());
+    let types: Vec<(String, String)> = ir
+        .get("config")
+        .and_then(Value::as_arr)
+        .unwrap()
+        .iter()
+        .filter(|s| s.get("declare").and_then(Value::as_str) == Some("state"))
+        .map(|s| {
+            let f = |k| s.get(k).and_then(Value::as_str).unwrap().to_string();
+            (f("id"), f("type"))
+        })
+        .collect();
+    let want = [
+        ("crossed", "boolean"),
+        ("coins", "integer"),
+        ("toll", "decimal"),
+        ("name", "text"),
+        ("ferryman", "id"),
+    ];
+    let want: Vec<(String, String)> = want
+        .iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect();
+    assert_eq!(types, want);
+    let fact = ir
+        .get("config")
+        .and_then(Value::as_arr)
+        .unwrap()
+        .iter()
+        .find(|s| s.get("declare").and_then(Value::as_str) == Some("fact"))
+        .unwrap();
+    assert_eq!(
+        fact.get("label").and_then(Value::as_str),
+        Some("The ford is deeper than it looks.")
+    );
+    assert_eq!(fact.get("tags"), Some(&json::parse(r#"["clue"]"#).unwrap()));
+}
+
+#[test]
+fn link_ids_and_titles_are_checked() {
+    let errs = |src: &str| -> Vec<String> {
+        check(src)
+            .diags
+            .into_iter()
+            .filter(|d| d.severity == inkjot::Severity::Error)
+            .map(|d| d.msg)
+            .collect()
+    };
+    assert!(errs(IR3).is_empty(), "{:?}", errs(IR3));
+    let twice = IR3.replace("> [[Wait->ford]]", "> [[Wait->ford]] ~ id pay");
+    assert_eq!(
+        errs(&twice),
+        ["two Links in this passage have the id `pay`"]
+    );
+    let unquoted = IR3.replace("title: \"The Ford\"", "title: The Ford");
+    assert_eq!(
+        errs(&unquoted),
+        ["a title is quoted text: `title: \"The Millpond\"`"]
     );
 }

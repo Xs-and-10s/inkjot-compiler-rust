@@ -5,11 +5,13 @@ choice-based work: a story, a game, or something between. Inkjot keeps the
 standard Twee 3 container (`:: passage [tags]`) and defines its own language for
 what goes inside a passage.
 
-This compiler targets **Inkjot v0.5**.
+This compiler targets **Inkjot v0.6**, being built (see
+[`docs/status.md`](docs/status.md)). `inkjot migrate` rewrites a v0.5 source
+for it.
 
 ## Status
 
-Four commands:
+Five commands:
 
 - `inkjot check` reads a `.twee` file and reports what is wrong with it.
 - `inkjot build` compiles a file that passes into its JSON IR.
@@ -17,6 +19,10 @@ Four commands:
   Linkers at one keyboard.
 - `inkjot test` runs a story's `[test]` passages: scripted playthroughs that
   check what is shown and what is offered. See [`docs/run.md`](docs/run.md).
+- `inkjot migrate` rewrites a v0.5 source for v0.6: `fact` becomes `state`,
+  `clue` becomes `fact … ~ clue`, `[fixme]` becomes `[fix]`, and the version
+  goes up. It notes what needs a person, such as an id that is now a
+  reserved word.
 
 ```
 $ inkjot check examples/ex1-the-night-train.twee
@@ -51,13 +57,13 @@ bad usage.
 
 - The Twee container: passage headers, tags, duplicate names, sub-Nibs whose
   parent is missing.
-- `StoryData`: valid JSON, `format` is `Inkjot`, the version is 0.5.x, the
+- `StoryData`: valid JSON, `format` is `Inkjot`, the version is 0.6.x, the
   start passage exists.
 - The config and the margins (`[config]`, `[npc]`, `[character]`, `[place]`,
   `[archetype]`): every statement starts with a known keyword; declarations
   have a name and a colon; `kind`, `mode`, `cohort` and `pov` agree.
 - Names: Link targets, `next:`, `{embed nib}`, `then play`, `start:` and
-  `starts:` name real passages. Items, clues, fuses, tables, lists, places,
+  `starts:` name real passages. Items, facts, fuses, tables, lists, places,
   ways, archetypes, stats and speakers are declared before they are used.
 - Links: `> [[label->target]]` and its `~` clauses, each of which must be a
   Link clause or a declared act or combo.
@@ -67,7 +73,7 @@ bad usage.
 - Expressions, wherever they appear: after `when`, in `[if …]`, in `let` and
   `expect`. `but` is a synonym for `and`.
 - Names inside expressions. Each must be a builtin (`me`, `here`, `clock`), a
-  declared id, a tag, or a `let` in scope. `me.knows.x` wants a clue and
+  declared id, a tag, or a `let` in scope. `me.knows.x` wants a fact and
   `me.holds.x` an item. A misspelling gets a suggestion:
 
   ```

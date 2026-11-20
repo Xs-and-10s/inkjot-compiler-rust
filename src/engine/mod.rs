@@ -47,7 +47,7 @@ use crate::run::{Ask, Run, Story};
 pub const ENGINE_VERSION: u32 = 1;
 
 /// The IR versions this engine reads.
-pub const IR_VERSIONS: [&str; 1] = ["2"];
+pub const IR_VERSIONS: [&str; 1] = ["3"];
 
 // ------------------------------------------------------------------ errors
 
@@ -140,7 +140,7 @@ pub struct Meta {
     pub ifid: String,
     /// The IR version: `"2"`.
     pub ir: String,
-    /// The compiler that made the IR: `"0.5.0"`.
+    /// The language version the source declared: `"0.6.0"`.
     pub inkjot: String,
     /// `story`, `story-game` or `game`.
     pub kind: String,
@@ -183,7 +183,7 @@ impl Inklink {
             if !IR_VERSIONS.contains(&version) {
                 return Err(refused(
                     RefusedKind::BadIr,
-                    format!("this is IR version `{version}`; this engine reads IR 2"),
+                    format!("this is IR version `{version}`; this engine reads IR 3"),
                 ));
             }
             let story = Story::new(ir).map_err(|e| refused(RefusedKind::BadIr, e))?;

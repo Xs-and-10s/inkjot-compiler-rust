@@ -81,6 +81,7 @@ pub(crate) const SETTINGS: &[&str] = &[
     "observe",
     "timeout",
     "param",
+    "title",
     // `[test]` passages.
     "given",
     "answer",
@@ -117,7 +118,7 @@ pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "ret
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
-    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch",
+    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch", "id",
     "pass", "release", "requires", "once", "loud", "quiet", "choice",
 ];
 

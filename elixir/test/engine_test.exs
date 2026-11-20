@@ -162,7 +162,7 @@ defmodule Inkjot.EngineTest do
 
   test "meta describes an Inklink before anyone reads it", %{inklinks: inklinks} do
     meta = Engine.meta(inklinks["ex3-the-fall-of-the-old-regime"])
-    assert %{title: "The Fall of the Old Regime", kind: "story", mode: "solo", ir: "2"} = meta
+    assert %{title: "The Fall of the Old Regime", kind: "story", mode: "solo", ir: "3"} = meta
     assert meta.povs == ["skittles"]
     assert meta.engine == Engine.engine_version()
   end
@@ -193,7 +193,7 @@ defmodule Inkjot.EngineTest do
     assert {:error, {:bad_ir, _, nil}} = Engine.load(<<0xFF, 0xFE>>)
 
     assert {:error, {:bad_ir, _, nil}} =
-             Engine.load(~s({"ir": "3", "config": [], "passages": []}))
+             Engine.load(~s({"ir": "2", "config": [], "passages": []}))
   end
 
   test "a term of the wrong shape raises", %{inklinks: inklinks} do

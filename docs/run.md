@@ -91,8 +91,8 @@ running the three examples.
   (`dining@1`), the walk arrives at the destination's cell for that time.
 - **A cell is a time**: arriving at `dining@2` makes it stop 2.
 - **A resource is each character's own** unless it is tagged `shared`.
-- **A fact declared in a passage** belongs to that passage's place, or to the
-  character or NPC whose margin it is: `orrery.ember`, `vell.cornered`.
+- **A state declared in a passage** belongs to that passage's place, or to
+  the character or NPC whose margin it is: `orrery.ember`, `vell.cornered`.
 - **In reach**: a `take` Link is offered while the item lies in this place, or
   is held by an NPC who is here (that is how Wren lifts the letter).
 - **Costs**: the last cost entry whose condition holds applies; `rest` takes
@@ -115,7 +115,7 @@ or NPC whose margin holds the handler (so `say self "…"` is the Host).
 | `act` | a pov arrives at an `[act]` passage | the passage |
 | `cross` | a pov walks along a way | the way |
 | `take` | a pov takes an item | the item |
-| `learn` | a pov learns a clue they did not know | the clue |
+| `learn` | a pov learns a fact they did not know | the fact |
 | `raise`, `lower`, `set` | a value changes | the value, `cleverness` or `glyph.broken` |
 | `turn` | a turn ends | — |
 | `death` | anyone dies | — (`actor` is who died) |
@@ -326,8 +326,8 @@ The interpreter keeps a log, as the paper Conductor did: a snapshot of the
 whole world at the start of every turn, and one for each checkpoint (taken
 at the start, and again whenever a passage says `checkpoint name`).
 
-A fact marked `survives death` (`fact deaths: 0 ~ survives death`) is never
-reset by a checkpoint.
+A state marked `survives death` (`state deaths: 0 ~ survives death`) is
+never reset by a checkpoint.
 
 **A death** is settled after the Link that caused it:
 
@@ -362,12 +362,12 @@ What a checkpoint resets, or a rewind keeps, is a list of categories:
 
 | Category | Means |
 |---|---|
-| `world` | every fact, everyone's included (`eldric.chained`); NPCs' places; items lying anywhere; lists. Not resources |
+| `world` | every state, everyone's included (`eldric.chained`); NPCs' places; items lying anywhere; lists. Not resources |
 | `held` | which character holds which item |
 | `knows` | what everyone knows |
-| a fact, stat, resource or relation (`trust`, `hp`) | its value, for everyone |
-| a place or map (`sanctum`, `prison`) | the facts of the places in it, and the items lying there |
-| a character or NPC (`hask`) | every fact about them |
+| a state, stat, resource or relation (`trust`, `hp`) | its value, for everyone |
+| a place or map (`sanctum`, `prison`) | the states of the places in it, and the items lying there |
+| a character or NPC (`hask`) | every state about them |
 
 `here.passed` holds, and `{passers}` names them, when someone dashed
 through this place on the way to the stop it is.
