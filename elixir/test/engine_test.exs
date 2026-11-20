@@ -270,4 +270,68 @@ defmodule Inkjot.EngineTest do
     median = Enum.at(Enum.sort(times), 100)
     assert median < 1_000, "take_link took #{median} µs (median of 200)"
   end
+
+  @ford """
+  :: StoryTitle
+  The Ford
+
+  :: StoryData
+  {"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "ford"}
+
+  :: Inklink [config]
+  kind: story
+  mode: solo
+  pov: nell
+  character nell: "Nell" ~ playable
+  resource inquests: 3
+  state trust: 0 ~ track
+
+  :: ford
+  title: "The Ford"
+  --
+  The ferryman holds out his *hand*.
+  > [[Pay the ferryman->bank]] ~ id pay ~ then raise trust 1
+  > [[Swim across in the dark->bank]] ~ inquest ~ id swim
+  > [[Steal the boat->bank]] ~ inquest ~ id steal ~ inquest from bank
+
+  :: bank [finale]
+  The far bank.
+  """
+
+  test "forks cross only when asked, and a taken fork replays" do
+    {:ok, ir} = Engine.build(@ford)
+    {:ok, inklink} = Engine.load(ir)
+    assert %{inquests: 3} = Engine.meta(inklink)
+    {:ok, ford} = Engine.start(inklink, 1)
+
+    view = Engine.view(ford)
+    assert Enum.map(view.links, & &1.id) == ["pay"]
+    assert [%{plain: "The ferryman holds out his hand.", runs: runs}] = view.text
+    assert %{text: "hand", style: ["italic"]} in runs
+
+    assert {:ok, [%{id: "swim"}, %{id: "steal"}]} = Engine.forks(ford, "pay")
+    assert {:ok, [%{id: "steal"}]} = Engine.forks(ford, "pay", "bank")
+    assert {:ok, true} = Engine.any_forks(ford)
+    assert Engine.asked_from(inklink, "bank") == ["ford"]
+    assert {:error, {:not_offered, _, nil}} = Engine.take_link(ford, "swim")
+
+    {:ok, swum} = Engine.take_fork(ford, "swim")
+    assert Engine.view(swum).nib == "bank"
+    assert Engine.actions(swum) == [{:take_fork, "swim", nil}]
+    {:ok, again} = Engine.replay(inklink, 1, %{}, Engine.actions(swum))
+    assert Engine.view(again) == Engine.view(swum)
+
+    {:ok, paid} = Engine.take_link(ford, "pay")
+    assert [%{"data" => %{"changes" => %{"trust" => [0, 1]}}} | _] = Engine.events(paid)
+  end
+
+  test "the story map" do
+    {:ok, ir} = Engine.build(@ford)
+    {:ok, inklink} = Engine.load(ir)
+    %{nodes: nodes, edges: edges} = Engine.map(inklink)
+    assert Enum.map(nodes, &{&1.id, &1.title}) == [{"ford", "The Ford"}, {"bank", nil}]
+
+    assert Enum.map(edges, &{&1.kind, &1.id, &1.stands_in_for}) ==
+             [{:link, "pay", nil}, {:fork, "swim", "pay"}, {:fork, "steal", "pay"}]
+  end
 end

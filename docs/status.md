@@ -30,6 +30,7 @@ here.
 | 17 | The NIF: `native/inkjot_nif` (Rustler) and `Inkjot.Engine` (`mix.exs` at the root, Elixir under `elixir/`), with StreamData properties; history snapshots shared behind `Arc`s (a Link 300 in to Ex 1: 25 ms to 0.5 ms); `build` through the NIF | #25 |
 | 18a | v0.6 foundations: `state`, `fact`, `clue`; `inkjot migrate` (Ex 1 to 3 migrated); names for the pov; `[fix]`; reserved words; IR 3's core: stable Link ids, passage titles, typed state | #26 |
 | 18b | Text: styled runs in prose and labels, braces in every string with escapes, `if … then … else`, `plural`, `capital`; names as the reader knows them (`shown_as` until `reveal`); `aka` policies and `{all x.aka}`; the engine's view carries styled paragraphs | #27 |
+| 18c | Inquests: forks (`~ inquest`, `for`, `from`, `by role ~ rejoin`, `credit`) as the `inquest` field, checked; `theme`, `brief`; analysis tags; `~ track` and `changes` on `nib_shown`; the engine's `forks`, `any_forks`, `take_fork`, `asked_from` and `map()`, in the NIF too | #28 |
 
 ## Next
 
@@ -41,7 +42,7 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
    `Inklinks.Engine.Rust` over `Inkjot.Engine`, its Ex 3 scenarios run
    against it, and the stub kept as an oracle (follow-up 4).
 4. **Milestone 18, IR 3 and the first part of v0.6**, in three pull
-   requests (see "Inkjot v0.6" below for what is in each).
+   requests (see "Inkjot v0.6" below for what is in each): #26, #27, #28.
 5. **Ex 6 to 9**, ideas first, then drafts:
    - Ex 6, a spy-noir `story-game` that leans on Inklog: two knowledge
      bases per character, and integrity constraints for facts that rule

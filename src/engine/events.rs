@@ -57,8 +57,8 @@ pub struct EventType {
 pub const CATALOGUE: &[EventType] = &[
     EventType {
         name: "nib_shown",
-        keys: &["nib", "passed", "links", "visit"],
-        when: "After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, and how many times the Nib has been arrived at.",
+        keys: &["nib", "passed", "links", "visit", "changes"],
+        when: "After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, how many times the Nib has been arrived at, and how the action changed the values marked `~ track` (`{\"leo.trust\": [2, 3]}`; empty when nothing tracked changed).",
     },
     EventType {
         name: "ending_reached",
@@ -114,7 +114,12 @@ pub fn catalogue_markdown() -> String {
 
 /// The engine's events for one action, given the view it led to. `ending`
 /// is the last finale reached in the reading, carried from state to state.
-pub(super) fn events(run: &mut Run, view: &View, ending: &mut Option<String>) -> Vec<Event> {
+pub(super) fn events(
+    run: &mut Run,
+    view: &View,
+    ending: &mut Option<String>,
+    changes: Value,
+) -> Vec<Event> {
     let mut out: Vec<Event> = run
         .take_noted()
         .into_iter()
@@ -137,6 +142,7 @@ pub(super) fn events(run: &mut Run, view: &View, ending: &mut Option<String>) ->
                 strings(view.links.iter().map(|l| l.id.clone()).collect()),
             ),
             ("visit", Value::Num(run.visits_to(&view.nib).to_string())),
+            ("changes", changes),
         ]),
     });
     // Reached on arrival, not again for each answer given while there.

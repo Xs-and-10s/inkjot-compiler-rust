@@ -50,6 +50,11 @@ assert_eq!(again.view(), state.view());
 | `state.events()` | `&[Event]` | What the action that made this state caused (below). |
 | `state.ending()` | `Option<&str>` | The last finale this reading reached. |
 | `state.actions()`, `state.seed()`, `state.started()` | the log | What to persist. |
+| `state.forks(link, from)` | `Vec<Link>` | The forks behind one offered Link, in the order written. `from`: the passage asked from, when it is a later one (pass the earlier visit's state). Never part of the view |
+| `state.any_forks(from)` | `bool` | Whether any fork may be taken here: flow D's "Noted" or Inquest mode |
+| `state.take_fork(fork, from)` | `State` | Only a fork `forks` would show. Spending an Inquest is the platform's |
+| `inklink.asked_from(nib)` | `Vec<String>` | The passages whose forks may be asked for from `nib`. Static |
+| `inklink.map()` | `StoryMap` | The story as a graph (below). Static |
 
 An `Inklink` is cheap to clone (two `Arc`s); every state made from it shares
 one indexed story.
@@ -59,12 +64,21 @@ one indexed story.
 **`Meta`**: `title`, `ifid`, `ir` (`"3"`), `inkjot` (the language version the source declared),
 `kind` (`story`, `story-game`, `game`), `mode` (`solo`, `cohort`), `start`,
 `povs` (the `pov:` setting, default first), `playable` (characters marked
-`~ playable`, for a lobby), `tags` (the Inker's), `engine`.
+`~ playable`, for a lobby), `tags` (the Inker's), `engine`, `inquests` (the
+`inquests` resource when the Inklink declares it and hides a fork; else
+none).
 
 **`Start`**: `nib` (a Nib to start at), `pov` (a character from `povs` or
 `playable`), `hints` (offer hints; a Linker may turn them off).
 
-**`Action`**: `TakeLink(id)`, `Answer(words)`, `Vote { who, how, proof }`.
+**`Action`**: `TakeLink(id)`, `Answer(words)`, `Vote { who, how, proof }`,
+`TakeFork { fork, from }`.
+
+**`StoryMap`**: `nodes` (`{ id, title, tags }`, in source order) and
+`edges` (`{ from, to, kind, id, label, stands_in_for, conditional }`, `kind`
+one of `link`, `fork`, `next`, `way`). For the platform's path tree and the
+Inker's path analytics; forks are edges marked as forks, so the platform
+decides who sees them.
 
 **`View`**:
 
@@ -108,7 +122,7 @@ The catalogue (`engine::CATALOGUE`; a test fails if this table differs):
 
 | Type | `data` | When |
 |---|---|---|
-| `nib_shown` | `nib`, `passed`, `links`, `visit` | After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, and how many times the Nib has been arrived at. |
+| `nib_shown` | `nib`, `passed`, `links`, `visit`, `changes` | After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, how many times the Nib has been arrived at, and how the action changed the values marked `~ track` (`{"leo.trust": [2, 3]}`; empty when nothing tracked changed). |
 | `ending_reached` | `ending` | The action arrived at a `[finale]` Nib. Its name is the ending's id. |
 | `reading_finished` | `ending` | Nothing is offered and nothing asked. `ending` is the last finale reached, or null. |
 | `checkpoint_reached` | `checkpoint` | A passage says `checkpoint name`: the world is saved there. |
@@ -240,6 +254,11 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
 | `events(state)` | a list of maps with string keys, as the platform's log stores them | normal |
 | `actions(state)`, `seed(state)`, `ending(state)` | the log | normal |
 | `take_link(state, id)`, `act(state, action)` | `{:ok, state}` | dirty CPU |
+| `forks(state, link, from \\ nil)` | `{:ok, [%{id, label, runs}]}` | normal |
+| `any_forks(state, from \\ nil)` | `{:ok, boolean}` | normal |
+| `take_fork(state, fork, from \\ nil)` | `{:ok, state}` | dirty CPU |
+| `asked_from(inklink, nib)` | `[passage]` | normal |
+| `map(inklink)` | `%{nodes: […], edges: […]}` | dirty CPU |
 | `replay(inklink, seed, start, actions, upto \\ nil)` | `{:ok, state}` | dirty CPU |
 | `replay_all(inklink, seed, start, actions)` | `{:ok, [state]}` | dirty CPU |
 | `engine_version()` | `1` | normal |
@@ -248,8 +267,8 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
   Elixir side holds, never copies. The BEAM frees them when nothing holds
   them. Keep one state per Nib shown, if going back needs it.
 - **Terms.** `start` is `%{nib: _, pov: _, hints: _}`, every key optional.
-  An action is `{:take_link, id}`, `{:answer, [word]}` or
-  `{:vote, who, how, [proof]}`. A refusal is
+  An action is `{:take_link, id}`, `{:answer, [word]}`,
+  `{:vote, who, how, [proof]}` or `{:take_fork, fork, from}`. A refusal is
   `{:error, {code, message, at}}`. A term of the wrong shape raises
   `ArgumentError`.
 - **Schedulers.** Every call that plays the story or reads a whole file runs
@@ -273,10 +292,6 @@ readings.
 ## Not yet
 
 - **Cohort play**: seats, shared acts and stops, through the engine.
-- **Inquests** (IR 3, milestone 18): `asked_from`, `forks`, `take_fork`.
-- **The story map**: the whole story (passages, Links, forks) as a graph,
-  for the platform's path tree and the Inker's path analytics: an engine
-  call, `map()`, built with IR 3.
 - **`snapshot`/`restore`**, once readings get long enough to need them.
 - **Precompiled NIFs** (`rustler_precompiled`), so the platform's build
   needs no Rust toolchain.

@@ -143,7 +143,7 @@ left out of the IR.
 | `id_from` | `inker` or `target`: where the id came from |
 | `label` | A list of parts, like a paragraph: styled runs and values included |
 | `lib` | Present when the Link lives in a `[lib]` passage that cells embed |
-| `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `inquest` (reserved), `release` |
+| `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `release`. A fork keeps its own kind: being a fork is the `inquest` field |
 | `act`, `arg` | The act or combo, and its argument (`take cufflink`) |
 | `cost` | The act's costs, then the Link's. **The last entry whose `when` holds applies.** `vults` is a number or `"rest"`; `per` and `from` appear when written |
 | `scope`, `capacity`, `check`, `ends_turn` | The Link's own value, else the act's |
@@ -156,6 +156,42 @@ left out of the IR.
 Other clauses appear as extra keys when used: `with` (an object of
 parameters), `become`, `order`, `by`, `chance`, `requires`, `once`, `loud`,
 `quiet`.
+
+**Forks.** A fork is a Link with an `inquest` field. A Link without one is
+an offered Link.
+
+```json
+{ "type": "link", "id": "swim", "label": ["Swim across in the dark"], "target": "bank", "kind": "go",
+  "inquest": { "stands_in_for": "pay", "from": ["bank"], "credit": "inker" }, "…": "…" }
+```
+
+| Field | Meaning |
+|---|---|
+| `stands_in_for` | The id of the offered Link this fork stands in for, in the same passage. Always written out: `~ inquest for pay`, or by default the offered Link just above |
+| `from` | Later passages it may also be asked for from: `~ inquest from bank` |
+| `credit` | Who wrote it as it stands: `inker` (the default), `monkeypaw`, `ghostwriter` or `storyteller`, from `~ credit …`. Attribution only |
+| `pending` | Only on a slot not written yet, filled at runtime: `{"by": "storyteller", "rejoin": ["bank"], "brief": "…"?}`, from `~ inquest by storyteller ~ rejoin bank ~ brief name`. `by` names a role, never a person |
+
+Several forks may stand in for one offered Link; their order is the order
+written. A fork is offered only while its offered Link is, and its own
+conditions must hold too. `brief` names a `brief` declaration (its fields
+come later; rule 0 lets them be added). The checker refuses forks in
+`mode: cohort`.
+
+**Analysis.** Tags that never change play ride in an `analysis` object:
+
+| Source | `analysis` |
+|---|---|
+| `~ beat turn` | `"beat": "turn"` (`opening`, `inciting`, `turn`, `midpoint`, `crisis`, `climax`, `resolution`) |
+| `~ weighs mercy, obedience` | `"weighs": ["mercy", "obedience"]`: declared `theme`s |
+| `~ arc ixe rises` | `"arc": {"who": "ixe", "way": "rises"}` (`rises`, `falls`, `holds`) |
+| `~ stakes other` | `"stakes": "other"` (`self`, `other`, `world`) |
+| `~ plants book`, `~ pays off book` | `"plants": ["book"]`, `"pays_off": ["book"]` |
+| `~ predict 40%` | `"predict": 40` |
+| `~ lasting` | `"lasting": true` |
+| `~ tone dark`, `~ reveals debts` | `"tone": "dark"`, `"reveals": "debts"` |
+
+`~ choice` stays its own field, as before.
 
 ## Statements
 
@@ -190,6 +226,8 @@ When there is no value, there is no colon: `archetype statue ~ lifeless`.
 | `way` | `from`, `to` |
 | `combo` | `acts` |
 | `relation` | `between` |
+| `theme` | `label`: `theme mercy: "Who deserves saving"` |
+| `brief` | `label`, and fields later |
 | `table` | `roll`, an expression (`d6 + bonus`); dice are names like `d6` |
 | `map` | `size`, `[columns, rows]` |
 
@@ -201,7 +239,7 @@ repeats, lists extend and objects merge.
 | Phrase | Field |
 |---|---|
 | `"…"` | `label`, or `description` if there is already a label. Quoted text is a plain string, or, when it has braces, `{"text": ["Keeper of ", {"value": "here"}]}`, worked out each time it is shown. Text that is read (a fact's text, a description, a list entry, a hint, a `say` line) also takes emphasis, so its parts may be styled runs; a name (`label`, `shown as`) and a value (`set x: "…"`) never do |
-| one word: `evidence`, `playable`, `loud` | added to `tags` |
+| one word: `evidence`, `playable`, `loud`, `track` | added to `tags`. `track` marks a value whose changes the engine reports |
 | `in X`, `at X` | `in`, `at` |
 | `held by X`, `belongs to X` | `held_by`, `belongs_to` |
 | `holds a, b: "label", c as mark` | `holds`: `[{"id", "label"?, "mark"?}]` |
@@ -321,6 +359,10 @@ Inkjot v0.6, milestone 18:
 - Quoted text with braces is `{"text": [parts]}`, in fields and in
   expressions; `if … then … else …`, `plural` and `capital` are new.
 - `aka_order` is `aka_pick`; `{all x.aka}` carries `"all": true`.
+- A fork is a Link with an `inquest` field (`stands_in_for`, `from`,
+  `credit`, `pending`); `kind: "inquest"` is retired. Analysis tags ride
+  in `analysis`. `theme` and `brief` are declarations; `pending:` is a
+  reserved header statement.
 - `reveal x` is an effect (`{"do": "reveal", "args": ["x"]}`); the
   `reveal:` setting is still the text's pacing.
 - `i`, `you`, `myself`, `yourself` are lowered as `me`; `know`, `hold`, `am`,

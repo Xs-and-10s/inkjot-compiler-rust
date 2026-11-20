@@ -111,6 +111,28 @@ struct Checker {
     stats: Stats,
     /// The Inker's Link ids in the passage being checked: `~ id burn`.
     link_ids: HashSet<String>,
+    /// The passage being checked, and its Links so far, for forks.
+    here: String,
+    links_here: Vec<LinkSeen>,
+    /// Where the first fork is, if the Inklink has any.
+    first_fork: Option<(usize, usize)>,
+    /// `~ plants x` and `~ pays off x`: where each was first seen.
+    plants: BTreeMap<String, (usize, usize)>,
+    pays: BTreeMap<String, (usize, usize)>,
+}
+
+/// A Link seen in the passage being checked.
+#[derive(Default)]
+struct LinkSeen {
+    line: usize,
+    col: usize,
+    target: String,
+    inker_id: Option<String>,
+    /// For a fork: where its `~ inquest` clause is, and the Link it names.
+    fork: Option<(usize, usize)>,
+    stands_in_for: Option<(String, usize, usize)>,
+    pending: bool,
+    rejoin: bool,
 }
 
 impl Checker {
@@ -420,6 +442,8 @@ impl Checker {
         }
         self.locals = self.scope_of(&p.name);
         self.link_ids.clear();
+        self.here = p.name.clone();
+        self.links_here.clear();
         let mut diags = std::mem::take(&mut self.diags);
         let (stmts, body) = gather(p, &mut diags);
         self.diags = diags;
@@ -427,6 +451,7 @@ impl Checker {
             self.stmt(s);
         }
         self.body(body);
+        self.forks_here();
         self.get_cycles(&stmts);
     }
 
@@ -545,6 +570,42 @@ impl Checker {
                         ),
                     }
                 }
+            }
+        }
+        if let Some((line, col)) = self.first_fork {
+            if value("mode").is_some_and(|(m, ..)| m == "cohort") {
+                self.err(
+                    line,
+                    col,
+                    "Inquests are for `mode: solo`; a cohort cannot take forks",
+                );
+            }
+            if !self.has("inquests", &["resource"]) {
+                self.diags.push(Diag::notice(
+                    line,
+                    col,
+                    "Linkers can ask for forks only when the Inklink declares `resource inquests: n`",
+                ));
+            }
+        }
+        let plants = std::mem::take(&mut self.plants);
+        let pays = std::mem::take(&mut self.pays);
+        for (name, (line, col)) in &plants {
+            if !pays.contains_key(name) {
+                self.diags.push(Diag::notice(
+                    *line,
+                    *col,
+                    format!("`{name}` is planted but never paid off"),
+                ));
+            }
+        }
+        for (name, (line, col)) in &pays {
+            if !plants.contains_key(name) {
+                self.diags.push(Diag::notice(
+                    *line,
+                    *col,
+                    format!("`{name}` is paid off but never planted"),
+                ));
             }
         }
         let cohort = value("cohort");
@@ -813,6 +874,127 @@ impl Checker {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn one_of(&mut self, value: &str, allowed: &[&str], what: &str, line: usize, col: usize) {
+        if !allowed.contains(&value) {
+            self.err(
+                line,
+                col,
+                format!("`{what}` is one of: {}", allowed.join(", ")),
+            );
+        }
+    }
+
+    /// `~ inquest`, `~ inquest for burn`, `~ inquest from ch3, ch4`,
+    /// `~ inquest by monkeypaw`: this Link is a fork.
+    fn inquest_clause(&mut self, c: &Clause) {
+        let rest = c.text["inquest".len()..].trim();
+        let rest_col = c.col + cols(&c.text[..c.text.len() - rest.len()]);
+        self.first_fork.get_or_insert((c.line, c.col));
+        if let Some(l) = self.links_here.last_mut() {
+            l.fork = Some((c.line, c.col));
+        }
+        let (how, list) = rest.split_once(' ').unwrap_or((rest, ""));
+        match how {
+            "" => {}
+            "for" if is_ident(list.trim()) => {
+                if let Some(l) = self.links_here.last_mut() {
+                    l.stands_in_for = Some((list.trim().to_string(), c.line, rest_col + 4));
+                }
+            }
+            "from" if !list.trim().is_empty() => {
+                for name in list.split(',') {
+                    self.need_passage(name.trim(), "the passage a fork may be asked from", c.line, rest_col + 5);
+                }
+            }
+            "by" => {
+                if !ROLES.contains(&list.trim()) || list.trim() == "inker" {
+                    self.err(
+                        c.line,
+                        rest_col + 3,
+                        "a pending fork is written by a role: monkeypaw, ghostwriter or storyteller",
+                    );
+                }
+                if let Some(l) = self.links_here.last_mut() {
+                    l.pending = true;
+                }
+            }
+            _ => self.err(
+                c.line,
+                c.col,
+                "a fork is `~ inquest`, `~ inquest for id`, `~ inquest from passage` or `~ inquest by role`",
+            ),
+        }
+    }
+
+    /// After a passage: every fork stands in for an offered Link here, and
+    /// a pending fork says where it rejoins.
+    fn forks_here(&mut self) {
+        let links = std::mem::take(&mut self.links_here);
+        let mut derived: HashMap<String, usize> = HashMap::new();
+        let ids: Vec<String> = links
+            .iter()
+            .map(|l| match &l.inker_id {
+                Some(id) => id.clone(),
+                None => {
+                    let base = format!("{}->{}", self.here, l.target);
+                    let n = derived.entry(base.clone()).or_default();
+                    *n += 1;
+                    if *n == 1 {
+                        base
+                    } else {
+                        format!("{base}#{n}")
+                    }
+                }
+            })
+            .collect();
+        let has_forks = links.iter().any(|l| l.fork.is_some());
+        for (i, l) in links.iter().enumerate() {
+            let Some((line, col)) = l.fork else {
+                continue;
+            };
+            match &l.stands_in_for {
+                Some((name, line, col)) => {
+                    let offered = links
+                        .iter()
+                        .zip(&ids)
+                        .any(|(o, id)| o.fork.is_none() && id == name);
+                    if !offered {
+                        self.err(
+                            *line,
+                            *col,
+                            format!("`{name}` is not an offered Link in this passage"),
+                        );
+                    }
+                }
+                None => {
+                    if !links[..i].iter().any(|o| o.fork.is_none()) {
+                        self.err(
+                            line,
+                            col,
+                            "a fork stands in for an offered Link: put it below one, or name it with `~ inquest for id`",
+                        );
+                    }
+                }
+            }
+            if l.pending && !l.rejoin {
+                self.err(
+                    line,
+                    col,
+                    "a pending fork says where it rejoins: `~ rejoin ch5`",
+                );
+            }
+        }
+        if has_forks {
+            for l in links.iter().filter(|l| l.inker_id.is_none()) {
+                self.diags.push(Diag::notice(
+                    l.line,
+                    l.col,
+                    "give this Link an id (`~ id name`), so the Inker's data still points at it after a revision",
+                ));
+            }
         }
     }
 
@@ -1167,6 +1349,12 @@ impl Checker {
         } else if !BUILTIN_TARGETS.contains(&target) {
             self.need_passage(target, "the Link target", l.no, tcol);
         }
+        self.links_here.push(LinkSeen {
+            line: l.no,
+            col,
+            target: target.to_string(),
+            ..LinkSeen::default()
+        });
         let rest = &text[close + 2..];
         if rest.trim().is_empty() {
             return;
@@ -1202,7 +1390,78 @@ impl Checker {
         let arg_col = c.col + cols(word) + 1;
         match word {
             "choice" => self.choice(arg, c.line, arg_col),
+            "inquest" => self.inquest_clause(c),
+            "rejoin" => {
+                for name in c.text[word.len()..].split(',') {
+                    self.need_passage(name.trim(), "the passage a fork rejoins", c.line, arg_col);
+                }
+                if let Some(l) = self.links_here.last_mut() {
+                    l.rejoin = true;
+                }
+            }
+            "brief" => self.need(arg, &["brief"], "brief", c.line, arg_col),
+            "credit" => {
+                if !ROLES.contains(&arg) {
+                    self.err(
+                        c.line,
+                        arg_col,
+                        "`credit` is one of: inker, monkeypaw, ghostwriter, storyteller",
+                    );
+                }
+            }
+            "beat" => self.one_of(arg, BEATS, "beat", c.line, arg_col),
+            "stakes" => self.one_of(arg, STAKES, "stakes", c.line, arg_col),
+            "tone" => self.one_of(arg, TONES, "tone", c.line, arg_col),
+            "weighs" => {
+                for theme in c.text[word.len()..].split(',') {
+                    self.need(theme.trim(), &["theme"], "theme", c.line, arg_col);
+                }
+            }
+            "arc" => {
+                let words: Vec<&str> = c.text.split_whitespace().collect();
+                match words.as_slice() {
+                    [_, who, way] => {
+                        self.need(who, &["character", "npc"], "character", c.line, arg_col);
+                        if !ARCS.contains(way) {
+                            self.err(c.line, c.col, "an arc is `~ arc who rises | falls | holds`");
+                        }
+                    }
+                    _ => self.err(c.line, c.col, "an arc is `~ arc who rises | falls | holds`"),
+                }
+            }
+            "plants" | "pays" => {
+                let list = match (word, c.text[word.len()..].trim_start().strip_prefix("off ")) {
+                    ("pays", Some(list)) => list,
+                    ("pays", None) => {
+                        return self.err(c.line, c.col, "a payoff is `~ pays off name`");
+                    }
+                    _ => &c.text[word.len()..],
+                };
+                for name in list.split(',') {
+                    let name = name.trim().to_string();
+                    let seen = if word == "plants" {
+                        &mut self.plants
+                    } else {
+                        &mut self.pays
+                    };
+                    seen.entry(name).or_insert((c.line, c.col));
+                }
+            }
+            "predict" => {
+                let n = arg.strip_suffix('%').and_then(|n| n.parse::<u32>().ok());
+                if !n.is_some_and(|n| n <= 100) || c.text.split_whitespace().count() != 2 {
+                    self.err(
+                        c.line,
+                        arg_col,
+                        "a prediction is a share of Linkers: `~ predict 40%`",
+                    );
+                }
+            }
+            "reveals" => self.need(arg, &["fact"], "fact", c.line, arg_col),
             "id" => {
+                if let Some(l) = self.links_here.last_mut() {
+                    l.inker_id = Some(arg.to_string());
+                }
                 if !is_ident(arg) || c.text.split_whitespace().count() != 2 {
                     self.err(c.line, c.col, "a Link id is one name: `~ id burn_the_book`");
                 } else if !self.link_ids.insert(arg.to_string()) {
@@ -1220,12 +1479,6 @@ impl Checker {
                 c.col,
                 "`~ hint` spends a hint request: declare `resource hints`",
             ),
-            "inquest" => self.diags.push(Diag::notice(
-                c.line,
-                c.col,
-                "`~ inquest` is reserved for Inquests (hidden forks a Linker can ask for); \
-                 the interpreter does not run them yet",
-            )),
             _ => {}
         }
         self.clause_common(c, true);
