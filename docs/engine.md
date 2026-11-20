@@ -74,8 +74,8 @@ one indexed story.
 | `tags` | Its tags: `finale`, `ending`, `epilogue`, `act`. |
 | `pov` | Who the Linker looks through. |
 | `now` | The clock's stop. |
-| `text` | The paragraphs the last action (or the start) showed, in order. Plain strings in IR 2; styled runs come with IR 3. |
-| `links` | The Links offered: `{ id, label }`. |
+| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style }` with `style` from `italic`, `bold`, `struck`. `Para::plain()` reads one as text. |
+| `links` | The Links offered: `{ id, label }`, the label a `Para`. |
 | `asks` | The open inputs: `{ kind, prompt, options, methods, length, voted }`. |
 | `over` | Nothing offered, nothing asked: the reading has ended. |
 
@@ -223,6 +223,8 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
 {:ok, inklink} = Inkjot.Engine.load(File.read!("ex3.json"))
 {:ok, state} = Inkjot.Engine.start(inklink, 42, %{})
 %{nib: nib, links: links, text: text} = Inkjot.Engine.view(state)
+# text: [%{plain: "…", runs: [%{text: "…", style: ["italic"]}]}]
+# links: [%{id: "…", label: "plain label", runs: [%{text, style}]}]
 {:ok, next} = Inkjot.Engine.take_link(state, hd(links).id)
 [%{"type" => "nib_shown", "origin" => "engine", "data" => data} | _] = Inkjot.Engine.events(next)
 {:ok, again} = Inkjot.Engine.replay(inklink, 42, %{}, Inkjot.Engine.actions(next))

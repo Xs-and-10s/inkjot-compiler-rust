@@ -35,7 +35,15 @@ pub struct Problem {
 }
 
 /// Functions that may be called by bare name.
-pub const FUNCTIONS: &[&str] = &["count", "one", "alone_with", "nearest"];
+pub const FUNCTIONS: &[&str] = &[
+    "count",
+    "one",
+    "alone_with",
+    "nearest",
+    // Helpers for text.
+    "plural",
+    "capital",
+];
 
 /// Names every Inklink can use without declaring them.
 pub const BUILTINS: &[&str] = &[
@@ -70,6 +78,12 @@ pub fn names(e: &Expr) -> Vec<String> {
 fn collect(e: &Expr, out: &mut Vec<String>) {
     match e {
         Expr::Num(_) | Expr::Str(_) => {}
+        Expr::Text(parts) => parts.iter().for_each(|p| {
+            if let crate::expr::TextPart::Expr(e) = p {
+                collect(e, out)
+            }
+        }),
+        Expr::If(c, a, b) => [c, a, b].into_iter().for_each(|e| collect(e, out)),
         Expr::Name(name, _) => out.push(name.clone()),
         Expr::Member(target, _) => collect(target, out),
         Expr::Call(target, args) => {
@@ -96,6 +110,12 @@ pub fn unresolved(e: &Expr, lookup: &impl Lookup) -> Vec<Problem> {
 fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
     match e {
         Expr::Num(_) | Expr::Str(_) => {}
+        Expr::Text(parts) => parts.iter().for_each(|p| {
+            if let crate::expr::TextPart::Expr(e) = p {
+                walk(e, lookup, out)
+            }
+        }),
+        Expr::If(c, a, b) => [c, a, b].into_iter().for_each(|e| walk(e, lookup, out)),
         Expr::Name(name, at) => {
             if !lookup.is_known(name) {
                 out.push(Problem {

@@ -102,6 +102,41 @@ running the three examples.
   choices always give the same story. A bare `d6` or `d20` rolls a die each
   time it is read, as in `table standoff: roll d6 + bonus`.
 
+## Text
+
+Prose, Link labels and every quoted string read the same way. Braces hold
+an insert or an expression: `{present}`, `{coins}`, `"Keeper of {here}"`.
+`\{` and `\}` are literal braces, `\"` a quote inside quoted text, `\\` a
+backslash, and `\*` an asterisk that is not emphasis.
+
+- **When it is worked out.** Prose and Link labels, each time they are
+  shown. A `label`, `shown as`, a fact's text or a hint, each time it is
+  shown. An effect's text (`set title: "Keeper of {here}"`, `say`), once,
+  when the effect runs.
+- **How values read.** An id reads as its name (below); a list as "a, b and
+  c"; a number of a thousand or more with `'` marks (`1'000`); nothing as
+  empty.
+- **Inline choice:** `{if lied then "a liar" else "an honest girl"}`.
+  Quotes nest inside braces.
+- **Helpers:** `plural(n, "card")` is "card" when `n` is 1, else "cards"
+  (`plural(n, "mouse", "mice")` for an irregular one); `capital(x)`
+  capitalizes the first letter.
+- **Emphasis** (`*italic*`, `**bold**`, `***both***`) is kept as styles, in
+  prose, Link labels, and quoted text that is read: a `say` line, a hint, a
+  fact's text, a description, a list entry. A name (`label`, `shown as`) and
+  a value (`set motto: "…"`) keep their asterisks. The terminal and `expect text:` see plain text; struck
+  list entries read `~~like this~~`.
+
+**Names, as the reader knows them.** `{marge}` and `@marge` show what she is
+`shown as` until `reveal marge`, then her name. `{marge.name}` is always her
+name and `{marge.shown_as}` always what she is shown as. Ex 3's widow is
+"the Surviving Authority" to the cats from start to end.
+
+**`aka`.** `{leo.aka}` picks one of his names by his `~ pick` policy:
+`shuffled` (the default: each name once, in a seeded order, then again),
+`cycle` (in the order written), `random` (any, each time) or `first`.
+`{all leo.aka}` shows every name.
+
 ## `on` handlers
 
 The interpreter fires these events. Every handler for an event runs, in the

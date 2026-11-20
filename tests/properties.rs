@@ -6,7 +6,7 @@
 //! that does. When it finds one it shrinks it to the smallest failing case and
 //! saves it under `proptest-regressions/`, so it is retried on every run.
 
-use inkjot::expr::{Arg, Expr};
+use inkjot::expr::{Arg, Expr, TextPart};
 use inkjot::json::{self, Value};
 use inkjot::{check, expr, render, Severity};
 use proptest::prelude::*;
@@ -145,7 +145,8 @@ fn tree() -> impl Strategy<Value = Expr> {
         select(vec!["me", "here", "door", "x", "a_b", "lounge@0"]).prop_map(Expr::name),
         (0..1000u32).prop_map(|n| Expr::Num(n.to_string())),
         (0..100u32, 0..100u32).prop_map(|(a, b)| Expr::Num(format!("{a}.{b}"))),
-        "[a-z ]{0,6}".prop_map(Expr::Str),
+        // Text with braces, quotes and backslashes, which print escaped.
+        "[a-z {}\"\\\\]{0,6}".prop_map(Expr::Str),
     ];
     // Up to 6 levels deep and about 64 nodes: deep enough that operators nest
     // inside each other on both sides, which is where brackets matter.
@@ -168,6 +169,23 @@ fn tree() -> impl Strategy<Value = Expr> {
             (boxed(), boxed()).prop_map(|(t, i)| Expr::Index(t, i)),
             vec(inner.clone(), 0..4).prop_map(Expr::List),
             (select(vec!["not", "-"]), boxed()).prop_map(|(op, e)| Expr::Unary(op, e)),
+            (boxed(), boxed(), boxed()).prop_map(|(c, a, b)| Expr::If(c, a, b)),
+            // Interpolated text: words and expressions, at least one of each.
+            (
+                vec(("[a-z {}\"]{1,4}", inner.clone()), 1..3),
+                proptest::option::of("[a-z ]{1,3}")
+            )
+                .prop_map(|(pairs, tail)| {
+                    let mut parts = Vec::new();
+                    for (lit, e) in pairs {
+                        parts.push(TextPart::Lit(lit));
+                        parts.push(TextPart::Expr(e));
+                    }
+                    if let Some(t) = tail {
+                        parts.push(TextPart::Lit(t));
+                    }
+                    Expr::Text(parts)
+                }),
             (binary, boxed(), boxed()).prop_map(|(op, a, b)| Expr::Binary(op, a, b)),
             (range_op.clone(), boxed(), boxed()).prop_map(|(op, lo, hi)| Expr::Range {
                 lo: Some(lo),

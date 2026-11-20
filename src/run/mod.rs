@@ -12,6 +12,7 @@ mod events;
 mod hints;
 mod inputs;
 mod limits;
+mod prose;
 mod senses;
 pub mod test;
 mod time;
@@ -24,6 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::json::Value;
 pub use inputs::Ask;
+pub use prose::{Para, Span};
 pub use value::V;
 
 /// An interpreter result. The error says what went wrong in plain words.
@@ -73,6 +75,24 @@ pub struct Story {
 /// The field `key` of a JSON object, or `null`.
 fn f<'a>(v: &'a Value, key: &str) -> &'a Value {
     v.get(key).unwrap_or(&Value::Null)
+}
+
+/// An English plural: `card` → `cards`, `box` → `boxes`, `fly` → `flies`.
+fn plural_of(word: &str) -> String {
+    let ends = |s: &str| word.ends_with(s);
+    if ends("s") || ends("x") || ends("z") || ends("ch") || ends("sh") {
+        format!("{word}es")
+    } else if ends("y")
+        && !word
+            .chars()
+            .rev()
+            .nth(1)
+            .is_some_and(|c| "aeiou".contains(c))
+    {
+        format!("{}ies", &word[..word.len() - 1])
+    } else {
+        format!("{word}s")
+    }
 }
 
 /// A whole number, as the IR writes one.
@@ -271,7 +291,8 @@ enum Local {
 #[derive(Debug, Clone)]
 struct Entry {
     id: String,
-    label: Option<String>,
+    /// The entry's own text, as the IR has it: plain or styled.
+    label: Option<Value>,
     mark: Option<String>,
     struck: bool,
 }
@@ -301,7 +322,7 @@ pub struct Run {
     /// The Links of the passage the pov is at, as last rendered.
     links: Vec<Value>,
     /// Text shown since the output was last taken.
-    output: Vec<String>,
+    output: Vec<Para>,
     chronon: u32,
     rng: u64,
     /// Per NPC: the order its `aka` names come out in, and how many are used.
@@ -649,7 +670,48 @@ impl Run {
 
     /// The text shown since this was last called.
     pub fn take_output(&mut self) -> Vec<String> {
+        self.take_text().iter().map(Para::plain).collect()
+    }
+
+    /// The text shown since this was last called, with its styles.
+    pub fn take_text(&mut self) -> Vec<Para> {
         std::mem::take(&mut self.output)
+    }
+
+    /// A text field as it reads now: plain text, or `{"text": […]}` worked
+    /// out.
+    pub(super) fn text_of(&mut self, v: &Value) -> R<String> {
+        Ok(self.text_para(v)?.plain())
+    }
+
+    /// A text field as it reads now, with its styles: `"*Wanted*: {who}"`.
+    pub(super) fn text_para(&mut self, v: &Value) -> R<Para> {
+        match v {
+            Value::Str(s) => Ok(Para::plain_text(s.clone())),
+            Value::Null => Ok(Para::default()),
+            Value::Obj(_) if v.get("text").is_some() => {
+                let mut out = Para::default();
+                self.parts(f(v, "text"), &[], false, &mut out, &mut Vec::new())?;
+                Ok(out)
+            }
+            other => {
+                let v = self.eval(other)?;
+                Ok(Para::plain_text(self.show(&v)))
+            }
+        }
+    }
+
+    /// A Link's label as the Linker reads it: its parts worked out now. A
+    /// Link the interpreter made has a plain label.
+    pub(super) fn label_of(&mut self, link: &Value) -> R<Para> {
+        match f(link, "label") {
+            Value::Str(s) => Ok(Para::plain_text(s.clone())),
+            Value::Arr(_) => {
+                let parts = f(link, "label").clone();
+                Ok(self.paragraph(&parts, false)?.0)
+            }
+            _ => Ok(Para::default()),
+        }
     }
 
     /// The clock's last stop, if it has one: 5 for `clock: 0..=5`.
@@ -709,6 +771,15 @@ impl Run {
 
     /// The Links the pov can take now, as `(id, label)`.
     pub fn choices(&mut self) -> R<Vec<(String, String)>> {
+        Ok(self
+            .offers()?
+            .into_iter()
+            .map(|(id, label)| (id, label.plain()))
+            .collect())
+    }
+
+    /// The Links the pov can take now, with their labels styled.
+    pub fn offers(&mut self) -> R<Vec<(String, Para)>> {
         let mut out = Vec::new();
         // A Linker who has locked in their move waits for the others; one
         // paused at an input answers it first.
@@ -717,8 +788,9 @@ impl Run {
         }
         for link in self.links.clone() {
             if self.available(&link)? {
-                let text = |key| f(&link, key).as_str().unwrap_or("").to_string();
-                out.push((text("id"), text("label")));
+                let id = f(&link, "id").as_str().unwrap_or("").to_string();
+                let label = self.label_of(&link)?;
+                out.push((id, label));
             }
         }
         Ok(out)
@@ -1185,7 +1257,7 @@ impl Run {
             if inputs::is_input(stmt) {
                 self.asking.clear();
                 let prompt = self.meet_input(stmt)?;
-                self.output.push(prompt);
+                self.output.push(prompt.into());
                 self.links.clear();
                 self.paused = Some(inputs::Paused {
                     passage: passage.to_string(),
@@ -1447,20 +1519,20 @@ impl Run {
                         .iter()
                         .enumerate()
                     {
-                        let (text, more) = self.paragraph(para, quiet)?;
+                        let (body, more) = self.paragraph(para, quiet)?;
                         links.extend(more);
-                        let text = if i == 0 {
-                            format!("{lead}{text}")
-                        } else {
-                            text
-                        };
-                        if quiet || text.trim().is_empty() {
+                        let mut text = Para::default();
+                        if i == 0 {
+                            text.push(&lead, &[]);
+                        }
+                        text.extend(body);
+                        if quiet || text.is_blank() {
                             continue;
                         }
                         match self.output.last_mut() {
                             Some(last) if append && i == 0 => {
-                                last.push(' ');
-                                last.push_str(&text);
+                                last.push(" ", &[]);
+                                last.extend(text);
                             }
                             _ => self.output.push(text),
                         }
@@ -1474,17 +1546,58 @@ impl Run {
     }
 
     /// One paragraph as text, and the Links of any passage it embeds.
-    fn paragraph(&mut self, para: &Value, quiet: bool) -> R<(String, Vec<Value>)> {
-        let mut text = String::new();
+    fn paragraph(&mut self, para: &Value, quiet: bool) -> R<(Para, Vec<Value>)> {
+        let mut text = Para::default();
         let mut links = Vec::new();
-        for part in para.as_arr().unwrap_or(&[]) {
+        self.parts(para, &[], quiet, &mut text, &mut links)?;
+        Ok((text, links))
+    }
+
+    /// Render parts into `text` in `style`: words, styled runs, values and
+    /// inserts.
+    fn parts(
+        &mut self,
+        parts: &Value,
+        style: &[&'static str],
+        quiet: bool,
+        text: &mut Para,
+        links: &mut Vec<Value>,
+    ) -> R<()> {
+        for part in parts.as_arr().unwrap_or(&[]) {
             if let Some(s) = part.as_str() {
-                text.push_str(s);
+                text.push(s, style);
+                continue;
+            }
+            if let Some(styles) = part.get("style").and_then(Value::as_arr) {
+                let mut inner: Vec<&'static str> = style.to_vec();
+                for s in styles {
+                    match s.as_str() {
+                        Some("italic") => inner.push("italic"),
+                        Some("bold") => inner.push("bold"),
+                        _ => {}
+                    }
+                }
+                self.parts(f(part, "parts"), &inner, quiet, text, links)?;
                 continue;
             }
             if let Some(v) = part.get("value") {
-                let v = if quiet { V::Null } else { self.eval(v)? };
-                text.push_str(&self.show(&v));
+                // `{all leo.aka}`: every name, not one picked.
+                let all = f(part, "all") == &Value::Bool(true);
+                let v = match (quiet, all, v.get("get").and_then(Value::as_arr)) {
+                    (true, ..) => V::Null,
+                    (false, true, Some([who, aka])) if aka.as_str() == Some("aka") => {
+                        let who = self.who(who)?;
+                        V::List(
+                            strs(self.story.field(&who, "aka"))
+                                .into_iter()
+                                .map(V::Str)
+                                .collect(),
+                        )
+                    }
+                    _ => self.eval(v)?,
+                };
+                let shown = self.show(&v);
+                text.push(&shown, style);
                 continue;
             }
             match f(part, "insert").as_str().unwrap_or("") {
@@ -1492,7 +1605,8 @@ impl Run {
                     let nib = f(part, "nib").as_str().unwrap_or("").to_string();
                     // An embedded passage brings its own `let`s with it.
                     self.lets_of(&nib)?;
-                    links.extend(self.render(&nib, quiet)?);
+                    let more = self.render(&nib, quiet)?;
+                    links.extend(more);
                 }
                 "present" => {
                     let here = place_of(self.here()).to_string();
@@ -1510,7 +1624,7 @@ impl Run {
                         .map(|l| self.label(l))
                         .collect();
                     linkers.extend(who);
-                    text.push_str(&linkers.join(", "));
+                    text.push(&linkers.join(", "), style);
                 }
                 "passers" => {
                     let key = (self.when(), place_of(self.here()).to_string());
@@ -1522,46 +1636,49 @@ impl Run {
                         .iter()
                         .map(|w| self.label(w))
                         .collect();
-                    text.push_str(&names.join(" and "));
+                    text.push(&names.join(" and "), style);
                 }
                 kind if kind == "accuse" || kind.ends_with(" input") => {
                     let prompt = self.meet_input(part)?;
                     if !quiet {
-                        text.push_str(&prompt);
+                        text.push(&prompt, style);
                     }
                 }
-                "ballots" => text.push_str(&self.ballots_text()),
+                "ballots" => {
+                    let tally = self.ballots_text();
+                    text.push(&tally, style);
+                }
                 "claimants" => {
                     let names = if self.claimants.is_empty() {
                         String::from("Someone")
                     } else {
                         self.claimants.clone()
                     };
-                    text.push_str(&names);
+                    text.push(&names, style);
                 }
                 "list" => {
                     let name = f(part, "list").as_str().unwrap_or("");
-                    let lines: Vec<String> = self
-                        .lists
-                        .get(name)
-                        .map(|entries| {
-                            entries
-                                .iter()
-                                .map(|e| {
-                                    let mut label =
-                                        e.label.clone().unwrap_or_else(|| self.label(&e.id));
-                                    if let Some(mark) = &e.mark {
-                                        label = format!("{label} ({mark})");
-                                    }
-                                    if e.struck {
-                                        format!("~~{label}~~")
-                                    } else {
-                                        label
-                                    }
-                                })
-                                .collect()
-                        })
-                        .unwrap_or_default();
+                    let entries = self.lists.get(name).cloned().unwrap_or_default();
+                    let mut lines: Vec<Para> = Vec::new();
+                    for e in entries {
+                        let mut label = match &e.label {
+                            Some(text) => self.text_para(text)?,
+                            None => Para::plain_text(self.label(&e.id)),
+                        };
+                        if let Some(mark) = &e.mark {
+                            label.push(&format!(" ({mark})"), &[]);
+                        }
+                        // A struck entry is struck all through.
+                        let mut line = Para::default();
+                        for span in label.runs {
+                            let mut style = span.style.clone();
+                            if e.struck {
+                                style.push("struck");
+                            }
+                            line.push(&span.text, &style);
+                        }
+                        lines.push(line);
+                    }
                     if !quiet {
                         self.output.extend(lines);
                     }
@@ -1570,25 +1687,80 @@ impl Run {
                 _ => {}
             }
         }
-        Ok((text, links))
+        Ok(())
     }
 
-    /// How a value reads in the story: an id reads as its label.
+    /// How a value reads in the story: an id reads as its label, a list as
+    /// "a, b and c", and a number of a thousand or more with `'` marks.
     fn show(&self, v: &V) -> String {
         match v {
             V::Id(id) => self.label(id),
+            V::List(items) => {
+                let shown: Vec<String> = items.iter().map(|i| self.show(i)).collect();
+                match shown.split_last() {
+                    None => String::new(),
+                    Some((last, [])) => last.clone(),
+                    Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                }
+            }
+            V::Num(n) if n.fract() == 0.0 && n.abs() >= 1000.0 && n.abs() < 1e15 => {
+                let digits = (n.abs() as i64).to_string();
+                let mut out = String::new();
+                for (i, d) in digits.chars().enumerate() {
+                    if i > 0 && (digits.len() - i).is_multiple_of(3) {
+                        out.push('\'');
+                    }
+                    out.push(d);
+                }
+                if *n < 0.0 {
+                    format!("-{out}")
+                } else {
+                    out
+                }
+            }
             other => other.to_string(),
         }
     }
 
-    /// A thing's name as players see it.
+    /// A thing's name as the reader knows it: what it is `shown as` until a
+    /// `reveal`, then its name. `{marge}` and `@marge` read this.
     fn label(&self, id: &str) -> String {
+        let shown_as = self.story.field(id, "shown_as");
+        let revealed = self
+            .vals
+            .get(&format!("{id}.revealed"))
+            .is_some_and(V::truthy);
+        if *shown_as != Value::Null && !revealed {
+            return self.text_now(shown_as).unwrap_or_else(|| id.to_string());
+        }
+        self.real_name(id)
+    }
+
+    /// Text worked out on a copy of the run, for a `&self` caller: showing
+    /// a name changes nothing.
+    fn text_now(&self, v: &Value) -> Option<String> {
+        match v {
+            Value::Str(s) => Some(s.clone()),
+            other => self.clone().text_of(other).ok(),
+        }
+    }
+
+    /// A thing's own name, revealed or not: `{marge.name}`.
+    fn real_name(&self, id: &str) -> String {
         if let Some(name) = self.vals.get(&format!("{id}.name")) {
             return name.to_string();
         }
-        match self.story.field(id, "label").as_str() {
-            Some(label) => label.to_string(),
-            None => id.to_string(),
+        match self.story.field(id, "label") {
+            Value::Str(label) => label.clone(),
+            // A label with braces is worked out each time it is shown; on a
+            // copy, since showing a name changes nothing.
+            text @ Value::Obj(_) => {
+                let text = text.clone();
+                self.clone()
+                    .text_of(&text)
+                    .unwrap_or_else(|_| id.to_string())
+            }
+            _ => id.to_string(),
         }
     }
 
@@ -1619,6 +1791,11 @@ impl Run {
         };
         let pov = self.pov.clone();
         match f(e, "do").as_str().unwrap_or("") {
+            // `reveal marge`: from now on she reads as her name.
+            "reveal" => {
+                let who = self.who(args.first().unwrap_or(&Value::Null))?;
+                self.vals.insert(format!("{who}.revealed"), V::Bool(true));
+            }
             "learn" => {
                 let clue = word(0);
                 if self
@@ -1795,8 +1972,9 @@ impl Run {
                     V::Id(id) => self.label(&id),
                     _ => self.label(who),
                 };
-                self.output
-                    .push(format!("{who}: {}", f(e, "text").as_str().unwrap_or("")));
+                let mut line = Para::plain_text(format!("{who}: "));
+                line.extend(self.text_para(f(e, "text"))?);
+                self.output.push(line);
             }
             "stop" | "nothing" => {}
             other => {
@@ -2017,6 +2195,35 @@ impl Run {
         let named = |key: &str| f(f(e, "with"), key);
         Ok(match op.as_str() {
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
+            // `"Keeper of {here}"`: worked out now, each part shown as text.
+            "text" => V::Str(self.text_para(e)?.plain()),
+            "if" => {
+                let pick = if self.eval(&items[0])?.truthy() { 1 } else { 2 };
+                self.eval(&items[pick])?
+            }
+            // `plural(count tobin.hand, "card")`, or with the plural given:
+            // `plural(n, "mouse", "mice")`.
+            "plural" => {
+                let n = self.eval(&items[0])?.num().unwrap_or(0.0);
+                let one = self.eval(&items[1])?.to_string();
+                if n == 1.0 {
+                    V::Str(one)
+                } else {
+                    match items.get(2) {
+                        Some(many) => V::Str(self.eval(many)?.to_string()),
+                        None => V::Str(plural_of(&one)),
+                    }
+                }
+            }
+            "capital" => {
+                let v = self.eval(&items[0])?;
+                let s = self.show(&v);
+                let mut chars = s.chars();
+                V::Str(match chars.next() {
+                    Some(c) => c.to_uppercase().chain(chars).collect(),
+                    None => String::new(),
+                })
+            }
             // `roll d6`: under a `let`, rolled once; under a `get`, on every read.
             "roll" => {
                 let sides = x
@@ -2318,7 +2525,12 @@ impl Run {
             (_, "name") => match self.vals.get(&format!("{id}.name")) {
                 Some(name) => name.clone(),
                 None if story.has_tag(&id, "custom") => V::Str(String::new()),
-                None => V::Str(self.label(&id)),
+                None => V::Str(self.real_name(&id)),
+            },
+            // What the reader is told it is: `{marge.shown_as}`.
+            (_, "shown_as") => match self.story.field(&id, "shown_as").clone() {
+                Value::Null => V::Str(self.real_name(&id)),
+                text => V::Str(self.text_of(&text)?),
             },
             // `cohort.size`, `cohort.alive`: the Linkers playing, and those alive.
             ("cohort", "size") => V::Num(self.voters_count(false)),
@@ -2380,11 +2592,19 @@ impl Run {
         }
         let order = self
             .story
-            .field(id, "aka_order")
+            .field(id, "aka_pick")
             .as_str()
             .unwrap_or("shuffled")
             .to_string();
         let n = names.len();
+        match order.as_str() {
+            "first" => return V::Str(names[0].clone()),
+            "random" => {
+                let i = self.roll(n as u64) as usize - 1;
+                return V::Str(names[i].clone());
+            }
+            _ => {}
+        }
         let (bag, used) = self
             .aka
             .entry(id.to_string())
@@ -2394,8 +2614,7 @@ impl Run {
         if bag.is_empty() || used == n {
             bag = (0..n).collect();
             match order.as_str() {
-                "reversed" => bag.reverse(),
-                "in order" => {}
+                "cycle" => {}
                 _ => {
                     // Fisher–Yates, from the run's seed.
                     for i in (1..n).rev() {
@@ -2406,11 +2625,7 @@ impl Run {
             }
             used = 0;
         }
-        let pick = if order == "random" {
-            self.roll(n as u64) as usize - 1
-        } else {
-            bag[used]
-        };
+        let pick = bag[used];
         self.aka.insert(id.to_string(), (bag, used + 1));
         V::Str(names[pick].clone())
     }
@@ -2512,7 +2727,7 @@ fn place_of(passage: &str) -> &str {
 fn entry(v: &Value) -> Entry {
     Entry {
         id: f(v, "id").as_str().unwrap_or("").to_string(),
-        label: f(v, "label").as_str().map(str::to_string),
+        label: v.get("label").cloned(),
         mark: f(v, "mark").as_str().map(str::to_string),
         struck: false,
     }
@@ -2526,11 +2741,11 @@ fn entry_from_words(words: &[Value], mark: Option<String>) -> Entry {
         .unwrap_or("")
         .trim_end_matches(':')
         .to_string();
-    let label = words
-        .get(1)
-        .and_then(|w| w.get("str"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    // `{"str": "the vet"}`, or text with braces, `{"text": […]}`.
+    let label = words.get(1).and_then(|w| match w.get("str") {
+        Some(s) => Some(s.clone()),
+        None => w.get("text").map(|_| w.clone()),
+    });
     Entry {
         id,
         label,

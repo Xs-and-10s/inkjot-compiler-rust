@@ -52,7 +52,11 @@ defmodule Inkjot.Engine do
           | :panic
   @type refused :: {:error, {code(), String.t(), non_neg_integer() | nil}}
 
-  @type link :: %{id: String.t(), label: String.t()}
+  @typedoc "A stretch of text in one style: `italic`, `bold`, `struck`."
+  @type run :: %{text: String.t(), style: [String.t()]}
+  @typedoc "A paragraph: its plain text, and its styled runs."
+  @type paragraph :: %{plain: String.t(), runs: [run()]}
+  @type link :: %{id: String.t(), label: String.t(), runs: [run()]}
   @type ask :: %{
           kind: String.t(),
           prompt: String.t(),
@@ -66,7 +70,7 @@ defmodule Inkjot.Engine do
           tags: [String.t()],
           pov: String.t(),
           now: non_neg_integer(),
-          text: [String.t()],
+          text: [paragraph()],
           links: [link()],
           asks: [ask()],
           over: boolean()

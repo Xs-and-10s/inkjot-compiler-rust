@@ -14,6 +14,7 @@ pub mod migrate;
 pub mod resolve;
 pub mod run;
 mod syntax;
+pub mod text;
 pub mod twee;
 
 pub use check::{check, Report, Stats, VERSION};

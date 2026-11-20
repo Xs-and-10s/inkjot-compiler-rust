@@ -421,7 +421,7 @@ fn take(state: &State, label: &str) -> State {
         .view()
         .links
         .iter()
-        .find(|l| l.label == label)
+        .find(|l| l.label.plain() == label)
         .unwrap_or_else(|| panic!("no Link {label:?} in {:?}", state.view().links));
     state.take_link(&link.id).unwrap()
 }

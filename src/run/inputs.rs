@@ -473,7 +473,7 @@ impl Run {
         let served = self.pov.clone();
         for v in voters {
             self.sit(v)?;
-            self.output.extend(lines.iter().cloned());
+            self.output.extend(lines.iter().map(|l| l.as_str().into()));
             self.relist()?;
         }
         self.sit(&served)

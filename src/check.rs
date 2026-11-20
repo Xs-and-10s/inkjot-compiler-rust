@@ -625,7 +625,7 @@ impl Checker {
             self.on(rest, head.line, rest_col);
         } else if let Some(kind) = DECLS.iter().copied().find(|k| *k == kw) {
             self.decl(kind, s, rest, rest_col);
-        } else if EFFECTS.contains(&kw) {
+        } else if is_effect(kw, rest) {
             self.effect(&head.text, head.line, head.col);
         } else if SETTINGS.contains(&kw) {
             self.setting(kw, s, rest, rest_col);
@@ -755,6 +755,41 @@ impl Checker {
             }
         };
         let value_col = rest_col + cols(&rest[..rest.len() - value.len()]);
+        // Quoted text in the value and in clauses that hold text, not
+        // conditions: labels, `shown as`, `formally`, list entries.
+        if value.contains('"') {
+            self.strings(value, head.line, value_col);
+        }
+        for c in &s.clauses[1..] {
+            let text = c.text.as_str();
+            // `~ pick cycle`: how `{x.aka}` picks from the names.
+            if let Some(how) = text.strip_prefix("pick ") {
+                if !AKA_PICKS.contains(&how.trim()) {
+                    self.err(
+                        c.line,
+                        c.col + 5,
+                        "`pick` is one of: shuffled, cycle, random, first",
+                    );
+                }
+            }
+            if let Some(how) = text.strip_prefix("aka ").filter(|h| !h.starts_with('"')) {
+                self.err(
+                    c.line,
+                    c.col,
+                    format!(
+                        "how `aka` picks is its own clause in v0.6: `~ pick {}`",
+                        how.trim()
+                    ),
+                );
+            }
+            if text.starts_with('"')
+                || text.starts_with("shown as ")
+                || text.starts_with("formally ")
+                || text.starts_with("holds ")
+            {
+                self.strings(text, c.line, c.col);
+            }
+        }
         match kind {
             "way" => self.places(value, " - ", head.line, value_col),
             // A map names a region and lays its places out in rows: `~ a | b | c`.
@@ -815,6 +850,7 @@ impl Checker {
             None => ("", rest_col),
         };
         match kw {
+            "hint" => self.strings(value, line, vcol),
             // A passage's own title, for the Linker: `title: "The Millpond"`.
             "title" => {
                 if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
@@ -992,6 +1028,7 @@ impl Checker {
             return self.err(line, col, format!("`{shown}` is not an effect"));
         }
         let core = before_when(text);
+        self.strings(core, line, col);
         let words: Vec<&str> = core.split_whitespace().collect();
         let word_col = |n: usize| col + cols(&core[..core.find(words[n]).unwrap_or(0)]);
         let arg = |n: usize| words.get(n).copied().unwrap_or("");
@@ -1005,6 +1042,13 @@ impl Checker {
                 }
             }
             "gain" | "give" => self.need(arg(1), &["item"], "item", line, col + 5),
+            "reveal" => self.need(
+                arg(1),
+                &["npc", "character", "item", "place", "fact"],
+                "thing",
+                line,
+                col + 7,
+            ),
             "burn" | "light" => self.need(arg(1), &["fuse"], "fuse", line, col + cols(verb) + 1),
             "roll" => self.need(arg(1), &["table"], "table", line, col + 5),
             "wake" => self.need(arg(1), &["npc", "character"], "NPC", line, col + 5),
@@ -1113,6 +1157,8 @@ impl Checker {
         self.stats.links += 1;
         if label.trim().is_empty() {
             self.err(l.no, cols(&text[..open]) + 3, "this Link has no label");
+        } else {
+            self.inserts(label, l.no, cols(&text[..open]) + 3);
         }
         let target = target.trim();
         let tcol = cols(&text[..target_at]) + 1;
@@ -1217,13 +1263,43 @@ impl Checker {
 
     /// Every `{…}` in a line of prose.
     fn inserts(&mut self, text: &str, line: usize, col: usize) {
+        match crate::text::split(text) {
+            Err((at, why)) => self.err(line, col + cols(&text[..at]), why),
+            Ok(pieces) => {
+                for p in pieces {
+                    if let crate::text::Piece::Code(code, at) = p {
+                        self.insert(&code, line, col + cols(&text[..at]));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every quoted string in `text`: its braces hold expressions, checked
+    /// like any other.
+    fn strings(&mut self, text: &str, line: usize, col: usize) {
         let mut from = 0;
-        while let Some(i) = text[from..].find('{') {
+        while let Some(i) = text[from..].find('"') {
             let open = from + i;
-            let Some(close) = text[open..].find('}').map(|j| open + j) else {
-                return self.err(line, col + cols(&text[..open]), "this `{` is never closed");
+            let Some(close) = crate::text::string_end(text, open) else {
+                return self.err(
+                    line,
+                    col + cols(&text[..open]),
+                    "this string is never closed",
+                );
             };
-            self.insert(&text[open + 1..close], line, col + cols(&text[..open]) + 1);
+            let inner = &text[open + 1..close];
+            let inner_col = col + cols(&text[..open + 1]);
+            match crate::text::split(inner) {
+                Err((at, why)) => self.err(line, inner_col + cols(&inner[..at]), why),
+                Ok(pieces) => {
+                    for p in pieces {
+                        if let crate::text::Piece::Code(code, at) = p {
+                            self.expr(&code, line, inner_col + cols(&inner[..at]));
+                        }
+                    }
+                }
+            }
             from = close + 1;
         }
     }
@@ -1263,6 +1339,14 @@ impl Checker {
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
             "list" => self.need(second, &["list"], "list", line, col + 5),
+            "all" if !second.is_empty() => {
+                let rest = &content[content.find("all").unwrap_or(0) + 3..];
+                self.expression_in(
+                    rest,
+                    line,
+                    col + cols(&content[..content.len() - rest.len()]),
+                );
+            }
             _ if second == "input" => self.input(first, c, line, col),
             _ => {
                 self.stats.expressions += 1;

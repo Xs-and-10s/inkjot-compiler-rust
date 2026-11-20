@@ -17,7 +17,7 @@
 //!   (`:not_offered`), `at` the index of the refused action in a replay,
 //!   else `nil`. A term of the wrong shape raises `ArgumentError`.
 
-use inkjot::engine::{Action, Event, Inklink, Refused, Start, State, View, ENGINE_VERSION};
+use inkjot::engine::{Action, Event, Inklink, Para, Refused, Start, State, View, ENGINE_VERSION};
 use inkjot::json::Value;
 use rustler::{Atom, Binary, Encoder, Env, NifResult, ResourceArc, Term};
 
@@ -93,6 +93,32 @@ fn ok<'a>(env: Env<'a>, t: Term<'a>) -> Term<'a> {
     (atoms::ok(), t).encode(env)
 }
 
+/// A paragraph: `%{plain: "…", runs: [%{text: "…", style: ["italic"]}]}`.
+fn para_term<'a>(env: Env<'a>, p: &Para) -> Term<'a> {
+    atom_map(
+        env,
+        &[
+            ("plain", p.plain().encode(env)),
+            ("runs", runs_term(env, p)),
+        ],
+    )
+}
+
+/// A paragraph's runs: `[%{text: "…", style: ["italic"]}]`.
+fn runs_term<'a>(env: Env<'a>, p: &Para) -> Term<'a> {
+    let runs: Vec<Term<'a>> = p
+        .runs
+        .iter()
+        .map(|r| {
+            atom_map(
+                env,
+                &[("text", r.text.encode(env)), ("style", r.style.encode(env))],
+            )
+        })
+        .collect();
+    runs.encode(env)
+}
+
 fn view_term<'a>(env: Env<'a>, v: &View) -> Term<'a> {
     let links: Vec<Term<'a>> = v
         .links
@@ -100,7 +126,11 @@ fn view_term<'a>(env: Env<'a>, v: &View) -> Term<'a> {
         .map(|l| {
             atom_map(
                 env,
-                &[("id", l.id.encode(env)), ("label", l.label.encode(env))],
+                &[
+                    ("id", l.id.encode(env)),
+                    ("label", l.label.plain().encode(env)),
+                    ("runs", runs_term(env, &l.label)),
+                ],
             )
         })
         .collect();
@@ -128,7 +158,14 @@ fn view_term<'a>(env: Env<'a>, v: &View) -> Term<'a> {
             ("tags", v.tags.encode(env)),
             ("pov", v.pov.encode(env)),
             ("now", v.now.encode(env)),
-            ("text", v.text.encode(env)),
+            (
+                "text",
+                v.text
+                    .iter()
+                    .map(|p| para_term(env, p))
+                    .collect::<Vec<_>>()
+                    .encode(env),
+            ),
             ("links", links.encode(env)),
             ("asks", asks.encode(env)),
             ("over", v.over.encode(env)),

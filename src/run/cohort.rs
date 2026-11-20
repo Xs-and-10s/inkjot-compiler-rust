@@ -32,7 +32,7 @@ use crate::json::Value;
 #[derive(Clone, Default)]
 pub(super) struct Seat {
     links: Vec<Value>,
-    output: Vec<String>,
+    output: Vec<super::Para>,
     locals: BTreeMap<String, Local>,
     asking: Vec<Value>,
     paused: Option<super::inputs::Paused>,
@@ -168,9 +168,9 @@ impl Run {
     /// Show a line to one Linker, whether or not they are being served.
     pub(super) fn tell(&mut self, who: &str, line: String) {
         if who == self.pov {
-            self.output.push(line);
+            self.output.push(line.into());
         } else if let Some(seat) = self.parked.get_mut(who) {
-            seat.output.push(line);
+            seat.output.push(line.into());
         }
     }
 
@@ -459,7 +459,10 @@ impl Run {
         let name = self.label(who);
         let line = match (f(link, "act").as_str(), f(link, "arg").as_str()) {
             (Some("take"), Some(item)) => format!("{name} takes {}.", self.label(item)),
-            _ => format!("{name}: “{}”", f(link, "label").as_str().unwrap_or("")),
+            _ => {
+                let label = self.label_of(link).map(|l| l.plain()).unwrap_or_default();
+                format!("{name}: “{label}”")
+            }
         };
         for other in self.linkers() {
             if other != who && self.location(&other) == place {

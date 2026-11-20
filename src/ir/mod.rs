@@ -116,11 +116,74 @@ fn split_when(text: &str) -> (&str, Option<Value>) {
     }
 }
 
-/// The text inside the first pair of double quotes, if any.
+/// The text inside the first pair of double quotes, if any, as written:
+/// braces may hold quotes of their own, and escapes are left in.
 fn quoted(text: &str) -> Option<&str> {
-    let start = text.find('"')? + 1;
-    let end = start + text[start..].find('"')?;
-    Some(&text[start..end])
+    let start = text.find('"')?;
+    let end = crate::text::string_end(text, start)?;
+    Some(&text[start + 1..end])
+}
+
+/// Quoted text as the IR keeps it: a plain string, or, when it has braces,
+/// `{"text": ["Keeper of ", {"value": "here"}]}`, worked out when used.
+pub(crate) fn text_value(inner: &str) -> Value {
+    use crate::text::{plain, split, Piece};
+    let Ok(pieces) = split(inner) else {
+        return Value::str(inner);
+    };
+    if pieces.iter().all(|p| matches!(p, Piece::Lit(_))) {
+        let s: String = pieces
+            .iter()
+            .map(|p| match p {
+                Piece::Lit(l) => plain(l),
+                Piece::Code(..) => String::new(),
+            })
+            .collect();
+        return Value::str(s);
+    }
+    let parts = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(plain(&l)),
+            Piece::Code(code, _) => Value::obj([("value", expression(&code))]),
+        })
+        .collect();
+    Value::obj([("text", Value::Arr(parts))])
+}
+
+/// Quoted text, if there is any, as [`text_value`] keeps it.
+fn quoted_text(text: &str) -> Option<Value> {
+    quoted(text).map(text_value)
+}
+
+/// Quoted text meant to be read, with emphasis lowered as in prose: a
+/// `say` line, a hint, a fact's text, a list entry, a description. A plain
+/// string when it has no braces and no emphasis; else `{"text": [parts]}`,
+/// whose parts may be styled runs. Names (`label`, `shown as`) and values
+/// (`set x: "…"`) never take emphasis.
+pub(crate) fn styled_value(inner: &str) -> Value {
+    use crate::text::{emphasis, plain, split, Piece};
+    let Ok(pieces) = split(inner) else {
+        return Value::str(inner);
+    };
+    let raw: Vec<Value> = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(l),
+            Piece::Code(code, _) => Value::obj([("value", expression(&code))]),
+        })
+        .collect();
+    let parts = emphasis(raw);
+    match parts.as_slice() {
+        [] => Value::str(""),
+        [Value::Str(s)] => Value::str(plain(s)),
+        _ => Value::obj([("text", Value::Arr(parts))]),
+    }
+}
+
+/// Quoted text meant to be read, as [`styled_value`] keeps it.
+fn quoted_styled(text: &str) -> Option<Value> {
+    quoted(text).map(styled_value)
 }
 
 // ---------------------------------------------------------------- expressions
@@ -182,6 +245,20 @@ pub fn lower(e: &Expr) -> Value {
             })
         }
         Expr::Str(s) => Value::obj([("str", Value::str(s))]),
+        // Text with braces: `{"text": ["Keeper of ", {"value": "here"}]}`.
+        Expr::Text(parts) => Value::obj([(
+            "text",
+            Value::Arr(
+                parts
+                    .iter()
+                    .map(|p| match p {
+                        crate::expr::TextPart::Lit(s) => Value::str(s),
+                        crate::expr::TextPart::Expr(e) => Value::obj([("value", lower(e))]),
+                    })
+                    .collect(),
+            ),
+        )]),
+        Expr::If(c, a, b) => one("if", vec![lower(c), lower(a), lower(b)]),
         // `yes` and `no` are Inkjot's booleans.
         Expr::Name(n, _) if n == "yes" => Value::Bool(true),
         Expr::Name(n, _) if n == "no" => Value::Bool(false),
@@ -462,7 +539,7 @@ impl Builder {
                 ])
             }
             _ if DECLS.contains(&kw) => self.declaration(s, kw, rest),
-            _ if EFFECTS.contains(&kw) => {
+            _ if is_effect(kw, rest) => {
                 let mut pairs = vec![("effect".to_string(), effect(head))];
                 if s.clauses.len() > 1 {
                     pairs.push(("clauses".to_string(), tail()));
@@ -523,7 +600,25 @@ impl Builder {
         for c in &s.clauses[1..] {
             f.phrase(&c.text);
         }
-        Value::Obj(f.into_pairs())
+        let mut pairs = f.into_pairs();
+        // A fact's text and a description are read, so they take emphasis;
+        // a name does not.
+        let texts: Vec<&str> = std::iter::once(value)
+            .chain(s.clauses[1..].iter().map(|c| c.text.as_str()))
+            .filter(|t| t.starts_with('"'))
+            .filter_map(quoted)
+            .collect();
+        for (key, i) in [("label", 0), ("description", 1)] {
+            if key == "label" && kw != "fact" {
+                continue;
+            }
+            if let (Some(slot), Some(text)) =
+                (pairs.iter_mut().find(|(k, _)| k == key), texts.get(i))
+            {
+                slot.1 = styled_value(text);
+            }
+        }
+        Value::Obj(pairs)
     }
 
     /// `cohort: 2..=5 ~ best 3..=4`, `goal flee: ~ toward platform`, …
@@ -535,7 +630,7 @@ impl Builder {
             "goal" | "reaction" | "checkpoint" => {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
-            "hint" => f.add("hint", Value::str(quoted(value).unwrap_or(value))),
+            "hint" => f.add("hint", quoted_styled(value).unwrap_or(Value::str(value))),
             "tags" => {
                 let all =
                     std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
@@ -776,7 +871,7 @@ impl Builder {
             ("type".into(), Value::str("link")),
             ("id".into(), Value::str(&id)),
             ("id_from".into(), Value::str(id_from)),
-            ("label".into(), Value::str(label.trim())),
+            ("label".into(), parts(label.trim())),
             ("target".into(), Value::str(target.trim())),
             ("kind".into(), Value::str(kind)),
             (
@@ -928,7 +1023,7 @@ pub(crate) fn effect(text: &str) -> Value {
         }
         "say" => {
             pairs.push(("who".into(), Value::str(first_word(rest))));
-            pairs.push(("text".into(), quoted(rest).map_or(Value::Null, Value::str)));
+            pairs.push(("text".into(), quoted_styled(rest).unwrap_or(Value::Null)));
         }
         _ => {
             let mut args = words(rest);
@@ -951,7 +1046,7 @@ fn clause(text: &str) -> Value {
         return Value::obj([("then", effect(e))]);
     }
     if text.starts_with('"') {
-        return Value::obj([("label", quoted(text).map_or(Value::Null, Value::str))]);
+        return Value::obj([("label", quoted_text(text).unwrap_or(Value::Null))]);
     }
     for lead in ["hidden", "fixed", "offstage"] {
         if let Some(e) = text
@@ -1063,22 +1158,16 @@ fn modifier(text: &str) -> Value {
 
 /// A line of prose as parts: plain strings, and one object per `{insert}`.
 fn parts(text: &str) -> Value {
-    let mut out = Vec::new();
-    let mut rest = text;
-    while let Some(open) = rest.find('{') {
-        let Some(close) = rest[open..].find('}').map(|i| open + i) else {
-            break;
-        };
-        if open > 0 {
-            out.push(Value::str(&rest[..open]));
-        }
-        out.push(insert(&rest[open + 1..close]));
-        rest = &rest[close + 1..];
-    }
-    if !rest.is_empty() {
-        out.push(Value::str(rest));
-    }
-    Value::Arr(out)
+    use crate::text::{emphasis, split, Piece};
+    let pieces = split(text).unwrap_or_else(|_| vec![Piece::Lit(text.to_string())]);
+    let raw: Vec<Value> = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(l),
+            Piece::Code(code, _) => insert(&code),
+        })
+        .collect();
+    Value::Arr(emphasis(raw))
 }
 
 /// One `{insert}`: a named insert, or `{"value": expression}`.
@@ -1131,6 +1220,11 @@ fn insert(content: &str) -> Value {
                 "args",
                 insert_args(c.split_once("input").map_or("", |(_, r)| r)),
             ),
+        ]),
+        // `{all leo.aka}`: every name, not one picked.
+        "all" if !second.is_empty() => Value::obj([
+            ("value", expression(&c[first.len()..])),
+            ("all", Value::Bool(true)),
         ]),
         _ => Value::obj([("value", expression(c))]),
     }

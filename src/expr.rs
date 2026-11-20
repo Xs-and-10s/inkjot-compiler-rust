@@ -8,7 +8,12 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Num(String),
+    /// Text with nothing to work out: `"a key"`.
     Str(String),
+    /// Text with braces in it: `"Keeper of {here}"`.
+    Text(Vec<TextPart>),
+    /// `if cond then a else b`.
+    If(Box<Expr>, Box<Expr>, Box<Expr>),
     /// A bare name, and where it starts in the source text.
     Name(String, At),
     Member(Box<Expr>, String),
@@ -55,6 +60,7 @@ impl Expr {
                 "+" | "-" => 6,
                 _ => 7, // * / mod
             },
+            Expr::If(..) => 0,
             Expr::Unary("not", _) => 3,
             Expr::Range { .. } => 5,
             Expr::Unary(..) => 8, // unary minus
@@ -81,7 +87,25 @@ impl fmt::Display for Expr {
         let mine = self.precedence();
         match self {
             Expr::Num(n) => write!(f, "{n}"),
-            Expr::Str(s) => write!(f, "\"{s}\""),
+            Expr::Str(s) => write!(f, "\"{}\"", crate::text::escape(s)),
+            Expr::Text(parts) => {
+                write!(f, "\"")?;
+                for part in parts {
+                    match part {
+                        TextPart::Lit(s) => write!(f, "{}", crate::text::escape(s))?,
+                        TextPart::Expr(e) => write!(f, "{{{e}}}")?,
+                    }
+                }
+                write!(f, "\"")
+            }
+            Expr::If(c, a, b) => {
+                write!(f, "if ")?;
+                c.fmt_at(f, 1)?;
+                write!(f, " then ")?;
+                a.fmt_at(f, 1)?;
+                write!(f, " else ")?;
+                b.fmt_at(f, 1)
+            }
             Expr::Name(n, _) => write!(f, "{n}"),
             Expr::Member(target, member) => {
                 target.fmt_at(f, 9)?;
@@ -143,6 +167,13 @@ impl fmt::Display for Expr {
             }
         }
     }
+}
+
+/// A piece of interpolated text: words, or an expression in braces.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TextPart {
+    Lit(String),
+    Expr(Expr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -208,15 +239,13 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
             }
             out.push((start, Tok::Ident(src[start..i].to_string())));
         } else if c == b'"' {
-            i += 1;
-            while i < b.len() && b[i] != b'"' {
-                i += 1;
-            }
-            if i >= b.len() {
+            // Braces in text may hold strings of their own, so the end is
+            // found by the text rules, not the next quote.
+            let Some(end) = crate::text::string_end(src, i) else {
                 return Err((start, "this string is never closed".into()));
-            }
-            out.push((start, Tok::Str(src[start + 1..i].to_string())));
-            i += 1;
+            };
+            out.push((start, Tok::Str(src[start + 1..end].to_string())));
+            i = end + 1;
         } else if let Some(op) = OPS.iter().find(|op| src[i..].starts_with(**op)) {
             i += op.len();
             out.push((start, Tok::Op(op)));
@@ -228,6 +257,34 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
         }
     }
     Ok(out)
+}
+
+/// The inside of a quoted string, `offset` bytes into the source: plain
+/// text, or text with expressions in braces.
+fn text(raw: &str, offset: usize) -> Result<Expr, ParseError> {
+    use crate::text::{plain, split, Piece};
+    let pieces = split(raw).map_err(|(at, why)| (offset + at, why))?;
+    if pieces.iter().all(|p| matches!(p, Piece::Lit(_))) {
+        let s: String = pieces
+            .iter()
+            .map(|p| match p {
+                Piece::Lit(l) => plain(l),
+                Piece::Code(..) => String::new(),
+            })
+            .collect();
+        return Ok(Expr::Str(s));
+    }
+    let mut parts = Vec::new();
+    for p in pieces {
+        match p {
+            Piece::Lit(l) => parts.push(TextPart::Lit(plain(&l))),
+            Piece::Code(code, at) => {
+                let e = parse(&code).map_err(|(i, why)| (offset + at + i, why))?;
+                parts.push(TextPart::Expr(e));
+            }
+        }
+    }
+    Ok(Expr::Text(parts))
 }
 
 pub fn parse(src: &str) -> Result<Expr, ParseError> {
@@ -303,6 +360,16 @@ impl Parser {
         }
     }
 
+    fn expect_word(&mut self, w: &str) -> Result<(), ParseError> {
+        match self.peek() {
+            Some(Tok::Ident(s)) if s == w => {
+                self.pos += 1;
+                Ok(())
+            }
+            _ => Err((self.at(), format!("expected `{w}` in `if … then … else …`"))),
+        }
+    }
+
     /// Run `f` one nesting level deeper, refusing to go past `MAX_DEPTH`.
     fn nested(
         &mut self,
@@ -372,7 +439,7 @@ impl Parser {
     fn starts_operand(&self) -> bool {
         match self.peek() {
             Some(Tok::Num(_)) | Some(Tok::Str(_)) => true,
-            Some(Tok::Ident(s)) => !WORD_OPS.contains(&s.as_str()),
+            Some(Tok::Ident(s)) => !WORD_OPS.contains(&s.as_str()) && s != "then" && s != "else",
             Some(Tok::Op(o)) => *o == "(" || *o == "[" || *o == "-",
             None => false,
         }
@@ -531,7 +598,18 @@ impl Parser {
             }
             Some(Tok::Str(s)) => {
                 self.pos += 1;
-                Ok(Expr::Str(s))
+                text(&s, at + 1)
+            }
+            Some(Tok::Ident(s)) if s == "if" => {
+                self.pos += 1;
+                self.nested(|p| {
+                    let cond = p.or()?;
+                    p.expect_word("then")?;
+                    let yes = p.or()?;
+                    p.expect_word("else")?;
+                    let no = p.or()?;
+                    Ok(Expr::If(Box::new(cond), Box::new(yes), Box::new(no)))
+                })
             }
             Some(Tok::Ident(s)) => {
                 if WORD_OPS.contains(&s.as_str()) {

@@ -127,7 +127,7 @@ fn a_link_is_expanded_with_its_acts_defaults() {
         "id": "dining_table->dining_table:letter",
         "id_from": "target",
         "lib": "dining_table",
-        "label": "Ask Mrs. Ardent about her letter",
+        "label": ["Ask Mrs. Ardent about her letter"],
         "target": "dining_table:letter",
         "kind": "act",
         "act": "ask",

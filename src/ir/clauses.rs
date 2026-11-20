@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use super::{cost, effect, expression, quoted, token, word, words};
+use super::{cost, effect, expression, quoted, quoted_text, token, word, words};
 use crate::json::Value;
 use crate::syntax::{is_ident, top_mask};
 
@@ -82,6 +82,7 @@ const PATTERNS: &[Pattern] = &[
     p(&["shown", "as"], "shown_as", Shape::Text),
     p(&["formally"], "formally", Shape::Text),
     p(&["aka"], "aka", Shape::Aka),
+    p(&["pick"], "aka_pick", Shape::Token),
     p(&["else"], "else", Shape::Token),
     p(&["weight"], "weight", Shape::Token),
     p(&["of"], "of", Shape::Token),
@@ -257,7 +258,7 @@ impl<'a> Fields<'a> {
             } else {
                 "label"
             };
-            self.add(key, Value::str(quoted(text).unwrap_or(text)));
+            self.add(key, quoted_text(text).unwrap_or(Value::str(text)));
             return;
         }
         // A map row: `orrery | gallery | gate`.
@@ -310,7 +311,7 @@ impl<'a> Fields<'a> {
             Shape::Flag => Value::Bool(true),
             Shape::Id => Value::str(rest),
             Shape::Ids => ids(rest),
-            Shape::Text => Value::str(quoted(rest).unwrap_or(rest)),
+            Shape::Text => quoted_text(rest).unwrap_or(Value::str(rest)),
             Shape::Expr => expression(rest),
             Shape::Token => token(rest),
             Shape::Words => Value::Arr(words(rest)),
@@ -332,7 +333,8 @@ impl<'a> Fields<'a> {
                 if rest.starts_with('"') {
                     texts(rest)
                 } else {
-                    self.add("aka_order", Value::str(rest));
+                    // v0.5's `aka shuffled`; v0.6 writes `pick shuffled`.
+                    self.add("aka_pick", Value::str(rest));
                     return;
                 }
             }
@@ -350,7 +352,7 @@ impl<'a> Fields<'a> {
                     };
                     let mut entry = vec![("id".to_string(), Value::str(id))];
                     if let Some(label) = label {
-                        entry.push(("label".to_string(), Value::str(label)));
+                        entry.push(("label".to_string(), super::styled_value(label)));
                     }
                     if let Some(mark) = mark {
                         entry.push(("mark".to_string(), Value::str(mark)));
@@ -465,11 +467,11 @@ mod tests {
     }
 
     #[test]
-    fn aka_takes_names_or_an_order() {
+    fn aka_takes_names_and_pick_takes_a_policy() {
         assert_eq!(
             read("aka \"Le Le Le Leo\", \"Lapkins\""),
             json(r#"{"aka": ["Le Le Le Leo", "Lapkins"]}"#)
         );
-        assert_eq!(read("aka shuffled"), json(r#"{"aka_order": "shuffled"}"#));
+        assert_eq!(read("pick cycle"), json(r#"{"aka_pick": "cycle"}"#));
     }
 }

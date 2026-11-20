@@ -29,6 +29,7 @@ here.
 | 16 | Engine events: `nib_shown`, `ending_reached`, `reading_finished`, and the interpreter's checkpoints, deaths, rewinds, echoes and turns; `replay_all`; `[finale]` is an ending (Ex 2 and Ex 3 retagged); the platform's handoff in `docs/platform/` | #24 |
 | 17 | The NIF: `native/inkjot_nif` (Rustler) and `Inkjot.Engine` (`mix.exs` at the root, Elixir under `elixir/`), with StreamData properties; history snapshots shared behind `Arc`s (a Link 300 in to Ex 1: 25 ms to 0.5 ms); `build` through the NIF | #25 |
 | 18a | v0.6 foundations: `state`, `fact`, `clue`; `inkjot migrate` (Ex 1 to 3 migrated); names for the pov; `[fix]`; reserved words; IR 3's core: stable Link ids, passage titles, typed state | #26 |
+| 18b | Text: styled runs in prose and labels, braces in every string with escapes, `if … then … else`, `plural`, `capital`; names as the reader knows them (`shown_as` until `reveal`); `aka` policies and `{all x.aka}`; the engine's view carries styled paragraphs | #27 |
 
 ## Next
 

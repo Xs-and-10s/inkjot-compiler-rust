@@ -65,8 +65,23 @@ Each node has a `type`.
 ```
 
 `paragraphs` has one entry per paragraph: the cue line, then each `~`
-continuation. A paragraph is a list of parts. A part is a plain string or an
-insert:
+continuation. A paragraph is a list of parts. A part is a plain string, a
+styled run, or an insert. Escapes are already resolved: `\{` arrives as `{`,
+`\*` as `*`.
+
+**Styled runs.** Emphasis is lowered here, so no runtime parses asterisks:
+
+```json
+["He opened his mouth to say ", {"style": ["italic"], "parts": ["I don’t remember"]}, "."]
+```
+
+`style` is `["italic"]`, `["bold"]` or `["bold", "italic"]`, for `*x*`,
+`**x**` and `***x***`. `parts` may hold anything a paragraph holds, inserts
+and other runs included. A run of asterisks pairs with the nearest open run
+of the same length; one that pairs with nothing stays a literal `*`.
+
+| Source | Part |
+|---|---|
 
 | Source | Part |
 |---|---|
@@ -81,6 +96,7 @@ The jury's and the inputs' arguments are typed: a number is a number,
 with arguments (`{reveal link: …}`, `{sound effect: …}`) keep them as text
 for now.
 | `{leo.aka}` | `{"value": {"get": ["leo", "aka"]}}` |
+| `{all leo.aka}` | `{"value": {"get": ["leo", "aka"]}, "all": true}`: every name, not one picked |
 
 **`modifier`**
 
@@ -125,6 +141,7 @@ left out of the IR.
 |---|---|
 | `id` | The Inker's `~ id` when written; otherwise the passage, `->`, and the target (`ch2->ch3`), with `#2`, `#3` for a second and third Link to the same target. Never the Link's position, so reordering Links keeps their ids |
 | `id_from` | `inker` or `target`: where the id came from |
+| `label` | A list of parts, like a paragraph: styled runs and values included |
 | `lib` | Present when the Link lives in a `[lib]` passage that cells embed |
 | `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `inquest` (reserved), `release` |
 | `act`, `arg` | The act or combo, and its argument (`take cufflink`) |
@@ -183,7 +200,7 @@ repeats, lists extend and objects merge.
 
 | Phrase | Field |
 |---|---|
-| `"…"` | `label`, or `description` if there is already a label |
+| `"…"` | `label`, or `description` if there is already a label. Quoted text is a plain string, or, when it has braces, `{"text": ["Keeper of ", {"value": "here"}]}`, worked out each time it is shown. Text that is read (a fact's text, a description, a list entry, a hint, a `say` line) also takes emphasis, so its parts may be styled runs; a name (`label`, `shown as`) and a value (`set x: "…"`) never do |
 | one word: `evidence`, `playable`, `loud` | added to `tags` |
 | `in X`, `at X` | `in`, `at` |
 | `held by X`, `belongs to X` | `held_by`, `belongs_to` |
@@ -191,7 +208,7 @@ repeats, lists extend and objects merge.
 | `knows a`, `for a, b`, `shared by a` | `knows`, `for`, `shared_by` (lists) |
 | `like X`, `with k: v`, `state k: v` | `like`, `with` (object), `state` (object) |
 | `shown as "…"`, `formally "…"` | `shown_as`, `formally` |
-| `aka "a", "b"` / `aka shuffled` | `aka` (list) / `aka_order` |
+| `aka "a", "b"` / `pick cycle` | `aka` (list) / `aka_pick`: `shuffled` (the default), `cycle`, `random` or `first` |
 | `else absent`, `weight heavy`, `of 6`, `survives death` | `else`, `weight`, `of`, `survives` |
 | `when E`, `open when E`, `done when E` | `when`, `open_when`, `done_when` |
 | `hidden until E`, `fixed until E`, `offstage until E` | `hidden_until`, `fixed_until`, `offstage_until` |
@@ -257,6 +274,9 @@ The `~` clauses of a declaration or setting:
 | `yes`, `no` | `true`, `false` |
 | `3`, `1.5` | `3`, `1.5` |
 | `"text"` | `{"str": "text"}` |
+| `"Keeper of {here}"` | `{"text": ["Keeper of ", {"value": "here"}]}` |
+| `if lied then "a" else "b"` | `{"if": ["lied", {"str": "a"}, {"str": "b"}]}` |
+| `plural(n, "card")`, `capital(x)` | `{"plural": ["n", {"str": "card"}]}`, `{"capital": ["x"]}` |
 | `door.open` | `{"get": ["door", "open"]}` |
 | `me.knows.secret`, `i.know.secret` | `{"knows": ["me", "secret"]}` |
 | `me.holds.key`, `i.hold.key` | `{"holds": ["me", "key"]}` |
@@ -297,6 +317,12 @@ Inkjot v0.6, milestone 18:
   `id_from`; never from position.
 - Passages may have a `title`.
 - `[fixme]` is `[fix]`.
+- Emphasis is lowered to styled runs; Link labels are lists of parts.
+- Quoted text with braces is `{"text": [parts]}`, in fields and in
+  expressions; `if … then … else …`, `plural` and `capital` are new.
+- `aka_order` is `aka_pick`; `{all x.aka}` carries `"all": true`.
+- `reveal x` is an effect (`{"do": "reveal", "args": ["x"]}`); the
+  `reveal:` setting is still the text's pacing.
 - `i`, `you`, `myself`, `yourself` are lowered as `me`; `know`, `hold`, `am`,
   `are` as `knows`, `holds`, `is`.
 
