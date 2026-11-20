@@ -7,6 +7,8 @@ usage:
   inkjot check <file.twee>...   read each file and report what is wrong with it
   inkjot build <file.twee>      compile one file to its JSON IR, on standard output
   inkjot build <file.twee> -o <out.json>
+  inkjot migrate <file.twee>    rewrite a v0.5 source for v0.6, on standard output
+  inkjot migrate <file.twee> -o <out.twee>
   inkjot test <file.twee>...    run the [test] passages; the files are read as one story
   inkjot play <file.twee>...    play the story in the terminal
       --as a,b                  several Linkers at one keyboard, one per character
@@ -24,6 +26,14 @@ fn main() -> ExitCode {
         Some("build") => match &args[1..] {
             [file] => build(file, None),
             [file, flag, out] if flag == "-o" => build(file, Some(out)),
+            _ => {
+                eprintln!("{USAGE}");
+                ExitCode::from(2)
+            }
+        },
+        Some("migrate") => match &args[1..] {
+            [file] => migrate(file, None),
+            [file, flag, out] if flag == "-o" => migrate(file, Some(out)),
             _ => {
                 eprintln!("{USAGE}");
                 ExitCode::from(2)
@@ -86,6 +96,31 @@ fn check(files: &[String]) -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+fn migrate(file: &str, out: Option<&String>) -> ExitCode {
+    let src = match std::fs::read_to_string(file) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("error: cannot read {file}: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let m = inkjot::migrate::migrate(&src);
+    for note in &m.notes {
+        eprintln!("note: {file}: {note}");
+    }
+    match out {
+        None => print!("{}", m.source),
+        Some(path) => {
+            if let Err(e) = std::fs::write(path, &m.source) {
+                eprintln!("error: cannot write {path}: {e}");
+                return ExitCode::FAILURE;
+            }
+            eprintln!("{file}: migrated to {path}");
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 fn build(file: &str, out: Option<&String>) -> ExitCode {

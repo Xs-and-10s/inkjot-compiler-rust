@@ -3,17 +3,22 @@
 `inkjot build story.twee -o story.json` compiles an Inklink to one JSON file.
 A runtime reads that file and never parses Inkjot itself.
 
-This describes IR format version `"2"`, frozen with the compiler's v0.5.0
-release. Any change to it from here on is IR version `"3"`. The three files
+This describes IR format version `"3"`, for Inkjot v0.6. It is being built
+in milestone 18; what changed from version 2 is at the end. The three files
 under `examples/ir/` are the compiler's real output for the three examples,
 and a test keeps them current.
+
+**Unknown fields are ignored.** A consumer ignores an object field it does
+not know, and the compiler never changes the meaning of an existing field
+without a new IR version. So a new optional field is an addition, not a new
+version, and a runtime written for an earlier IR 3 keeps working.
 
 ## Top level
 
 ```json
 {
-  "ir": "2",
-  "inkjot": "0.5.0",
+  "ir": "3",
+  "inkjot": "0.6.0",
   "title": "The Night Train",
   "ifid": "…",
   "start": "cast",
@@ -35,10 +40,13 @@ and a test keeps them current.
 ## Passages
 
 ```json
-{ "name": "hall:look", "tags": ["act"], "margin": false, "header": [ … ], "body": [ … ] }
+{ "name": "ch2_alt", "title": "The Millpond", "tags": ["act"], "margin": false, "header": [ … ], "body": [ … ] }
 ```
 
-`header` holds statements. `body` holds nodes. A margin passage (`[npc]`,
+`title` is present when the passage says `title: "…"` in its header: a name
+for people, where the platform would otherwise show the passage's id. The
+statement itself is not repeated in `header`. `header` holds statements.
+`body` holds nodes. A margin passage (`[npc]`,
 `[character]`, `[place]`, `[archetype]`) is all header.
 
 A passage with a doc comment (a `(((…)))` block straight after its `::`
@@ -83,7 +91,7 @@ for now.
 Modifiers stay in order, as in the source: each applies until the next one.
 `after` and `beat` carry `"time"`; `reveal` carries `"mode"`.
 
-Author's notes (`[note]`, `[todo]`, `[fixme]`) and the text under them are
+Author's notes (`[note]`, `[todo]`, `[fix]`) and the text under them are
 left out of the IR.
 
 **`link`**
@@ -91,7 +99,8 @@ left out of the IR.
 ```json
 {
   "type": "link",
-  "id": "dining_table#4",
+  "id": "dining_table->dining_table:letter",
+  "id_from": "target",
   "lib": "dining_table",
   "label": "Ask Mrs. Ardent about her letter",
   "target": "dining_table:letter",
@@ -114,7 +123,8 @@ left out of the IR.
 
 | Field | Meaning |
 |---|---|
-| `id` | The passage name, `#`, and the Link's position in it, counting from 1 |
+| `id` | The Inker's `~ id` when written; otherwise the passage, `->`, and the target (`ch2->ch3`), with `#2`, `#3` for a second and third Link to the same target. Never the Link's position, so reordering Links keeps their ids |
+| `id_from` | `inker` or `target`: where the id came from |
 | `lib` | Present when the Link lives in a `[lib]` passage that cells embed |
 | `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `inquest` (reserved), `release` |
 | `act`, `arg` | The act or combo, and its argument (`take cufflink`) |
@@ -155,7 +165,8 @@ When there is no value, there is no colon: `archetype statue ~ lifeless`.
 | Declares | Field |
 |---|---|
 | most things | `label`, from the quoted text |
-| `fact` | `value`, an expression (`no` is `false`) |
+| `state` | `value`, an expression (`no` is `false`), and `type`: `boolean`, `integer`, `decimal`, `text`, `id` (a name, or `nothing`), `range`, `list`, or `expression` |
+| `fact` | `label`, the fact's text; `~ clue` and the other tags in `tags` |
 | `stat` | `range` |
 | `resource` | `value`, if it starts with a number |
 | `fuse` | `start` |
@@ -178,7 +189,7 @@ repeats, lists extend and objects merge.
 | `held by X`, `belongs to X` | `held_by`, `belongs_to` |
 | `holds a, b: "label", c as mark` | `holds`: `[{"id", "label"?, "mark"?}]` |
 | `knows a`, `for a, b`, `shared by a` | `knows`, `for`, `shared_by` (lists) |
-| `like X`, `with k: v`, `fact k: v` | `like`, `with` (object), `facts` (object) |
+| `like X`, `with k: v`, `state k: v` | `like`, `with` (object), `state` (object) |
 | `shown as "…"`, `formally "…"` | `shown_as`, `formally` |
 | `aka "a", "b"` / `aka shuffled` | `aka` (list) / `aka_order` |
 | `else absent`, `weight heavy`, `of 6`, `survives death` | `else`, `weight`, `of`, `survives` |
@@ -189,7 +200,7 @@ repeats, lists extend and objects merge.
 | `cost …`, `check E`, `min n`, `steps R`, `capacity n` | `cost` (list), `check`, `min`, `steps`, `capacity` |
 | `requires …` | `requires` (lowered words) |
 | `ends turn`, `one way`, `on tap` | `ends_turn`, `one_way`, `on_tap`: `true` |
-| `learned from clue X`, `once per turn` / `once per day` | `learned_from`, `once_per`: `"turn"` / `"day"` |
+| `learned from X`, `once per turn` / `once per day` | `learned_from`, `once_per`: `"turn"` / `"day"` |
 | `choice proactive` (`reactive`, `inactive`) | `choice` |
 | `back 1..=2` (on `rewind: echo`) | `back` |
 | `moves a, b` / `moves none` / `moves 2 per chronon` | `moves` (list; `[]` for none) / `speed` |
@@ -242,14 +253,14 @@ The `~` clauses of a declaration or setting:
 
 | Source | JSON |
 |---|---|
-| `me` | `"me"` |
+| `me`, and `i`, `you`, `myself`, `yourself` | `"me"` |
 | `yes`, `no` | `true`, `false` |
 | `3`, `1.5` | `3`, `1.5` |
 | `"text"` | `{"str": "text"}` |
 | `door.open` | `{"get": ["door", "open"]}` |
-| `me.knows.secret` | `{"knows": ["me", "secret"]}` |
-| `me.holds.key` | `{"holds": ["me", "key"]}` |
-| `me.is(rook)` | `{"is": ["me", "rook"]}` |
+| `me.knows.secret`, `i.know.secret` | `{"knows": ["me", "secret"]}` |
+| `me.holds.key`, `i.hold.key` | `{"holds": ["me", "key"]}` |
+| `me.is(rook)`, `i.am(rook)` | `{"is": ["me", "rook"]}` |
 | `count(linker, in: here)` | `{"count": ["linker"], "with": {"in": "here"}}` |
 | `a and b`, `a or b` | `{"and": [a, b]}`, `{"or": [a, b]}` |
 | `not a`, `-a` | `{"not": a}`, `{"neg": a}` |
@@ -264,7 +275,7 @@ A method call puts its receiver first: `here.has(vell)` is
 `{"has": ["here", "vell"]}`. The `in` operator is spelled `within` so it can
 never be confused with a method named `in`. `but` is lowered as `and`.
 
-## What version 2 does not lower
+## What version 3 does not lower yet
 
 Only one thing reaches `other`: the Ex 2 duel's spell vocabulary (`thaws ice`,
 `absorbs spells`, `shields target from the next spell`, and four more), which
@@ -273,6 +284,21 @@ phrase is left untyped.
 
 Insert arguments for inputs, `accuse`, `reveal` and sounds are still text in
 `args`, and v0.6 statements appear as `stretch` with their source.
+
+## Changes from version 2
+
+Inkjot v0.6, milestone 18:
+
+- Unknown fields are ignored (above).
+- `fact` (a value) is now `state`, with a `type`; `fact` is now knowledge
+  (v0.5's `clue`), with a `label`; `clue` is a tag. An item's `~ fact k: v`
+  is `~ state k: v`, in a `state` field.
+- Link ids come from the Inker's `~ id` or from passage and target, with
+  `id_from`; never from position.
+- Passages may have a `title`.
+- `[fixme]` is `[fix]`.
+- `i`, `you`, `myself`, `yourself` are lowered as `me`; `know`, `hold`, `am`,
+  `are` as `knows`, `holds`, `is`.
 
 ## Changes from version 1
 

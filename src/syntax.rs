@@ -16,8 +16,8 @@ pub(crate) const DECLS: &[&str] = &[
     "spot",
     "way",
     "item",
-    "clue",
     "fact",
+    "state",
     "fuse",
     "character",
     "npc",
@@ -40,7 +40,7 @@ pub(crate) const UNIQUE: &[&str] = &[
     "place",
     "way",
     "item",
-    "clue",
+    "fact",
     "character",
     "npc",
     "act",
@@ -81,6 +81,7 @@ pub(crate) const SETTINGS: &[&str] = &[
     "observe",
     "timeout",
     "param",
+    "title",
     // `[test]` passages.
     "given",
     "answer",
@@ -117,7 +118,7 @@ pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "ret
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
-    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch",
+    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch", "id",
     "pass", "release", "requires", "once", "loud", "quiet", "choice",
 ];
 
@@ -145,8 +146,44 @@ pub(crate) const BUILTIN_TAGS: &[&str] = &[
     "character",
     "npc",
     "item",
-    "clue",
+    "fact",
     "place",
+];
+
+/// Names that mean the pov, everywhere. The IR always says `me`.
+pub(crate) const POV_NAMES: &[&str] = &["i", "me", "you", "myself", "yourself"];
+
+/// Words reserved now for v0.6 features built later, so that no id written
+/// today collides with them.
+pub(crate) const RESERVED_LATER: &[&str] = &[
+    "knowledge",
+    "rule",
+    "never",
+    "assert",
+    "retract",
+    "period",
+    "recipe",
+    "between",
+];
+
+/// Words that can never be declared as an id.
+pub(crate) const RESERVED: &[&str] = &[
+    "i",
+    "me",
+    "you",
+    "myself",
+    "yourself",
+    "self",
+    "it",
+    "here",
+    "knowledge",
+    "rule",
+    "never",
+    "assert",
+    "retract",
+    "period",
+    "recipe",
+    "between",
 ];
 
 /// Link targets that are not passages.

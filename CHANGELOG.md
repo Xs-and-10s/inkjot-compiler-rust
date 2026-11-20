@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Inkjot v0.6, milestone 18a
+
+- `format-version: 0.6.0`. `inkjot migrate` rewrites a v0.5 source, and the
+  checker points a v0.5 file at it (#26).
+- `state` is a mutable value (v0.5's `fact`), with a type in the IR; `fact`
+  is knowledge (v0.5's `clue`); `clue` is a tag on a fact (#26).
+- `i`, `you`, `myself` and `yourself` mean the pov, and `i.know.x`,
+  `i.hold.key`, `i.am(rook)` read as `me.knows.x`, `me.holds.key`,
+  `me.is(rook)`; the IR always says `me` (#26).
+- `[fixme]` is `[fix]` (#26).
+- Reserved words: the pov names, `self`, `it`, `here`, and the words of v0.6
+  features still to come (#26).
+- IR version 3: unknown fields are ignored; Link ids come from the Inker's
+  `~ id` or from passage and target, never from position; passages may
+  have a `title` (#26).
+
 ### The engine
 
 - `inkjot::engine`: the interpreter as the Inklinks platform calls it.

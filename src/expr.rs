@@ -468,6 +468,14 @@ impl Parser {
                     // After a dot any word is a member, keywords included: `here.in(x)`.
                     Some(Tok::Ident(s)) => {
                         self.pos += 1;
+                        // `i.know.x`, `i.hold.key`, `i.am(rook)`: the first
+                        // person's verbs are the same as `knows`, `holds`, `is`.
+                        let s = match s.as_str() {
+                            "know" => "knows".to_string(),
+                            "hold" => "holds".to_string(),
+                            "am" | "are" => "is".to_string(),
+                            _ => s,
+                        };
                         e = Expr::Member(Box::new(e), s);
                     }
                     _ => return Err((self.at(), "expected a name after `.`".into())),
@@ -530,6 +538,12 @@ impl Parser {
                     return Err((at, format!("`{s}` needs something before it")));
                 }
                 self.pos += 1;
+                // `i`, `you`, `myself` and `yourself` are the pov, as `me` is.
+                let s = if crate::syntax::POV_NAMES.contains(&s.as_str()) {
+                    "me".to_string()
+                } else {
+                    s
+                };
                 Ok(Expr::Name(s, At(at)))
             }
             Some(Tok::Op("(")) => {

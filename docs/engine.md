@@ -37,7 +37,7 @@ assert_eq!(again.view(), state.view());
 
 | Call | Returns | Notes |
 |---|---|---|
-| `Inklink::load(json)` | `Inklink` | Parses the IR text. Unknown fields are ignored. Reads IR `"2"`. |
+| `Inklink::load(json)` | `Inklink` | Parses the IR text. Unknown fields are ignored. Reads IR `"3"`. |
 | `Inklink::from_ir(&value)` | `Inklink` | The same, from an IR already parsed (`inkjot::build`'s result). |
 | `inklink.meta()` | `&Meta` | No reading needed. |
 | `inklink.start(seed, &start)` | `State` | `Start { nib, pov, hints }`; the default is the story's own start and pov, hints on. |
@@ -56,7 +56,7 @@ one indexed story.
 
 ## Types
 
-**`Meta`**: `title`, `ifid`, `ir` (`"2"`), `inkjot` (the compiler version),
+**`Meta`**: `title`, `ifid`, `ir` (`"3"`), `inkjot` (the language version the source declared),
 `kind` (`story`, `story-game`, `game`), `mode` (`solo`, `cohort`), `start`,
 `povs` (the `pov:` setting, default first), `playable` (characters marked
 `~ playable`, for a lobby), `tags` (the Inker's), `engine`.

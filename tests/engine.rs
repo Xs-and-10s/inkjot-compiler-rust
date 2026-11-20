@@ -197,7 +197,7 @@ fn meta_describes_the_inklink() {
     assert_eq!(meta.title, "The Fall of the Old Regime");
     assert_eq!(meta.kind, "story");
     assert_eq!(meta.mode, "solo");
-    assert_eq!(meta.ir, "2");
+    assert_eq!(meta.ir, "3");
     assert_eq!(meta.start, "arrival");
     assert_eq!(meta.povs, ["skittles"]);
     assert!(meta.tags.iter().any(|t| t == "cozy"));
@@ -236,7 +236,7 @@ fn bad_ir_is_refused() {
         "",
         "{",
         "[1, 2]",
-        r#"{"ir": "3", "config": [], "passages": []}"#,
+        r#"{"ir": "2", "config": [], "passages": []}"#,
     ] {
         let r = Inklink::load(ir).unwrap_err();
         assert_eq!(r.kind, RefusedKind::BadIr, "{ir}: {r}");
@@ -283,7 +283,7 @@ const ROUND_AND_ROUND: &str = r#":: StoryTitle
 Round and Round
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
 
 :: Inklink [config]
 kind: story
@@ -463,7 +463,7 @@ const THE_PIT: &str = r#":: StoryTitle
 The Pit
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
 
 :: Inklink [config]
 kind: game

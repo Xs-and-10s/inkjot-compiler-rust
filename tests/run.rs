@@ -197,15 +197,15 @@ const LET_AND_GET: &str = r#":: StoryTitle
 Counting
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "room"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "room"}
 
 :: Inklink [config]
 kind: story
 mode: solo
 pov: ann
 character ann: "Ann" ~ playable
-fact count: 0
-fact pinned: 0
+state count: 0
+state pinned: 0
 
 :: room
 let before: count
@@ -260,7 +260,7 @@ const STATUE: &str = r#":: StoryTitle
 Statue
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
 
 :: Inklink [config]
 kind: story
@@ -453,7 +453,7 @@ const ECHO: &str = r#":: StoryTitle
 Echo
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall@0"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall@0"}
 
 :: Inklink [config]
 kind: story
@@ -469,8 +469,8 @@ rewind: echo
 act walk: cost 1 ~ steps 1 ~ ends turn
 act fiddle: cost 1 ~ private
 character ann: "Ann" ~ playable
-fact lamp: no
-clue lamp_works: "The lamp works."
+state lamp: no
+fact lamp_works: "The lamp works." ~ clue
 
 :: watch [lib everywhere]
 > [[Turn back->rewind]] ~ when me.rewinds > 0 and not me.past
@@ -589,7 +589,7 @@ const LIMITS: &str = r#":: StoryTitle
 Limits
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "yard"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "yard"}
 
 :: Inklink [config]
 kind: game
@@ -603,7 +603,7 @@ place yard: "the yard"
 place shed: "the shed"
 resource vults: 10 ~ per character ~ refill each chronon
 item pin: "a hairpin" ~ lockpick ~ in yard
-fact count: 0
+state count: 0
 act take: cost 0
 act pick: cost 1 ~ requires lockpick
 act heave: cost 4 from each ~ requires pov.all here

@@ -78,7 +78,7 @@ const PATTERNS: &[Pattern] = &[
     // What a thing is.
     p(&["like"], "like", Shape::Id),
     p(&["with"], "with", Shape::Pair),
-    p(&["fact"], "facts", Shape::Pair),
+    p(&["state"], "state", Shape::Pair),
     p(&["shown", "as"], "shown_as", Shape::Text),
     p(&["formally"], "formally", Shape::Text),
     p(&["aka"], "aka", Shape::Aka),
@@ -104,7 +104,7 @@ const PATTERNS: &[Pattern] = &[
     p(&["capacity"], "capacity", Shape::Token),
     p(&["requires"], "requires", Shape::Words),
     p(&["ends", "turn"], "ends_turn", Shape::Flag),
-    p(&["learned", "from", "clue"], "learned_from", Shape::Id),
+    p(&["learned", "from"], "learned_from", Shape::Id),
     p(&["once", "per"], "once_per", Shape::Token),
     p(&["choice"], "choice", Shape::Token),
     // Rewinds: `rewind: echo ~ back 1..=2`.
@@ -415,8 +415,8 @@ mod tests {
         assert_eq!(read("moves 2 per chronon"), json(r#"{"speed": 2}"#));
         assert_eq!(read("knows debts"), json(r#"{"knows": ["debts"]}"#));
         assert_eq!(
-            read("fact rusty: no"),
-            json(r#"{"facts": {"rusty": false}}"#)
+            read("state rusty: no"),
+            json(r#"{"state": {"rusty": false}}"#)
         );
         assert_eq!(
             read("to oubliette for roland, chapel for eldric"),
