@@ -1,7 +1,11 @@
 //! The engine, as the platform calls it: states are values, a reading is
 //! its log, the same log plays the same way, and errors are data.
 
-use inkjot::engine::{Action, Inklink, RefusedKind, Start, State, ENGINE_VERSION};
+use inkjot::engine::{
+    catalogue_markdown, Action, Event, Inklink, RefusedKind, Start, State, CATALOGUE,
+    ENGINE_VERSION,
+};
+use inkjot::json::Value;
 use proptest::prelude::*;
 
 const NAMES: [&str; 3] = [
@@ -218,6 +222,12 @@ fn a_reading_ends_at_a_finale() {
     }
     assert!(state.view().over);
     assert!(!state.view().text.is_empty());
+    let kinds: Vec<&str> = state.events().iter().map(|e| e.kind).collect();
+    assert_eq!(kinds, ["nib_shown", "ending_reached", "reading_finished"]);
+    let ending = |e: &Event| e.data.get("ending").cloned();
+    assert_eq!(ending(&state.events()[1]), Some(Value::str("the_list")));
+    assert_eq!(ending(&state.events()[2]), Some(Value::str("the_list")));
+    assert_eq!(state.ending(), Some("the_list"));
 }
 
 #[test]
@@ -314,4 +324,191 @@ fn a_next_loop_hits_the_step_limit() {
         .join()
         .unwrap();
     assert_eq!(outcome, (RefusedKind::StepLimit, true));
+}
+
+/// The keys of an event's data, in order.
+fn keys(e: &Event) -> Vec<&str> {
+    match &e.data {
+        Value::Obj(pairs) => pairs.iter().map(|(k, _)| k.as_str()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn data<'a>(e: &'a Event, key: &str) -> &'a Value {
+    e.data.get(key).unwrap()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// Every event the engine reports is in the catalogue, with exactly
+    /// its keys. Every action reports one `nib_shown`, naming the Nib and
+    /// the Links in the view; `ending_reached` only on arriving at a
+    /// finale; `reading_finished` exactly when the reading is over.
+    #[test]
+    fn every_event_is_in_the_catalogue(
+        start in 0..7usize,
+        seed in 1..1000u64,
+        picks in proptest::collection::vec(0..20usize, 1..40),
+    ) {
+        let (which, start) = starts().swap_remove(start);
+        for state in play(&load(which), seed, &start, &picks) {
+            let view = state.view();
+            for e in state.events() {
+                let entry = CATALOGUE.iter().find(|t| t.name == e.kind);
+                prop_assert!(entry.is_some(), "{} is not in the catalogue", e.kind);
+                prop_assert_eq!(keys(e), entry.unwrap().keys.to_vec());
+            }
+            let shown: Vec<&Event> = state.events().iter().filter(|e| e.kind == "nib_shown").collect();
+            prop_assert_eq!(shown.len(), 1);
+            prop_assert_eq!(data(shown[0], "nib"), &Value::str(&view.nib));
+            let links: Vec<Value> = view.links.iter().map(|l| Value::str(&l.id)).collect();
+            prop_assert_eq!(data(shown[0], "links"), &Value::Arr(links));
+            let finished = state.events().iter().any(|e| e.kind == "reading_finished");
+            prop_assert_eq!(finished, view.over);
+            if state.events().iter().any(|e| e.kind == "ending_reached") {
+                prop_assert!(view.tags.iter().any(|t| t == "finale"));
+            }
+        }
+    }
+
+    /// Replaying a reading with the engine alone, from its seed and its
+    /// actions, reports exactly its events, in order: the check the
+    /// platform runs against its log.
+    #[test]
+    fn replay_reports_exactly_the_readings_events(
+        start in 0..7usize,
+        seed in 1..1000u64,
+        picks in proptest::collection::vec(0..20usize, 1..30),
+    ) {
+        let (which, start) = starts().swap_remove(start);
+        let inklink = load(which);
+        let live = play(&inklink, seed, &start, &picks);
+        let replayed = inklink
+            .replay_all(seed, &start, live.last().unwrap().actions())
+            .unwrap();
+        prop_assert_eq!(replayed.len(), live.len());
+        for (a, b) in live.iter().zip(&replayed) {
+            prop_assert_eq!(a.events(), b.events());
+            prop_assert_eq!(a.view(), b.view());
+        }
+    }
+}
+
+#[test]
+fn the_catalogue_is_documented() {
+    let doc =
+        std::fs::read_to_string(format!("{}/docs/engine.md", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    assert!(
+        doc.contains(&catalogue_markdown()),
+        "docs/engine.md's event table differs from the catalogue:\n{}",
+        catalogue_markdown()
+    );
+}
+
+#[test]
+fn an_event_carries_its_origin_and_version() {
+    let state = load(2).start(1, &Start::default()).unwrap();
+    let json = state.events()[0].to_json().to_string();
+    assert!(json.contains(r#""type": "nib_shown""#), "{json}");
+    assert!(json.contains(r#""origin": "engine""#), "{json}");
+    assert!(json.contains(r#""type_version": 1"#), "{json}");
+}
+
+/// Take the offered Link with this label.
+fn take(state: &State, label: &str) -> State {
+    let link = state
+        .view()
+        .links
+        .iter()
+        .find(|l| l.label == label)
+        .unwrap_or_else(|| panic!("no Link {label:?} in {:?}", state.view().links));
+    state.take_link(&link.id).unwrap()
+}
+
+fn kinds(state: &State) -> Vec<&'static str> {
+    state.events().iter().map(|e| e.kind).collect()
+}
+
+/// Ex 2: a turn ends, and the Backward Knot takes Roland back to its start.
+#[test]
+fn a_rewind_is_reported() {
+    let inklink = load(1);
+    let at = |nib: &str| Start {
+        nib: Some(nib.into()),
+        ..Start::default()
+    };
+    let s = inklink.start(1, &at("prologue")).unwrap();
+    let s = take(&s, "Wake as Roland, in the pit");
+    let s = take(&s, "Look up through the grate");
+    let s = take(&s, "End the turn");
+    assert!(kinds(&s).contains(&"turn_ended"));
+    let ended = s.events().iter().find(|e| e.kind == "turn_ended").unwrap();
+    assert_eq!(data(ended, "stop"), &Value::Num("0".into()));
+    let s = take(&s, "Tug the bolt across the room");
+    let s = take(&s, "Tie the Backward Knot");
+    let s = take(&s, "Back to the start of turn 1");
+    assert_eq!(kinds(&s), ["rewound", "nib_shown"]);
+    let back = &s.events()[0];
+    assert_eq!(data(back, "who"), &Value::str("roland"));
+    assert_eq!(data(back, "stop"), &Value::Num("1".into()));
+    assert_eq!(data(back, "checkpoint"), &Value::Null);
+    assert_eq!(data(back, "echo"), &Value::Bool(false));
+    assert_eq!(data(back, "cause"), &Value::str("rewind"));
+}
+
+/// A checkpoint is reached, a death is caught by it, and the world falls
+/// back: reported in the order it happened.
+const THE_PIT: &str = r#":: StoryTitle
+The Pit
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+
+:: Inklink [config]
+kind: game
+mode: solo
+pov: ann
+character ann: "Ann" ~ playable
+place hall: "the hall" ~ checkpoint
+place pit: "the pit"
+way ladder: hall - pit
+checkpoint hall ~ on death in pit
+~ resets world
+~ to hall
+
+:: hall
+checkpoint hall
+--
+The hall.
+> [[Jump into the pit->pit]]
+
+:: pit
+kill ann
+--
+You fall.
+"#;
+
+#[test]
+fn a_death_and_a_fall_back_are_reported() {
+    let inklink = Inklink::from_ir(&inkjot::build(THE_PIT).unwrap()).unwrap();
+    let hall = inklink.start(1, &Start::default()).unwrap();
+    assert_eq!(kinds(&hall), ["checkpoint_reached", "nib_shown"]);
+    let fell = take(&hall, "Jump into the pit");
+    assert_eq!(
+        kinds(&fell),
+        ["died", "rewound", "checkpoint_reached", "nib_shown"]
+    );
+    let died = &fell.events()[0];
+    assert_eq!(
+        (data(died, "who"), data(died, "at")),
+        (&Value::str("ann"), &Value::str("pit"))
+    );
+    let back = &fell.events()[1];
+    assert_eq!(data(back, "checkpoint"), &Value::str("hall"));
+    assert_eq!(data(back, "cause"), &Value::str("death"));
+    let shown = &fell.events()[3];
+    assert_eq!(data(shown, "nib"), &Value::str("hall"));
+    assert_eq!(data(shown, "passed"), &Value::Arr(vec![Value::str("pit")]));
+    assert_eq!(data(shown, "visit"), &Value::Num("2".into()));
 }

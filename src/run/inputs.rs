@@ -205,7 +205,7 @@ impl Run {
     /// Answer the first open input (not the jury): a name, or the words
     /// chosen.
     pub fn answer(&mut self, words: &[String]) -> R<()> {
-        self.work = Default::default();
+        self.begin_action();
         let input = self
             .asking
             .iter()
@@ -271,7 +271,7 @@ impl Run {
 
     /// Cast the served Linker's ballot. When everyone has, the jury decides.
     pub fn vote(&mut self, who: &str, how: &str, proof: &[String]) -> R<()> {
-        self.work = Default::default();
+        self.begin_action();
         let jury = self
             .asking
             .iter()

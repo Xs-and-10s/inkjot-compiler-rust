@@ -75,6 +75,16 @@ fn f<'a>(v: &'a Value, key: &str) -> &'a Value {
     v.get(key).unwrap_or(&Value::Null)
 }
 
+/// A whole number, as the IR writes one.
+fn num(n: impl std::fmt::Display) -> Value {
+    Value::Num(n.to_string())
+}
+
+/// A name, or `null`.
+fn str_or_null(s: Option<&str>) -> Value {
+    s.map_or(Value::Null, Value::str)
+}
+
 fn strs(v: &Value) -> Vec<String> {
     v.as_arr()
         .unwrap_or(&[])
@@ -351,6 +361,12 @@ pub struct Run {
     player_uses: BTreeMap<String, V>,
     /// What the action in hand has done so far, against the step limit.
     work: Work,
+    /// The passages the action in hand entered, in order.
+    trail: Vec<String>,
+    /// What happened during the action in hand that the engine reports as
+    /// an event: `(type, data)`, in order. Not part of the world, so a
+    /// rewind never takes it back.
+    noted: Vec<(&'static str, Value)>,
 }
 
 /// The most passages one action may enter. A `next:` that leads back to
@@ -427,6 +443,8 @@ impl Run {
             seen: BTreeMap::new(),
             player_uses: BTreeMap::new(),
             work: Work::default(),
+            trail: Vec::new(),
+            noted: Vec::new(),
         };
         run.init();
         run.place_npcs();
@@ -567,7 +585,7 @@ impl Run {
 
     /// Begin at `passage`, or at the story's start, looking through `who`.
     pub fn start(&mut self, passage: Option<&str>, who: Option<&str>) -> R<()> {
-        self.work = Work::default();
+        self.begin_action();
         if let Some(who) = who {
             self.pov = who.to_string();
         }
@@ -589,6 +607,34 @@ impl Run {
         // The log begins where play does.
         self.history = vec![self.snapshot()];
         Ok(())
+    }
+
+    /// Every action (`start`, `choose`, `answer`, `vote`) begins here: no
+    /// work done, no passages entered, nothing noted.
+    pub(super) fn begin_action(&mut self) {
+        self.work = Work::default();
+        self.trail.clear();
+        self.noted.clear();
+    }
+
+    /// Note something that happened, for the engine's events.
+    pub(super) fn note(&mut self, kind: &'static str, data: Value) {
+        self.noted.push((kind, data));
+    }
+
+    /// What was noted since the action began, oldest first.
+    pub fn take_noted(&mut self) -> Vec<(&'static str, Value)> {
+        std::mem::take(&mut self.noted)
+    }
+
+    /// The passages the last action entered, in order.
+    pub fn trail(&self) -> &[String] {
+        &self.trail
+    }
+
+    /// How many times the pov's side has arrived at this passage.
+    pub fn visits_to(&self, passage: &str) -> u32 {
+        self.visits.get(passage).copied().unwrap_or(0)
     }
 
     /// The story being played.
@@ -680,7 +726,7 @@ impl Run {
 
     /// Take the available Link with this id.
     pub fn choose(&mut self, id: &str) -> R<()> {
-        self.work = Work::default();
+        self.begin_action();
         let link = self
             .links
             .iter()
@@ -1034,6 +1080,7 @@ impl Run {
             actor: &actor,
             before: false,
         })?;
+        self.note("turn_ended", Value::obj([("stop", num(self.chronon))]));
         // The clock stops at its last stop: `clock: 0..=5`.
         if self.last_stop().is_none_or(|last| self.chronon < last) {
             self.chronon += 1;
@@ -1079,6 +1126,7 @@ impl Run {
                  check for a `next:` that leads back where it came from"
             ));
         }
+        self.trail.push(passage.to_string());
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;

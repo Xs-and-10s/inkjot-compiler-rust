@@ -1343,7 +1343,7 @@ Nothing. He will not burn his own heart, and he knows you know it.
 > [[Next round->sanctum:round]] ~ when hask.wards > 0 and pov.any.up
 > [[He falls->fallen]] ~ when hask.wards == 0
 
-:: fallen [finale]
+:: fallen
 --
 The last ward breaks. The Hollow Host comes down out of the air like a kite with its string cut, and lies on the flagstones, and is suddenly very small.
 
@@ -1359,7 +1359,7 @@ Without his heart, there is nothing to put him back. He looks at the two of you 
 > [[Carry it home to the Dawn together->ending_vigil]] ~ for pov ~ when not hask.mortal and trust == 3
 > [[Climb out into the morning->ending_dawn]] ~ when hask.mortal
 
-:: ending_dawn [ending]
+:: ending_dawn [finale]
 --
 They climbed out of the Host’s house at sunrise, a thief and a knight, both of them filthy, neither of them dead.
 
@@ -1369,13 +1369,13 @@ Eldric carried Lumen home to an order that had stopped hoping for it.
 [end]
 Roland, at the crossroads, offered his hand. Eldric looked at it for a long moment, the way you’d look at a lock, and took it.
 
-:: ending_scholar [ending]
+:: ending_scholar [finale]
 --
 Roland kept the heart. He told Eldric it was for study, and Eldric let him say it.
 
 It sits in a box on Roland’s desk to this day, beating slowly, waiting. Some nights, when Roland reads late, he could swear it hums.
 
-:: ending_vigil [ending]
+:: ending_vigil [finale]
 --
 They carried the heart between them, a week on foot, to the first chapel of the Dawn they found, and laid it under the altar, and kept vigil over it a night and a day: the knight praying, the thief keeping the candle lit.
 

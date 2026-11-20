@@ -9531,7 +9531,7 @@
     },
     {
       "name": "fallen",
-      "tags": ["finale"],
+      "tags": [],
       "margin": false,
       "header": [],
       "body": [
@@ -9709,7 +9709,7 @@
     },
     {
       "name": "ending_dawn",
-      "tags": ["ending"],
+      "tags": ["finale"],
       "margin": false,
       "header": [],
       "body": [
@@ -9752,7 +9752,7 @@
     },
     {
       "name": "ending_scholar",
-      "tags": ["ending"],
+      "tags": ["finale"],
       "margin": false,
       "header": [],
       "body": [
@@ -9772,7 +9772,7 @@
     },
     {
       "name": "ending_vigil",
-      "tags": ["ending"],
+      "tags": ["finale"],
       "margin": false,
       "header": [],
       "body": [

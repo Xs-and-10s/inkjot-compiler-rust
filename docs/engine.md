@@ -10,10 +10,14 @@ property test in `tests/engine.rs`.
 | **States are values** | Nothing changes a `State`. Acting clones the run, plays on the clone and returns it. Keep any state you have seen; branch from it. | `states_are_values` |
 | **A reading is its log** | A state is decided by the IR, the seed, the `Start` and the `Action`s, which it carries. `replay` rebuilds it, or any state before it. | `replay_equals_playing_step_by_step` |
 | **Determinism within an engine version** | The same log reads the same way under the same `ENGINE_VERSION`. | `the_same_log_reads_the_same_way` |
+| **Replay reports the same events** | Replaying a log with the engine alone reports exactly the reading's engine events, in order: the platform's own check against its log. | `replay_reports_exactly_the_readings_events` |
 | **Errors are data** | Every call returns `Result<_, Refused>`. A refused call changes nothing. Panics are caught. | `what_is_not_offered_is_refused`, `a_panic_is_refused_not_raised` |
 
-This is a solo engine. Cohort play, the event log and Inquest forks come in
-later milestones (see the end).
+Every state also carries the **events** the action that made it caused,
+for the platform's log (below).
+
+This is a solo engine. Cohort play and Inquest forks come in later
+milestones (see the end).
 
 ## Calls
 
@@ -41,6 +45,9 @@ assert_eq!(again.view(), state.view());
 | `state.answer(words)` | `State` | Only while `view.asks` has an input that is not the jury. |
 | `state.act(&action)` | `State` | Any `Action`; the three above are shorthands. |
 | `inklink.replay(seed, &start, &actions, upto)` | `State` | The state after the first `upto` actions, or all. A refused action has its index in `Refused.at`. |
+| `inklink.replay_all(seed, &start, &actions)` | `Vec<State>` | Every state on the way: the start, then one per action. For going back, and for checking a log's engine events. |
+| `state.events()` | `&[Event]` | What the action that made this state caused (below). |
+| `state.ending()` | `Option<&str>` | The last finale this reading reached. |
 | `state.actions()`, `state.seed()`, `state.started()` | the log | What to persist. |
 
 An `Inklink` is cheap to clone (two `Arc`s); every state made from it shares
@@ -84,6 +91,54 @@ for an Elixir atom:
 | `unsupported` | The story uses something the interpreter does not run yet |
 | `story_error` | The story went somewhere the interpreter could not follow: a missing passage, a pov nobody may play |
 | `panic` | A bug in the engine, caught. Report it with the log. |
+
+## Events
+
+The platform keeps one log per reading
+([`platform/events.md`](platform/events.md)). Some events are the Linker's
+(`link_taken`), some the platform's (`rating_asked`), and some the
+engine's: whatever follows from the story, the seed and the actions, so a
+replay reports it again, exactly. `state.events()` holds those, for the
+action that made the state. The platform wraps each in its envelope (ids,
+stream, version, times); `event.to_json()` gives the part the engine
+knows: `{"type", "type_version": 1, "origin": "engine", "data"}`.
+
+The catalogue (`engine::CATALOGUE`; a test fails if this table differs):
+
+| Type | `data` | When |
+|---|---|---|
+| `nib_shown` | `nib`, `passed`, `links`, `visit` | After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, and how many times the Nib has been arrived at. |
+| `ending_reached` | `ending` | The action arrived at a `[finale]` Nib. Its name is the ending's id. |
+| `reading_finished` | `ending` | Nothing is offered and nothing asked. `ending` is the last finale reached, or null. |
+| `checkpoint_reached` | `checkpoint` | A passage says `checkpoint name`: the world is saved there. |
+| `died` | `who`, `at` | A character died during the action, at that place. |
+| `rewound` | `who`, `stop`, `checkpoint`, `echo`, `cause` | Someone went back: to the start of `stop`, or to `checkpoint` (else null); as an echo re-living it, or with the world going back; `cause` is `rewind` (a Link) or `death`. |
+| `echo_ended` | `who` | An echo reached the present again. |
+| `turn_ended` | `stop` | The clock's stop `stop` ended. |
+
+**Order.** An action's events come in the order things happened: what the
+interpreter met while playing it (a death, the fall back that caught it, a
+checkpoint, a turn's end), then `nib_shown`, then `ending_reached`, then
+`reading_finished`. The platform puts the Linker's `link_taken` before
+them, and its own `rating_asked` between `ending_reached` and
+`reading_finished`.
+
+**`nib_shown`** comes once per action, answers included: a new view is a
+Nib put in front of the Linker again. `passed` lists the passages the
+action entered before the one shown (an act, a `next:` hop, a checkpoint's
+fall back), oldest first. `visit` counts arrivals: it does not go up when
+an act shows its result and leaves the pov where it was.
+
+**Finales and endings.** A `[finale]` passage is an ending, and its name is
+the ending's id. An Inklink may have many, reached by Links (Ex 2, Ex 3) or
+by the clock (Ex 1's `terminus`). `[epilogue]` is a coda after one, and a
+passage may be both (Ex 3's `the_list`). `ending_reached` is reported on
+arriving at a finale; `reading_finished` names the last finale reached,
+which the ratings box is about.
+
+**Not yet.** Whether a step reports what it changed (events.md §9.8) waits
+for a way to mark values worth tracking (`~ track`?) in v0.6. Cohort play
+will add locks, claims and clashes, in a stream of the shared world.
 
 ## The log, and what to persist
 
@@ -145,7 +200,9 @@ milestone 17 measures it through the NIF, and sharing snapshots behind
 
 ## Not yet
 
-- **Events** (milestone 16): each action returns the events it caused, in
-  the shape the platform's event log needs.
 - **Cohort play**: seats, shared acts and stops, through the engine.
 - **Inquests** (IR 3, milestone 18): `asked_from`, `forks`, `take_fork`.
+- **The story map**: the whole story (passages, Links, forks) as a graph,
+  for the platform's path tree and the Inker's path analytics. An engine
+  call or a documented part of the IR; see `status.md`.
+- **`snapshot`/`restore`**, once readings get long enough to need them.

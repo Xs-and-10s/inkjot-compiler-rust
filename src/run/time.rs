@@ -43,7 +43,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{f, place_of, strs, Entry, Event, Run, Sighting, R, V};
+use super::{f, num, place_of, str_or_null, strs, Entry, Event, Run, Sighting, R, V};
 use crate::json::Value;
 
 /// Resources that belong to the player, not the character: a rewind never
@@ -125,6 +125,10 @@ impl Run {
 
     /// `checkpoint threshold` in a passage's header: reached.
     pub(super) fn reach_checkpoint(&mut self, name: &str) {
+        self.note(
+            "checkpoint_reached",
+            Value::obj([("checkpoint", Value::str(name))]),
+        );
         self.saved.insert(name.to_string(), self.snapshot());
         if !self.reached.iter().any(|r| r == name) {
             self.reached.push(name.to_string());
@@ -152,13 +156,17 @@ impl Run {
             if !self.vals.get(&format!("{who}.dead")).is_some_and(V::truthy) {
                 continue; // already brought back by an earlier one
             }
+            self.note(
+                "died",
+                Value::obj([("who", Value::str(&who)), ("at", Value::str(&place))]),
+            );
             let caught = self.story.checkpoints.iter().find(|cp| {
                 f(cp, "on_death_in")
                     .as_str()
                     .is_some_and(|region| self.inside(&place, region))
             });
             if let Some(cp) = caught.cloned() {
-                self.fall_back(&cp)?;
+                self.fall_back(&cp, &who)?;
                 continue;
             }
             let charges = self.vals.get(&format!("{who}.rewinds")).and_then(V::num);
@@ -189,9 +197,10 @@ impl Run {
 
     /// A checkpoint catches a death: reset what it names, bring the dead
     /// back, and send everyone where it says.
-    fn fall_back(&mut self, cp: &Value) -> R<()> {
+    fn fall_back(&mut self, cp: &Value, who: &str) -> R<()> {
         let name = f(cp, "checkpoint").as_str().unwrap_or("");
         let saved = self.saved.get(name).cloned().unwrap_or_default();
+        self.note_rewound(who, saved.chronon, Some(name), false, "death");
         let resets = strs(f(cp, "resets"));
         let keeps = strs(f(cp, "keeps"));
         let current = self.snapshot();
@@ -259,6 +268,7 @@ impl Run {
         self.vals.remove(&format!("{who}.dead"));
         // Vell kills at the end of a stop, after the clock has moved on.
         let died_in = self.chronon.saturating_sub(1);
+        self.note_rewound(who, died_in, None, true, "death");
         let served = self.pov.clone();
         self.sit(who)?;
         self.output
@@ -356,19 +366,45 @@ impl Run {
     /// Go back to the time a rewind Link names.
     pub(super) fn rewind_to(&mut self, link: &Value) -> R<()> {
         let to = f(link, "target").as_str().unwrap_or("").to_string();
+        let who = self.pov.clone();
         if let Some(n) = to.strip_prefix("echo:") {
             let back: u32 = n.parse().unwrap_or(1);
             let when = self.chronon.saturating_sub(back);
+            self.note_rewound(&who, when, None, true, "rewind");
             return self.become_echo(when);
         }
-        let snap = if let Some(name) = to.strip_prefix("checkpoint:") {
+        let checkpoint = to.strip_prefix("checkpoint:");
+        let snap = if let Some(name) = checkpoint {
             self.saved.get(name).cloned()
         } else {
             let n: u32 = to.trim_start_matches("turn:").parse().unwrap_or(0);
             self.history.iter().rev().find(|s| s.chronon == n).cloned()
         };
         let snap = snap.ok_or_else(|| format!("there is no time `{to}` to go back to"))?;
+        self.note_rewound(&who, snap.chronon, checkpoint, false, "rewind");
         self.undo(snap)
+    }
+
+    /// Note a going back: who, to which stop, by which checkpoint, as an
+    /// echo or not, and because of a `rewind` Link or a death.
+    fn note_rewound(
+        &mut self,
+        who: &str,
+        stop: u32,
+        checkpoint: Option<&str>,
+        echo: bool,
+        cause: &str,
+    ) {
+        self.note(
+            "rewound",
+            Value::obj([
+                ("who", Value::str(who)),
+                ("stop", num(stop)),
+                ("checkpoint", str_or_null(checkpoint)),
+                ("echo", Value::Bool(echo)),
+                ("cause", Value::str(cause)),
+            ]),
+        );
     }
 
     /// Put everything back as it was, except what the rewind keeps.
@@ -447,6 +483,8 @@ impl Run {
         let next = self.when() + 1;
         if next >= self.chronon {
             self.past.remove(&self.pov);
+            let who = Value::str(&self.pov);
+            self.note("echo_ended", Value::obj([("who", who)]));
             self.output.push("You are back in the present.".into());
         } else {
             self.past.insert(self.pov.clone(), next);
