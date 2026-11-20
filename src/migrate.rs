@@ -10,6 +10,8 @@
 //! | `clue debts: "…"` | `fact debts: "…" ~ clue` |
 //! | `~ learned from clue lodestone` | `~ learned from lodestone` |
 //! | `[fixme]` | `[fix]` |
+//! | `~ aka in order` / `~ aka shuffled` / `~ aka random` | `~ pick cycle` / `~ pick shuffled` / `~ pick random` |
+//! | a brace in quoted text: `"{"` | `"\{"` (v0.6 strings interpolate) |
 //!
 //! Only statements are rewritten, found the way the checker finds them, so
 //! prose that happens to start with "fact" is left alone. What cannot be
@@ -78,6 +80,21 @@ pub fn migrate(src: &str) -> Migrated {
             }
             for c in &s.clauses[1..] {
                 let raw = &mut lines[c.line - 1];
+                for (old, new) in [
+                    ("aka in order", "pick cycle"),
+                    ("aka shuffled", "pick shuffled"),
+                    ("aka random", "pick random"),
+                ] {
+                    if c.text == old {
+                        *raw = raw.replacen(old, new, 1);
+                    }
+                }
+                if c.text == "aka reversed" {
+                    notes.push(format!(
+                        "line {}: `aka reversed` has no v0.6 form; use `pick cycle` and list the names in the order wanted",
+                        c.line
+                    ));
+                }
                 if c.text.starts_with("fact ") {
                     *raw = replace_word_at(raw, c.col, "fact", "state");
                 }
@@ -85,6 +102,15 @@ pub fn migrate(src: &str) -> Migrated {
                     *raw = raw.replacen("learned from clue ", "learned from ", 1);
                 }
             }
+        }
+        // v0.5's quoted strings never interpolated: their braces are text.
+        let mut statement_lines: Vec<usize> = stmts
+            .iter()
+            .flat_map(|s| s.clauses.iter().map(|c| c.line))
+            .collect();
+        statement_lines.dedup();
+        for no in statement_lines {
+            lines[no - 1] = escape_braces_in_strings(&lines[no - 1]);
         }
         for l in body {
             let t = l.text.trim();
@@ -98,6 +124,22 @@ pub fn migrate(src: &str) -> Migrated {
         source.push('\n');
     }
     Migrated { source, notes }
+}
+
+/// Escape `{` and `}` inside v0.5 quoted strings, which end at the next
+/// quote.
+fn escape_braces_in_strings(line: &str) -> String {
+    let mut out = String::new();
+    let mut in_str = false;
+    for ch in line.chars() {
+        match ch {
+            '"' => in_str = !in_str,
+            '{' | '}' if in_str => out.push('\\'),
+            _ => {}
+        }
+        out.push(ch);
+    }
+    out
 }
 
 /// `"format-version": "0.5.0"` becomes `"0.6.0"`.
@@ -144,7 +186,7 @@ pov: ann
 character ann: "Ann" ~ playable
 clue debts: "He owed." ~ motive
 fact cornered: no
-item lever: "a lever"
+item lever: "a lever {old}"
 ~ fact rusty: no
 act pull: cost 1 ~ learned from clue debts
 
@@ -167,6 +209,7 @@ fact is, this line is prose.
         );
         assert!(s.contains("state cornered: no"), "{s}");
         assert!(s.contains("~ state rusty: no"), "{s}");
+        assert!(s.contains(r#"item lever: "a lever \{old\}""#), "{s}");
         assert!(s.contains("~ learned from debts"), "{s}");
         assert!(s.contains("state here_only: 1"), "{s}");
         assert!(s.contains("[fix] the fact of the matter"), "{s}");

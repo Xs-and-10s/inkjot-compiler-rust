@@ -82,6 +82,7 @@ const PATTERNS: &[Pattern] = &[
     p(&["shown", "as"], "shown_as", Shape::Text),
     p(&["formally"], "formally", Shape::Text),
     p(&["aka"], "aka", Shape::Aka),
+    p(&["pick"], "aka_pick", Shape::Token),
     p(&["else"], "else", Shape::Token),
     p(&["weight"], "weight", Shape::Token),
     p(&["of"], "of", Shape::Token),
@@ -332,7 +333,8 @@ impl<'a> Fields<'a> {
                 if rest.starts_with('"') {
                     texts(rest)
                 } else {
-                    self.add("aka_order", Value::str(rest));
+                    // v0.5's `aka shuffled`; v0.6 writes `pick shuffled`.
+                    self.add("aka_pick", Value::str(rest));
                     return;
                 }
             }
@@ -465,11 +467,11 @@ mod tests {
     }
 
     #[test]
-    fn aka_takes_names_or_an_order() {
+    fn aka_takes_names_and_pick_takes_a_policy() {
         assert_eq!(
             read("aka \"Le Le Le Leo\", \"Lapkins\""),
             json(r#"{"aka": ["Le Le Le Leo", "Lapkins"]}"#)
         );
-        assert_eq!(read("aka shuffled"), json(r#"{"aka_order": "shuffled"}"#));
+        assert_eq!(read("pick cycle"), json(r#"{"aka_pick": "cycle"}"#));
     }
 }

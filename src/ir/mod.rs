@@ -509,7 +509,7 @@ impl Builder {
                 ])
             }
             _ if DECLS.contains(&kw) => self.declaration(s, kw, rest),
-            _ if EFFECTS.contains(&kw) => {
+            _ if is_effect(kw, rest) => {
                 let mut pairs = vec![("effect".to_string(), effect(head))];
                 if s.clauses.len() > 1 {
                     pairs.push(("clauses".to_string(), tail()));
@@ -1172,6 +1172,11 @@ fn insert(content: &str) -> Value {
                 "args",
                 insert_args(c.split_once("input").map_or("", |(_, r)| r)),
             ),
+        ]),
+        // `{all leo.aka}`: every name, not one picked.
+        "all" if !second.is_empty() => Value::obj([
+            ("value", expression(&c[first.len()..])),
+            ("all", Value::Bool(true)),
         ]),
         _ => Value::obj([("value", expression(c))]),
     }

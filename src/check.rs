@@ -625,7 +625,7 @@ impl Checker {
             self.on(rest, head.line, rest_col);
         } else if let Some(kind) = DECLS.iter().copied().find(|k| *k == kw) {
             self.decl(kind, s, rest, rest_col);
-        } else if EFFECTS.contains(&kw) {
+        } else if is_effect(kw, rest) {
             self.effect(&head.text, head.line, head.col);
         } else if SETTINGS.contains(&kw) {
             self.setting(kw, s, rest, rest_col);
@@ -762,6 +762,26 @@ impl Checker {
         }
         for c in &s.clauses[1..] {
             let text = c.text.as_str();
+            // `~ pick cycle`: how `{x.aka}` picks from the names.
+            if let Some(how) = text.strip_prefix("pick ") {
+                if !AKA_PICKS.contains(&how.trim()) {
+                    self.err(
+                        c.line,
+                        c.col + 5,
+                        "`pick` is one of: shuffled, cycle, random, first",
+                    );
+                }
+            }
+            if let Some(how) = text.strip_prefix("aka ").filter(|h| !h.starts_with('"')) {
+                self.err(
+                    c.line,
+                    c.col,
+                    format!(
+                        "how `aka` picks is its own clause in v0.6: `~ pick {}`",
+                        how.trim()
+                    ),
+                );
+            }
             if text.starts_with('"')
                 || text.starts_with("shown as ")
                 || text.starts_with("formally ")
@@ -1022,6 +1042,13 @@ impl Checker {
                 }
             }
             "gain" | "give" => self.need(arg(1), &["item"], "item", line, col + 5),
+            "reveal" => self.need(
+                arg(1),
+                &["npc", "character", "item", "place", "fact"],
+                "thing",
+                line,
+                col + 7,
+            ),
             "burn" | "light" => self.need(arg(1), &["fuse"], "fuse", line, col + cols(verb) + 1),
             "roll" => self.need(arg(1), &["table"], "table", line, col + 5),
             "wake" => self.need(arg(1), &["npc", "character"], "NPC", line, col + 5),
@@ -1312,6 +1339,14 @@ impl Checker {
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
             "list" => self.need(second, &["list"], "list", line, col + 5),
+            "all" if !second.is_empty() => {
+                let rest = &content[content.find("all").unwrap_or(0) + 3..];
+                self.expression_in(
+                    rest,
+                    line,
+                    col + cols(&content[..content.len() - rest.len()]),
+                );
+            }
             _ if second == "input" => self.input(first, c, line, col),
             _ => {
                 self.stats.expressions += 1;

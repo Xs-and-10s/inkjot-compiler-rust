@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Inkjot v0.6, milestone 18b
+
+- Emphasis (`*italic*`, `**bold**`, `***both***`) is lowered to styled runs
+  in prose and Link labels; labels are lists of parts (#27).
+- Braces work in every quoted string, as in prose, with `\{`, `\}`, `\"`,
+  `\\` and `\*` as escapes; `if … then … else …`, `plural()` and
+  `capital()`; lists read "a, b and c" and big numbers take `'` marks (#27).
+- Names as the reader knows them: `shown as` until `reveal x`, then the
+  name; `{x.name}` and `{x.shown_as}` (#27).
+- `~ pick shuffled | cycle | random | first` for `aka`, and `{all x.aka}`
+  (#27).
+- The engine's view carries styled paragraphs and labels; the NIF sends
+  `%{plain, runs}` (#27).
+
 ### Inkjot v0.6, milestone 18a
 
 - `format-version: 0.6.0`. `inkjot migrate` rewrites a v0.5 source, and the

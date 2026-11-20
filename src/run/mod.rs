@@ -1575,7 +1575,21 @@ impl Run {
                 continue;
             }
             if let Some(v) = part.get("value") {
-                let v = if quiet { V::Null } else { self.eval(v)? };
+                // `{all leo.aka}`: every name, not one picked.
+                let all = f(part, "all") == &Value::Bool(true);
+                let v = match (quiet, all, v.get("get").and_then(Value::as_arr)) {
+                    (true, ..) => V::Null,
+                    (false, true, Some([who, aka])) if aka.as_str() == Some("aka") => {
+                        let who = self.who(who)?;
+                        V::List(
+                            strs(self.story.field(&who, "aka"))
+                                .into_iter()
+                                .map(V::Str)
+                                .collect(),
+                        )
+                    }
+                    _ => self.eval(v)?,
+                };
                 let shown = self.show(&v);
                 text.push(&shown, style);
                 continue;
@@ -1700,8 +1714,31 @@ impl Run {
         }
     }
 
-    /// A thing's name as players see it.
+    /// A thing's name as the reader knows it: what it is `shown as` until a
+    /// `reveal`, then its name. `{marge}` and `@marge` read this.
     fn label(&self, id: &str) -> String {
+        let shown_as = self.story.field(id, "shown_as");
+        let revealed = self
+            .vals
+            .get(&format!("{id}.revealed"))
+            .is_some_and(V::truthy);
+        if *shown_as != Value::Null && !revealed {
+            return self.text_now(shown_as).unwrap_or_else(|| id.to_string());
+        }
+        self.real_name(id)
+    }
+
+    /// Text worked out on a copy of the run, for a `&self` caller: showing
+    /// a name changes nothing.
+    fn text_now(&self, v: &Value) -> Option<String> {
+        match v {
+            Value::Str(s) => Some(s.clone()),
+            other => self.clone().text_of(other).ok(),
+        }
+    }
+
+    /// A thing's own name, revealed or not: `{marge.name}`.
+    fn real_name(&self, id: &str) -> String {
         if let Some(name) = self.vals.get(&format!("{id}.name")) {
             return name.to_string();
         }
@@ -1746,6 +1783,11 @@ impl Run {
         };
         let pov = self.pov.clone();
         match f(e, "do").as_str().unwrap_or("") {
+            // `reveal marge`: from now on she reads as her name.
+            "reveal" => {
+                let who = self.who(args.first().unwrap_or(&Value::Null))?;
+                self.vals.insert(format!("{who}.revealed"), V::Bool(true));
+            }
             "learn" => {
                 let clue = word(0);
                 if self
@@ -2486,7 +2528,12 @@ impl Run {
             (_, "name") => match self.vals.get(&format!("{id}.name")) {
                 Some(name) => name.clone(),
                 None if story.has_tag(&id, "custom") => V::Str(String::new()),
-                None => V::Str(self.label(&id)),
+                None => V::Str(self.real_name(&id)),
+            },
+            // What the reader is told it is: `{marge.shown_as}`.
+            (_, "shown_as") => match self.story.field(&id, "shown_as").clone() {
+                Value::Null => V::Str(self.real_name(&id)),
+                text => V::Str(self.text_of(&text)?),
             },
             // `cohort.size`, `cohort.alive`: the Linkers playing, and those alive.
             ("cohort", "size") => V::Num(self.voters_count(false)),
@@ -2548,11 +2595,19 @@ impl Run {
         }
         let order = self
             .story
-            .field(id, "aka_order")
+            .field(id, "aka_pick")
             .as_str()
             .unwrap_or("shuffled")
             .to_string();
         let n = names.len();
+        match order.as_str() {
+            "first" => return V::Str(names[0].clone()),
+            "random" => {
+                let i = self.roll(n as u64) as usize - 1;
+                return V::Str(names[i].clone());
+            }
+            _ => {}
+        }
         let (bag, used) = self
             .aka
             .entry(id.to_string())
@@ -2562,8 +2617,7 @@ impl Run {
         if bag.is_empty() || used == n {
             bag = (0..n).collect();
             match order.as_str() {
-                "reversed" => bag.reverse(),
-                "in order" => {}
+                "cycle" => {}
                 _ => {
                     // Fisher–Yates, from the run's seed.
                     for i in (1..n).rev() {
@@ -2574,11 +2628,7 @@ impl Run {
             }
             used = 0;
         }
-        let pick = if order == "random" {
-            self.roll(n as u64) as usize - 1
-        } else {
-            bag[used]
-        };
+        let pick = bag[used];
         self.aka.insert(id.to_string(), (bag, used + 1));
         V::Str(names[pick].clone())
     }

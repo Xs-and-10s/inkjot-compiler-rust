@@ -95,8 +95,14 @@ pub(crate) const SETTINGS: &[&str] = &[
 pub(crate) const EFFECTS: &[&str] = &[
     "learn", "teach", "gain", "lose", "give", "set", "raise", "lower", "toggle", "burn", "light",
     "wake", "move", "kill", "wound", "destroy", "detain", "add", "remove", "strike", "roll",
-    "play", "say", "stop", "fix", "take", "dash", "feign", "nothing", "wait",
+    "play", "say", "stop", "fix", "take", "dash", "feign", "nothing", "wait", "reveal",
 ];
+
+/// Is this statement an effect? `reveal` is also a setting, `reveal: by
+/// speech`; the colon tells them apart.
+pub(crate) fn is_effect(kw: &str, rest: &str) -> bool {
+    EFFECTS.contains(&kw) && !(kw == "reveal" && rest.trim_start().starts_with(':'))
+}
 
 /// Deferred to v0.6: parsed far enough to skip, then reported in one notice.
 pub(crate) const STRETCH: &[&str] = &[
@@ -127,6 +133,9 @@ pub(crate) const INPUTS: &[&str] = &[
     "name", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret", "roll",
     "note",
 ];
+
+/// How `{x.aka}` picks a name: `~ pick cycle`.
+pub(crate) const AKA_PICKS: &[&str] = &["shuffled", "cycle", "random", "first"];
 
 /// What kind of choice an act or Link is: `~ choice proactive`.
 pub(crate) const CHOICES: &[&str] = &["proactive", "reactive", "inactive"];

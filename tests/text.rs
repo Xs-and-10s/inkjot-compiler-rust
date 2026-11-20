@@ -173,3 +173,71 @@ fn a_fact_with_braces_reads_its_value_when_shown() {
         .unwrap();
     assert!(fact.get("label").unwrap().get("text").is_some());
 }
+
+const NAMES: &str = r#":: StoryTitle
+Names
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "room"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: skittles
+character skittles: "Skittles" ~ playable
+npc widow: "Marge" ~ shown as "the Surviving Authority"
+npc leo: "Leo" ~ aka "Leo-Leo", "Lapkins", "Le Le" ~ pick cycle
+npc jojo: "Jojo" ~ aka "Jojo Bear", "Juju" ~ pick first
+
+:: room
+{widow} is here. Her name is {widow.name}; you call her {widow.shown_as}.
+Leo is {leo.aka}, then {leo.aka}, then {leo.aka}, then {leo.aka}.
+Jojo is {jojo.aka}, and {jojo.aka}. Leo goes by {all leo.aka}.
+@widow Hello, Skittles.
+> [[Listen->room:listen]]
+
+:: room:listen [act]
+reveal widow
+--
+{widow} says her own name.
+"#;
+
+#[test]
+fn the_reader_sees_what_they_know_until_a_reveal() {
+    assert_eq!(errors(NAMES), Vec::<String>::new());
+    let inklink = Inklink::from_ir(&build(NAMES).unwrap()).unwrap();
+    let room = inklink.start(1, &Start::default()).unwrap();
+    let text: Vec<String> = room.view().text.iter().map(|p| p.plain()).collect();
+    assert_eq!(
+        text[0],
+        "the Surviving Authority is here. Her name is Marge; you call her the Surviving Authority."
+    );
+    assert_eq!(
+        text[1],
+        "Leo is Leo-Leo, then Lapkins, then Le Le, then Leo-Leo."
+    );
+    assert_eq!(
+        text[2],
+        "Jojo is Jojo Bear, and Jojo Bear. Leo goes by Leo-Leo, Lapkins and Le Le."
+    );
+    assert_eq!(text[3], "the Surviving Authority: Hello, Skittles.");
+    let link = room.view().links[0].id.clone();
+    let after = room.take_link(&link).unwrap();
+    assert_eq!(after.view().text[0].plain(), "Marge says her own name.");
+}
+
+#[test]
+fn aka_picks_and_reveals_are_checked() {
+    let bad_pick = NAMES.replace("~ pick cycle", "~ pick backwards");
+    assert_eq!(
+        errors(&bad_pick),
+        ["`pick` is one of: shuffled, cycle, random, first"]
+    );
+    let old_form = NAMES.replace("~ pick cycle", "~ aka shuffled");
+    assert_eq!(
+        errors(&old_form),
+        ["how `aka` picks is its own clause in v0.6: `~ pick shuffled`"]
+    );
+    let nobody = NAMES.replace("reveal widow", "reveal widdow");
+    assert!(errors(&nobody)[0].contains("`widdow` is not a declared thing"));
+}
