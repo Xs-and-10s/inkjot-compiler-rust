@@ -238,7 +238,7 @@ repeats, lists extend and objects merge.
 
 | Phrase | Field |
 |---|---|
-| `"…"` | `label`, or `description` if there is already a label. Quoted text is a plain string, or, when it has braces, `{"text": ["Keeper of ", {"value": "here"}]}`, worked out each time it is shown |
+| `"…"` | `label`, or `description` if there is already a label. Quoted text is a plain string, or, when it has braces, `{"text": ["Keeper of ", {"value": "here"}]}`, worked out each time it is shown. Text that is read (a fact's text, a description, a list entry, a hint, a `say` line) also takes emphasis, so its parts may be styled runs; a name (`label`, `shown as`) and a value (`set x: "…"`) never do |
 | one word: `evidence`, `playable`, `loud`, `track` | added to `tags`. `track` marks a value whose changes the engine reports |
 | `in X`, `at X` | `in`, `at` |
 | `held by X`, `belongs to X` | `held_by`, `belongs_to` |

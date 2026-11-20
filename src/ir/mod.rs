@@ -156,6 +156,36 @@ fn quoted_text(text: &str) -> Option<Value> {
     quoted(text).map(text_value)
 }
 
+/// Quoted text meant to be read, with emphasis lowered as in prose: a
+/// `say` line, a hint, a fact's text, a list entry, a description. A plain
+/// string when it has no braces and no emphasis; else `{"text": [parts]}`,
+/// whose parts may be styled runs. Names (`label`, `shown as`) and values
+/// (`set x: "…"`) never take emphasis.
+pub(crate) fn styled_value(inner: &str) -> Value {
+    use crate::text::{emphasis, plain, split, Piece};
+    let Ok(pieces) = split(inner) else {
+        return Value::str(inner);
+    };
+    let raw: Vec<Value> = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(l),
+            Piece::Code(code, _) => Value::obj([("value", expression(&code))]),
+        })
+        .collect();
+    let parts = emphasis(raw);
+    match parts.as_slice() {
+        [] => Value::str(""),
+        [Value::Str(s)] => Value::str(plain(s)),
+        _ => Value::obj([("text", Value::Arr(parts))]),
+    }
+}
+
+/// Quoted text meant to be read, as [`styled_value`] keeps it.
+fn quoted_styled(text: &str) -> Option<Value> {
+    quoted(text).map(styled_value)
+}
+
 // ---------------------------------------------------------------- expressions
 
 /// Parse and lower an expression. `check` has already accepted the source,
@@ -570,7 +600,25 @@ impl Builder {
         for c in &s.clauses[1..] {
             f.phrase(&c.text);
         }
-        Value::Obj(f.into_pairs())
+        let mut pairs = f.into_pairs();
+        // A fact's text and a description are read, so they take emphasis;
+        // a name does not.
+        let texts: Vec<&str> = std::iter::once(value)
+            .chain(s.clauses[1..].iter().map(|c| c.text.as_str()))
+            .filter(|t| t.starts_with('"'))
+            .filter_map(quoted)
+            .collect();
+        for (key, i) in [("label", 0), ("description", 1)] {
+            if key == "label" && kw != "fact" {
+                continue;
+            }
+            if let (Some(slot), Some(text)) =
+                (pairs.iter_mut().find(|(k, _)| k == key), texts.get(i))
+            {
+                slot.1 = styled_value(text);
+            }
+        }
+        Value::Obj(pairs)
     }
 
     /// `cohort: 2..=5 ~ best 3..=4`, `goal flee: ~ toward platform`, …
@@ -582,7 +630,7 @@ impl Builder {
             "goal" | "reaction" | "checkpoint" => {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
-            "hint" => f.add("hint", quoted_text(value).unwrap_or(Value::str(value))),
+            "hint" => f.add("hint", quoted_styled(value).unwrap_or(Value::str(value))),
             "tags" => {
                 let all =
                     std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
@@ -1043,7 +1091,7 @@ pub(crate) fn effect(text: &str) -> Value {
         }
         "say" => {
             pairs.push(("who".into(), Value::str(first_word(rest))));
-            pairs.push(("text".into(), quoted_text(rest).unwrap_or(Value::Null)));
+            pairs.push(("text".into(), quoted_styled(rest).unwrap_or(Value::Null)));
         }
         _ => {
             let mut args = words(rest);

@@ -352,7 +352,7 @@ impl<'a> Fields<'a> {
                     };
                     let mut entry = vec![("id".to_string(), Value::str(id))];
                     if let Some(label) = label {
-                        entry.push(("label".to_string(), super::text_value(label)));
+                        entry.push(("label".to_string(), super::styled_value(label)));
                     }
                     if let Some(mark) = mark {
                         entry.push(("mark".to_string(), Value::str(mark)));

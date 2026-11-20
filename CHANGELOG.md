@@ -19,7 +19,8 @@
 ### Inkjot v0.6, milestone 18b
 
 - Emphasis (`*italic*`, `**bold**`, `***both***`) is lowered to styled runs
-  in prose and Link labels; labels are lists of parts (#27).
+  in prose, Link labels and quoted text that is read (`say`, hints, fact
+  text, descriptions, list entries); labels are lists of parts (#27).
 - Braces work in every quoted string, as in prose, with `\{`, `\}`, `\"`,
   `\\` and `\*` as escapes; `if … then … else …`, `plural()` and
   `capital()`; lists read "a, b and c" and big numbers take `'` marks (#27).

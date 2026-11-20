@@ -69,7 +69,7 @@ impl Run {
     }
 
     /// The next hint the pov would hear: the first unheard one that applies.
-    fn next_hint(&mut self) -> R<Option<(String, usize, String)>> {
+    fn next_hint(&mut self) -> R<Option<(String, usize, Value)>> {
         let player = self.player();
         for nib in self.hint_nibs() {
             let header = match self.story.passages.get(&nib) {
@@ -84,8 +84,7 @@ impl Run {
                     continue;
                 }
                 if self.hint_applies(stmt)? {
-                    let text = self.text_of(hint)?;
-                    return Ok(Some((nib, i, text)));
+                    return Ok(Some((nib, i, hint.clone())));
                 }
             }
         }
@@ -129,7 +128,8 @@ impl Run {
         let left = self.hints_left()?;
         self.vals.insert(key, V::Num(left - 1.0));
         self.heard.insert((self.player(), nib, i));
-        self.output.push(text.into());
+        let text = self.text_para(&text)?;
+        self.output.push(text);
         Ok(())
     }
 }
