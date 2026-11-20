@@ -2,6 +2,7 @@
 //!
 //! Two operations: [`check`] reads an Inkjot source file and reports what is
 //! wrong with it; [`build`] compiles a file that passes into its JSON IR.
+//! [`engine`] plays the IR, for a program that hosts Inklinks.
 
 pub mod check;
 pub mod diag;

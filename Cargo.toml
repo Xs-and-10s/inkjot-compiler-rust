@@ -3,7 +3,7 @@ name = "inkjot"
 version = "0.5.0"
 edition = "2021"
 description = "Compiler for Inkjot, the Twee 3 dialect behind Inklinks"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/Xs-and-10s/inkjot-compiler-rust"
 
 [lib]
