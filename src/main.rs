@@ -262,7 +262,7 @@ fn play(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let mut run = inkjot::run::Run::new(&story, 1);
+    let mut run = inkjot::run::Run::new(std::sync::Arc::new(story), 1);
     if !hints {
         run.turn_off_hints();
     }

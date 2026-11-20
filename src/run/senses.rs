@@ -39,7 +39,7 @@ pub(super) struct SeenMove {
     pub(super) to: String,
 }
 
-impl Run<'_> {
+impl Run {
     /// Truly asleep: in the hours `asleep during` says, and not woken.
     /// Feigning is not sleeping.
     pub(super) fn sleeping(&self, who: &str) -> bool {

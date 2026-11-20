@@ -29,7 +29,8 @@
 //! describes what is on screen. A failed `expect` is recorded and the test
 //! goes on, so one run reports every broken expectation.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use super::{Run, Story};
 use crate::json::Value;
@@ -56,7 +57,7 @@ impl Outcome {
 
 /// Run every `[test]` passage in `src` against the compiled story `ir`.
 pub fn run_all(src: &str, ir: &Value) -> Result<Vec<Outcome>, String> {
-    let story = Story::new(ir)?;
+    let story = Arc::new(Story::new(ir)?);
     let passages = twee::parse(src, &mut Vec::new());
     Ok(passages
         .iter()
@@ -75,17 +76,17 @@ fn unquote(s: &str) -> &str {
         .unwrap_or(s)
 }
 
-fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
+fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
     let mut out = Outcome {
         name: name.to_string(),
         line,
         failures: Vec::new(),
         transcript: Vec::new(),
     };
-    let mut run = Run::new(story, 1);
+    let mut run = Run::new(Arc::clone(story), 1);
     let mut started = false;
     // Text shown to each Linker since their last `do`.
-    let mut shown: HashMap<String, Vec<String>> = HashMap::new();
+    let mut shown: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     for (i, s) in stmts.iter().enumerate() {
         let head = &s.clauses[0];
@@ -98,7 +99,7 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
         };
         let step = match s.kw.as_str() {
             "seed" if i == 0 => {
-                run = Run::new(story, value.parse().unwrap_or(1));
+                run = Run::new(Arc::clone(story), value.parse().unwrap_or(1));
                 Ok(())
             }
             "seed" => Err("`seed:` must be the first line of a test".to_string()),
@@ -217,7 +218,7 @@ fn run_one(story: &Story, name: &str, line: usize, stmts: &[Stmt]) -> Outcome {
 }
 
 /// Move what the served Linker has been shown into their pile.
-fn collect(run: &mut Run, shown: &mut HashMap<String, Vec<String>>) {
+fn collect(run: &mut Run, shown: &mut BTreeMap<String, Vec<String>>) {
     let lines = run.take_output();
     shown.entry(run.pov.clone()).or_default().extend(lines);
 }

@@ -26,6 +26,9 @@ $ inkjot build examples/ex1-the-night-train.twee -o night-train.json
 examples/ex1-the-night-train.twee: built night-train.json (123671 bytes)
 ```
 
+A program that plays Inklinks (the Inklinks platform, through a NIF) uses
+the library's engine instead: [`docs/engine.md`](docs/engine.md).
+
 Without `-o`, `build` writes the IR to standard output. Source with errors is
 not built. [`docs/ir.md`](docs/ir.md) describes the format, and `examples/ir/`
 holds the IR of the three examples. [`docs/status.md`](docs/status.md) says
@@ -147,6 +150,7 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
 | `src/ir/mod.rs` | Lowering to the JSON IR |
 | `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
+| `src/engine.rs` | The engine: the interpreter as the platform calls it |
 | `src/run/mod.rs` | The interpreter over the IR |
 | `src/run/value.rs` | Values while a story runs |
 | `src/run/events.rs` | `on` handlers: what happens when something happens |
@@ -160,4 +164,18 @@ When a property finds a bug, fix it and add a plain test for it in
 
 ## Licence
 
-MIT.
+The compiler and interpreter (everything outside `examples/`) are licensed
+under either of
+
+- the Apache License, Version 2.0 ([`LICENSE-APACHE`](LICENSE-APACHE)), or
+- the MIT licence ([`LICENSE-MIT`](LICENSE-MIT)),
+
+at your option.
+
+The example Inklinks in `examples/` (their source, tests and compiled IR)
+are licensed under Creative Commons Attribution 4.0 International: see
+[`examples/LICENSE`](examples/LICENSE).
+
+Unless you say otherwise, any contribution you submit for inclusion in this
+work, as defined in the Apache-2.0 licence, is licensed as above, without
+any additional terms or conditions.

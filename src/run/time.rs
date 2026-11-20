@@ -41,7 +41,7 @@
 //! What a checkpoint keeps wins over what it resets: `resets world ~ keeps
 //! hask` puts every lock back but leaves the Host his count of deaths.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::{f, place_of, strs, Entry, Event, Run, Sighting, R, V};
 use crate::json::Value;
@@ -54,18 +54,18 @@ const META: &[&str] = &["rewinds", "hints", "inquests"];
 #[derive(Clone, Default)]
 pub(super) struct Snapshot {
     pub(super) chronon: u32,
-    vals: HashMap<String, V>,
-    knows: HashMap<String, BTreeSet<String>>,
-    holder: HashMap<String, String>,
-    lists: HashMap<String, Vec<Entry>>,
-    visits: HashMap<String, u32>,
-    once: HashSet<String>,
-    place: HashMap<String, String>,
-    pub(super) at: HashMap<String, String>,
+    vals: BTreeMap<String, V>,
+    knows: BTreeMap<String, BTreeSet<String>>,
+    holder: BTreeMap<String, String>,
+    lists: BTreeMap<String, Vec<Entry>>,
+    visits: BTreeMap<String, u32>,
+    once: BTreeSet<String>,
+    place: BTreeMap<String, String>,
+    pub(super) at: BTreeMap<String, String>,
     rng: u64,
-    aka: HashMap<String, (Vec<usize>, usize)>,
+    aka: BTreeMap<String, (Vec<usize>, usize)>,
     handler_counts: Vec<u32>,
-    sightings: HashMap<String, Vec<Sighting>>,
+    sightings: BTreeMap<String, Vec<Sighting>>,
 }
 
 impl Snapshot {
@@ -75,7 +75,7 @@ impl Snapshot {
     }
 }
 
-impl Run<'_> {
+impl Run {
     /// The world as it is now.
     pub(super) fn snapshot(&self) -> Snapshot {
         Snapshot {
@@ -230,7 +230,7 @@ impl Run<'_> {
             }
             self.sit(&who)?;
             let at = self.here().to_string();
-            self.enter(&at, HashMap::new())?;
+            self.enter(&at, BTreeMap::new())?;
         }
         self.sit(&served)
     }
@@ -435,7 +435,7 @@ impl Run<'_> {
         let cell = self
             .arrival_at(&place, when)
             .ok_or_else(|| format!("there is no `{place}` at {when} to go back to"))?;
-        self.enter(&cell, HashMap::new())
+        self.enter(&cell, BTreeMap::new())
     }
 
     /// An echo moves: one stop forward, until they are back in the present.
@@ -454,7 +454,7 @@ impl Run<'_> {
         let cell = self
             .arrival_at(&to, next.min(self.chronon))
             .ok_or_else(|| format!("there is nowhere to arrive at `{to}`"))?;
-        self.enter(&cell, HashMap::new())
+        self.enter(&cell, BTreeMap::new())
     }
 
     /// May an echo apply this effect? An echo learns; it changes nothing.
@@ -472,7 +472,7 @@ impl Run<'_> {
         if categories.is_empty() {
             return;
         }
-        let keys: HashSet<String> = base.vals.keys().chain(from.vals.keys()).cloned().collect();
+        let keys: BTreeSet<String> = base.vals.keys().chain(from.vals.keys()).cloned().collect();
         for key in keys {
             if categories.iter().any(|c| self.val_in(c, &key)) {
                 match from.vals.get(&key) {
@@ -481,7 +481,7 @@ impl Run<'_> {
                 };
             }
         }
-        let items: HashSet<String> = base
+        let items: BTreeSet<String> = base
             .holder
             .keys()
             .chain(from.holder.keys())
@@ -505,7 +505,7 @@ impl Run<'_> {
         if categories.iter().any(|c| c == "knows") {
             base.knows = from.knows.clone();
         }
-        let npcs: HashSet<String> = base
+        let npcs: BTreeSet<String> = base
             .place
             .keys()
             .chain(from.place.keys())
@@ -615,8 +615,8 @@ mod tests {
                 vec!["world", "held", "knows", "trust", "hp", "vults", "sanctum", "prison", "hask", "roland"], 0..4),
         ) {
             let ir = crate::build(EX2).unwrap();
-            let story = Story::new(&ir).unwrap();
-            let mut run = Run::new(&story, seed);
+            let story = std::sync::Arc::new(Story::new(&ir).unwrap());
+            let mut run = Run::new(story.clone(), seed);
             run.start(None, None).unwrap();
             wander(&mut run, &first);
             let then = run.snapshot();
@@ -625,7 +625,7 @@ mod tests {
             let categories: Vec<String> = pick.iter().map(|c| c.to_string()).collect();
             let mut merged = now.clone();
             run.merge(&mut merged, &then, &categories);
-            let keys: std::collections::HashSet<&String> = now.vals.keys().chain(then.vals.keys()).collect();
+            let keys: std::collections::BTreeSet<&String> = now.vals.keys().chain(then.vals.keys()).collect();
             for key in keys {
                 let named = categories.iter().any(|c| run.val_in(c, key));
                 let want = if named { then.vals.get(key) } else { now.vals.get(key) };
@@ -649,7 +649,8 @@ mod tests {
             let ir = crate::build(EX2).unwrap();
             let mut story = Story::new(&ir).unwrap();
             story.rewind = None; // keeps nothing of its own
-            let mut run = Run::new(&story, seed);
+            let story = std::sync::Arc::new(story);
+            let mut run = Run::new(story.clone(), seed);
             run.start(None, None).unwrap();
             wander(&mut run, &first);
             let then = run.snapshot();

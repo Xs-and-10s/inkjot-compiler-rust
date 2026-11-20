@@ -42,10 +42,12 @@ pub(super) struct Paused {
 
 /// What an open input lets the Linker answer with, for a player or a test
 /// that has to make something up.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ask {
     /// `name input`, `choose input`, `accuse`.
     pub kind: String,
+    /// What the Linker is asked, as the story words it.
+    pub prompt: String,
     /// What may be chosen: the `from:` kind's things, or the suspects.
     pub options: Vec<String>,
     /// For the jury: the methods.
@@ -71,7 +73,7 @@ pub(super) fn is_input(v: &Value) -> bool {
         .is_some_and(|i| i == "accuse" || i.ends_with(" input"))
 }
 
-impl Run<'_> {
+impl Run {
     /// What the Linker being served is asked: one `(kind, prompt)` per open
     /// input, the first of which `answer` and `vote` fill.
     pub fn asking(&mut self) -> Vec<(String, String)> {
@@ -97,8 +99,10 @@ impl Run<'_> {
                 "accuse" => (self.suspects(&args), self.methods(&args)?),
                 _ => (Vec::new(), Vec::new()),
             };
+            let prompt = self.prompt(&input)?;
             out.push(Ask {
                 kind,
+                prompt,
                 options,
                 methods,
                 length: f(&args, "length").as_u64().map(|n| n as usize),
@@ -201,6 +205,7 @@ impl Run<'_> {
     /// Answer the first open input (not the jury): a name, or the words
     /// chosen.
     pub fn answer(&mut self, words: &[String]) -> R<()> {
+        self.work = Default::default();
         let input = self
             .asking
             .iter()
@@ -266,6 +271,7 @@ impl Run<'_> {
 
     /// Cast the served Linker's ballot. When everyone has, the jury decides.
     pub fn vote(&mut self, who: &str, how: &str, proof: &[String]) -> R<()> {
+        self.work = Default::default();
         let jury = self
             .asking
             .iter()

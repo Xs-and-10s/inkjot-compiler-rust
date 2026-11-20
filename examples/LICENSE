@@ -1,0 +1,28 @@
+The example Inklinks in this directory, and everything made from them, are
+licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0):
+
+    https://creativecommons.org/licenses/by/4.0/
+    https://creativecommons.org/licenses/by/4.0/legalcode
+
+That covers:
+
+- the stories: examples/*.twee
+- their tests: examples/tests/*.twee
+- their compiled IR: examples/ir/*.json
+- the drafts: examples/drafts/*.twee
+
+Copyright (c) 2026 Mark Manley.
+
+To attribute them, name the work and the author, link to this repository,
+and say if you changed anything. For example:
+
+    "The Night Train" by Mark Manley, from
+    https://github.com/Xs-and-10s/inkjot-compiler-rust, CC BY 4.0.
+
+The code that compiles and plays them (everything outside this directory)
+is licensed separately, under MIT OR Apache-2.0: see LICENSE-MIT and
+LICENSE-APACHE at the root.
+
+These are test fixtures and teaching examples. Works meant for the Inklinks
+Library are not kept in this repository.

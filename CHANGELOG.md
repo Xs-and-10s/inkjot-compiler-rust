@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### The engine
+
+- `inkjot::engine`: the interpreter as the Inklinks platform calls it.
+  `Inklink::load`, `meta`, `start`, `view`, `take_link`, `answer`, `act`
+  and `replay`. States are values; a reading is its log; the same log reads
+  the same way under one `ENGINE_VERSION`; every error is a `Refused`,
+  panics included. See `docs/engine.md` (#23).
+- A step limit: one action may enter 64 passages and evaluate 100,000
+  expressions. A `next:` loop is now an error, not a stack overflow (#23).
+- The interpreter keeps every map ordered, so nothing depends on a
+  hasher (#23).
+- An `Ask` carries its prompt (#23).
+
+### Licence
+
+- The code is now `MIT OR Apache-2.0`. The example Inklinks are CC BY 4.0
+  (`examples/LICENSE`) (#23).
+
 ## 0.5.0 (15 Nov 2026)
 
 The first release. The compiler and interpreter cover Inkjot v0.5, as its

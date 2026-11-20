@@ -13,6 +13,7 @@
 
 use super::{f, Local, Run, R, V};
 use crate::json::Value;
+use std::sync::Arc;
 
 /// How deeply handlers may set off other handlers before the interpreter
 /// stops, rather than loop forever.
@@ -27,7 +28,7 @@ pub(super) struct Event<'a> {
     pub before: bool,
 }
 
-impl Run<'_> {
+impl Run {
     /// Run every handler for `event`. Returns `true` if one said `stop`.
     pub(super) fn fire(&mut self, event: Event) -> R<bool> {
         if self.firing >= MAX_DEPTH {
@@ -36,7 +37,7 @@ impl Run<'_> {
                 event.on
             ));
         }
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let mut stopped = false;
         for (i, (handler, owner)) in story.handlers.iter().enumerate() {
             if f(handler, "on").as_str() != Some(event.on) {
