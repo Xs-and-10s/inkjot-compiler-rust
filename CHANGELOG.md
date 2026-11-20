@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Inkjot v0.6, milestone 18d
+
+- Costs name their resource: `default cost: vults` in the config, and a
+  cost in the IR is `{"amount": …}`. Without a `default cost` nothing is
+  spent, and `inkjot check` says so; a `default cost` that is not a
+  declared resource is an error. `inkjot migrate` adds `default cost:
+  vults` where a v0.5 source declares `resource vults` (#29).
+- `requires full x` reads the resource it names (#29).
+- `hushed` is no longer built in; Ex 2 declares `state hushed: no` (#29).
+- `rewinds`, `hints` and `inquests` are documented as the reserved,
+  player-owned resource names (#29).
+- `docs/define.md`: a proposal for Inker-defined words, not decided (#29).
+
 ### Inkjot v0.6, milestone 18c
 
 - Inquests: a fork is a Link with `~ inquest` (`for id`, `from passage`,

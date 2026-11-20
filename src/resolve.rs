@@ -61,7 +61,6 @@ pub const BUILTINS: &[&str] = &[
     "no",
     "nobody",
     "nothing",
-    "hushed",
     // v0.6 stretch: the duel.
     "cast",
     "absorbed",

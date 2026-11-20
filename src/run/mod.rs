@@ -338,7 +338,7 @@ pub struct Run {
     at: BTreeMap<String, String>,
     /// Where each NPC is.
     place: BTreeMap<String, String>,
-    /// Every stored value, keyed by path: `grate_up`, `vell.cornered`, `roland.vults`.
+    /// Every stored value, keyed by path: `grate_up`, `vell.cornered`, `roland.hp`.
     vals: BTreeMap<String, V>,
     knows: BTreeMap<String, BTreeSet<String>>,
     /// Who or where holds each item. An item with no entry is gone.
@@ -1000,16 +1000,15 @@ impl Run {
         let actor = f(link, "order")
             .as_str()
             .map_or(self.pov.clone(), str::to_string);
-        let have = self.vults(&actor);
+        let have = self.purse(&actor);
         // `observe: cost rest ~ min 1`; `dash: requires full vults`.
         if let (Some(min), Some(have)) = (f(link, "min").as_u64(), have) {
             if have < min as f64 {
                 return Ok(false);
             }
         }
-        if f(link, "requires_full") == &Value::Bool(true) {
-            let full = self.constant(self.story.field("vults", "value")).num();
-            if have.is_some_and(|h| full.is_some_and(|full| h < full)) {
+        if let Some(resource) = f(link, "requires_full").as_str() {
+            if !self.is_full(&actor, resource) {
                 return Ok(false);
             }
         }
@@ -1021,7 +1020,7 @@ impl Run {
         match self.cost(link)? {
             Some(cost) => Ok(payers
                 .iter()
-                .all(|p| self.vults(p).is_none_or(|have| have >= cost))),
+                .all(|p| self.purse(p).is_none_or(|have| have >= cost))),
             None => Ok(true),
         }
     }
@@ -1038,7 +1037,8 @@ impl Run {
         Ok(each)
     }
 
-    /// What a Link costs in vults: the last cost entry whose condition holds.
+    /// What a Link costs, in the resource acts spend: the last cost entry
+    /// whose condition holds.
     /// `rest` costs whatever is left, which is always affordable.
     fn cost(&mut self, link: &Value) -> R<Option<f64>> {
         let mut cost = None;
@@ -1048,14 +1048,42 @@ impl Run {
                 cost = Some(entry);
             }
         }
-        Ok(cost.and_then(|c| match f(c, "vults") {
+        Ok(cost.and_then(|c| match f(c, "amount") {
             Value::Num(n) => n.parse().ok(),
             _ => Some(0.0),
         }))
     }
 
-    fn vults(&self, who: &str) -> Option<f64> {
-        self.vals.get(&format!("{who}.vults")).and_then(V::num)
+    /// The resource acts spend: `default cost: vults`. Without one, acts
+    /// cost nothing.
+    pub(super) fn currency(&self) -> Option<String> {
+        self.story
+            .defaults
+            .get("cost")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    }
+
+    /// How much of the spent resource `who` has left.
+    fn purse(&self, who: &str) -> Option<f64> {
+        let currency = self.currency()?;
+        self.vals.get(&format!("{who}.{currency}")).and_then(V::num)
+    }
+
+    /// Set how much of the spent resource `who` has left.
+    fn set_purse(&mut self, who: &str, amount: f64) {
+        if let Some(currency) = self.currency() {
+            self.vals
+                .insert(format!("{who}.{currency}"), V::Num(amount));
+        }
+    }
+
+    /// Does `who` have as much of `resource` as it holds full, its declared
+    /// value? `requires full vults`. Someone without it is not held back.
+    pub(super) fn is_full(&self, who: &str, resource: &str) -> bool {
+        let full = self.constant(self.story.field(resource, "value")).num();
+        let have = self.vals.get(&format!("{who}.{resource}")).and_then(V::num);
+        have.zip(full).is_none_or(|(h, f)| h >= f)
     }
 
     /// Is an item here: lying in this place, or held by an NPC who is?
@@ -1107,8 +1135,8 @@ impl Run {
         if let Some(cost) = self.cost(link)? {
             if self.paid_by_each(link)? {
                 for p in self.story.povs.clone() {
-                    if let Some(have) = self.vults(&p) {
-                        self.vals.insert(format!("{p}.vults"), V::Num(have - cost));
+                    if let Some(have) = self.purse(&p) {
+                        self.set_purse(&p, have - cost);
                     }
                 }
                 return Ok(());
@@ -1116,12 +1144,11 @@ impl Run {
             if f(link, "cost")
                 .as_arr()
                 .and_then(|c| c.last())
-                .is_some_and(|c| f(c, "vults").as_str() == Some("rest"))
+                .is_some_and(|c| f(c, "amount").as_str() == Some("rest"))
             {
-                self.vals.insert(format!("{actor}.vults"), V::Num(0.0));
-            } else if let Some(have) = self.vults(&actor) {
-                self.vals
-                    .insert(format!("{actor}.vults"), V::Num(have - cost));
+                self.set_purse(&actor, 0.0);
+            } else if let Some(have) = self.purse(&actor) {
+                self.set_purse(&actor, have - cost);
             }
         }
         Ok(())
@@ -2597,8 +2624,6 @@ impl Run {
             "me" => return V::Id(self.pov.clone()),
             "here" => return V::Id(self.here().to_string()),
             "nothing" | "nobody" => return V::Null,
-            // Nothing is hushed unless a story says so.
-            "hushed" => return self.vals.get("hushed").cloned().unwrap_or(V::Bool(false)),
             _ => {}
         }
         if let Some(v) = self.vals.get(n) {

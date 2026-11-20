@@ -46,6 +46,7 @@
       "of": "moves",
       "value": ["walk", "dash"]
     },
+    {"setting": "default", "of": "cost", "value": "vults"},
     {"declare": "place", "id": "sleeper", "label": "the sleeper car"},
     {"declare": "place", "id": "dining", "label": "the dining car"},
     {"declare": "place", "id": "lounge", "label": "the observation lounge"},
@@ -107,7 +108,7 @@
       "declare": "act",
       "id": "walk",
       "cost": [
-        {"vults": 2}
+        {"amount": 2}
       ],
       "steps": 1,
       "ends_turn": true
@@ -117,7 +118,7 @@
       "id": "dash",
       "requires": ["full", "vults"],
       "cost": [
-        {"vults": 1, "per": "step"}
+        {"amount": 1, "per": "step"}
       ],
       "steps": {
         "range": [1, 2],
@@ -130,7 +131,7 @@
       "declare": "act",
       "id": "slip",
       "cost": [
-        {"vults": 3}
+        {"amount": 3}
       ],
       "steps": 1,
       "ends_turn": true,
@@ -140,7 +141,7 @@
       "declare": "act",
       "id": "observe",
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "min": 1,
       "ends_turn": true,
@@ -150,7 +151,7 @@
       "declare": "act",
       "id": "take",
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "tags": ["shared"],
       "capacity": 1
@@ -159,7 +160,7 @@
       "declare": "act",
       "id": "force",
       "cost": [
-        {"vults": 2}
+        {"amount": 2}
       ],
       "tags": ["shared", "loud"],
       "capacity": 1
@@ -168,7 +169,7 @@
       "declare": "act",
       "id": "examine",
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "tags": ["private"]
     },
@@ -176,7 +177,7 @@
       "declare": "act",
       "id": "ask",
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "tags": ["private"]
     },
@@ -184,7 +185,7 @@
       "declare": "act",
       "id": "confront",
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "tags": ["shared"],
       "capacity": "many",
@@ -194,7 +195,7 @@
       "declare": "act",
       "id": "wind",
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "min": 1,
       "tags": ["private"],
@@ -431,7 +432,7 @@
   "acts": {
     "ask": {
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "scope": "private",
       "capacity": null,
@@ -441,7 +442,7 @@
     },
     "confront": {
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "scope": "shared",
       "capacity": "many",
@@ -451,7 +452,7 @@
     },
     "dash": {
       "cost": [
-        {"vults": 1, "per": "step"}
+        {"amount": 1, "per": "step"}
       ],
       "scope": null,
       "capacity": null,
@@ -461,7 +462,7 @@
     },
     "examine": {
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "scope": "private",
       "capacity": null,
@@ -471,7 +472,7 @@
     },
     "force": {
       "cost": [
-        {"vults": 2}
+        {"amount": 2}
       ],
       "scope": "shared",
       "capacity": 1,
@@ -481,7 +482,7 @@
     },
     "observe": {
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "scope": null,
       "capacity": null,
@@ -491,7 +492,7 @@
     },
     "slip": {
       "cost": [
-        {"vults": 3}
+        {"amount": 3}
       ],
       "scope": null,
       "capacity": null,
@@ -501,7 +502,7 @@
     },
     "take": {
       "cost": [
-        {"vults": 1}
+        {"amount": 1}
       ],
       "scope": "shared",
       "capacity": 1,
@@ -511,7 +512,7 @@
     },
     "walk": {
       "cost": [
-        {"vults": 2}
+        {"amount": 2}
       ],
       "scope": null,
       "capacity": null,
@@ -521,7 +522,7 @@
     },
     "wind": {
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "scope": "private",
       "capacity": null,
@@ -1248,7 +1249,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -1330,9 +1331,9 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1},
+            {"amount": 1},
             {
-              "vults": 0,
+              "amount": 0,
               "when": {
                 "is": ["me", "ada"]
               }
@@ -1438,7 +1439,7 @@
           "act": "take",
           "arg": "notebook",
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -1465,7 +1466,7 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 2}
+            {"amount": 2}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -1627,7 +1628,7 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -1656,7 +1657,7 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -1844,7 +1845,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -1945,7 +1946,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -1970,7 +1971,7 @@
           "act": "take",
           "arg": "cufflink",
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -1995,7 +1996,7 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -2020,9 +2021,9 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1},
+            {"amount": 1},
             {
-              "vults": 2,
+              "amount": 2,
               "when": {
                 "is": ["me", "rook"]
               }
@@ -2053,7 +2054,7 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -2078,7 +2079,7 @@
           "act": "take",
           "arg": "letter",
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -2103,7 +2104,7 @@
           "act": "take",
           "arg": "vial",
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -2378,7 +2379,7 @@
           "act": "take",
           "arg": "vell_ticket",
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -2543,7 +2544,7 @@
           "act": "wind",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -2568,7 +2569,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -2647,8 +2648,8 @@
           "act": "take",
           "arg": "patent_model",
           "cost": [
-            {"vults": 1},
-            {"vults": 2}
+            {"amount": 1},
+            {"amount": 2}
           ],
           "scope": "shared",
           "capacity": 1,
@@ -2718,7 +2719,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,
@@ -2773,7 +2774,7 @@
           "act": "confront",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": "many",
@@ -2816,7 +2817,7 @@
           "act": "confront",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "shared",
           "capacity": "many",
@@ -3061,9 +3062,9 @@
           "act": "ask",
           "arg": null,
           "cost": [
-            {"vults": 1},
+            {"amount": 1},
             {
-              "vults": 2,
+              "amount": 2,
               "when": {
                 "is": ["me", "rook"]
               }
@@ -3552,7 +3553,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 1}
+            {"amount": 1}
           ],
           "scope": "private",
           "capacity": null,

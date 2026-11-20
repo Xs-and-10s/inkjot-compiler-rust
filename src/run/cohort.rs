@@ -306,7 +306,10 @@ impl Run {
                     ("via", Value::Arr(passed)),
                     (
                         "requires_full",
-                        Value::Bool(requires.iter().any(|r| r == "full")),
+                        match requires.iter().position(|r| r == "full") {
+                            Some(i) => Value::str(requires.get(i + 1).cloned().unwrap_or_default()),
+                            None => Value::Null,
+                        },
                     ),
                 ]));
             }
@@ -369,11 +372,11 @@ impl Run {
                     if f(&e, "per").as_str() != Some("step") {
                         return e;
                     }
-                    let each = match f(&e, "vults") {
+                    let each = match f(&e, "amount") {
                         Value::Num(n) => n.parse::<f64>().unwrap_or(0.0),
                         _ => 0.0,
                     };
-                    Value::obj([("vults", Value::Num(format!("{}", each * steps as f64)))])
+                    Value::obj([("amount", Value::Num(format!("{}", each * steps as f64)))])
                 })
                 .collect(),
         )

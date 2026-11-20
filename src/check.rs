@@ -53,6 +53,7 @@ pub fn check(src: &str) -> Report {
         c.passage(p);
     }
     c.file_rules(&passages);
+    c.costs();
     c.stretch_notice();
     c.diags.sort_by_key(|d| (d.line, d.col, d.severity));
     Report {
@@ -119,6 +120,9 @@ struct Checker {
     /// `~ plants x` and `~ pays off x`: where each was first seen.
     plants: BTreeMap<String, (usize, usize)>,
     pays: BTreeMap<String, (usize, usize)>,
+    /// Where the first cost is, and `default cost: vults` if the config has one.
+    first_cost: Option<(usize, usize)>,
+    default_cost: Option<(String, usize, usize)>,
 }
 
 /// A Link seen in the passage being checked.
@@ -628,6 +632,34 @@ impl Checker {
         }
     }
 
+    fn cost_seen(&mut self, line: usize, col: usize) {
+        if self.first_cost.is_none() {
+            self.first_cost = Some((line, col));
+        }
+    }
+
+    /// Costs spend the resource `default cost` names. Without it nothing is
+    /// spent, which is allowed but almost never meant.
+    fn costs(&mut self) {
+        match (self.default_cost.clone(), self.first_cost) {
+            (Some((name, line, col)), _) => {
+                if !self.has(&name, &["resource", "stat"]) {
+                    self.err(
+                        line,
+                        col,
+                        format!("`default cost` names the resource acts spend; `{name}` is not a declared resource"),
+                    );
+                }
+            }
+            (None, Some((line, col))) => self.diags.push(Diag::notice(
+                line,
+                col,
+                "this costs nothing until the config says what acts spend: `default cost: vults`",
+            )),
+            (None, None) => {}
+        }
+    }
+
     fn stretch_notice(&mut self) {
         if self.stretch.is_empty() {
             return;
@@ -697,6 +729,15 @@ impl Checker {
         }
 
         for (i, c) in s.clauses.iter().enumerate() {
+            // `act walk: cost 2` or `~ cost 2 when …`.
+            let text = if i == 0 {
+                c.text.split_once(": ").map_or("", |(_, v)| v)
+            } else {
+                c.text.as_str()
+            };
+            if text.starts_with("cost ") {
+                self.cost_seen(c.line, c.col);
+            }
             self.clause_common(c, i > 0);
             if i > 0 && matches!(kw, "item" | "npc" | "character") {
                 self.actor_clause(c);
@@ -1093,6 +1134,9 @@ impl Checker {
             }
             "route" => self.places(value, " - ", line, vcol),
             "default" => {
+                if rest.starts_with("cost") {
+                    self.default_cost = Some((value.to_string(), line, vcol));
+                }
                 if let Some(list) = rest.strip_prefix("moves") {
                     self.moves(list, line, rest_col + 5);
                 } else if rest.starts_with("clash")
@@ -1389,6 +1433,7 @@ impl Checker {
         let arg = c.text[word.len()..].split_whitespace().next().unwrap_or("");
         let arg_col = c.col + cols(word) + 1;
         match word {
+            "cost" => self.cost_seen(c.line, c.col),
             "choice" => self.choice(arg, c.line, arg_col),
             "inquest" => self.inquest_clause(c),
             "rejoin" => {

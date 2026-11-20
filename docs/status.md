@@ -31,6 +31,7 @@ here.
 | 18a | v0.6 foundations: `state`, `fact`, `clue`; `inkjot migrate` (Ex 1 to 3 migrated); names for the pov; `[fix]`; reserved words; IR 3's core: stable Link ids, passage titles, typed state | #26 |
 | 18b | Text: styled runs in prose and labels, braces in every string with escapes, `if … then … else`, `plural`, `capital`; names as the reader knows them (`shown_as` until `reveal`); `aka` policies and `{all x.aka}`; the engine's view carries styled paragraphs | #27 |
 | 18c | Inquests: forks (`~ inquest`, `for`, `from`, `by role ~ rejoin`, `credit`) as the `inquest` field, checked; `theme`, `brief`; analysis tags; `~ track` and `changes` on `nib_shown`; the engine's `forks`, `any_forks`, `take_fork`, `asked_from` and `map()`, in the NIF too | #28 |
+| 18d | Costs name their resource: `default cost: vults`, `{"amount": …}` in the IR, `requires full x` for any resource; `hushed` is no longer built in (Ex 2 declares it); the reserved resource names documented | #29 |
 
 ## Next
 
@@ -42,7 +43,8 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
    `Inklinks.Engine.Rust` over `Inkjot.Engine`, its Ex 3 scenarios run
    against it, and the stub kept as an oracle (follow-up 4).
 4. **Milestone 18, IR 3 and the first part of v0.6**, in three pull
-   requests (see "Inkjot v0.6" below for what is in each): #26, #27, #28.
+   requests (see "Inkjot v0.6" below for what is in each): #26, #27, #28,
+   and a fourth, #29, that takes the last Inklink words out of the engine.
 5. **Ex 6 to 9**, ideas first, then drafts:
    - Ex 6, a spy-noir `story-game` that leans on Inklog: two knowledge
      bases per character, and integrity constraints for facts that rule
@@ -123,6 +125,17 @@ breaking change.
 - The engine: `asked_from`, `forks`, `take_fork`, and `map()`, the story
   as a graph.
 
+### Milestone 18d: the engine speaks no Inklink's words
+
+- `default cost: vults` names the resource acts spend; a cost in the IR is
+  `{"amount": 2}`. Without a `default cost` nothing is spent, and `inkjot
+  check` notes the first cost. `inkjot migrate` adds `default cost: vults`
+  to a v0.5 source that declares `resource vults`.
+- `requires full x` reads the resource it names.
+- `hushed` is no longer a built-in name: Ex 2 declares `state hushed: no`.
+- `rewinds`, `hints` and `inquests` are the reserved resource names, the
+  player's rather than the world's (documented in `run.md`).
+
 ### Later in v0.6
 
 - **Inklog:** `rule`, `{{ }}` lexed as its own tokens, `~ means` on facts,
@@ -158,16 +171,77 @@ breaking change.
 - `finale when:` for endings that depend on play.
 - `expect events:` in tests.
 - **Redaction**, for Ex 6: `~ redacted until …` on list items, `aka`
-  entries, paragraphs and Link labels. Redacted text is shown as a bar and
-  never reaches the page; the IR carries its length only.
+  entries, paragraphs, Link labels and documents (below). Redacted text is
+  shown as a bar and never reaches the page; the IR carries its length
+  only.
+
+Text, decided 20 Nov 2026:
+
+- **`plural()`** keeps its rules and gains a built-in table of about sixty
+  common irregulars and invariants (`child`, `mouse`, `sheep`, `series`…),
+  the third argument as an override (`plural(n, "goose", "geese")`), and
+  `~ plural "geese"` on a declared thing so `{plural(n, goose)}` needs no
+  override. Documented: pass the singular.
+- **`possessive()` and pronouns**, together: `~ pronouns she` (or `he`,
+  `they`, `it`, or a set: `~ pronouns xe/xem/xyr`), read as `{x.they}`,
+  `{x.them}`, `{x.their}`, with `capital()` for the start of a sentence;
+  `possessive(x)` gives "Leo's", "the Widow's", "the twins'".
+- **Blockquotes**: `[quote sign]` … `[end]`, with kinds `sign`, `letter`,
+  `poster`, `edict` and an optional `~ by "…"`. An IR node of its own, so
+  the platform styles each kind. Pairs with redaction: a redacted line in a
+  letter.
+- **Presentation hints** on an insert: `{list stocks ~ marquee}`, `{all
+  leo.aka ~ rotate 2s}`. The engine passes the hint through and changes
+  nothing else; the text is complete without it. The platform renders it
+  with a pause control (WCAG 2.2.2, anything that moves for more than five
+  seconds) and, under `prefers-reduced-motion`, shows the whole list at
+  once. The intent: the reader lives what the character does, remembering
+  a list one item at a time, or a mind that will not stop cycling (OCD).
+
+Inquests:
+
+- **A pending fork's one home** (with MonkeyPaw): the placeholder passage
+  says everything, `pending: by monkeypaw ~ rejoin ch5 ~ brief tragic ~
+  timeout 1m`; its body is the fallback a Linker reads if nothing is
+  generated in time; the fork itself just says `~ inquest`.
+
+**The encounter milestone**, Ex 2's duel rewritten in general words (the
+analysis of 20 Nov 2026):
+
+- `spell` becomes `threat`: anything incoming that counters can answer.
+- Counters come in four kinds, `prevents`, `blocks`, `covers`, `absorbs`;
+  effects `block`, `prevent`, `cover`, `deflect with`, `absorb with`.
+  `parries flame` is `~ deflects flame`; `absorbs spells` is `~ absorbs
+  any`.
+- Materials are tags plus rules, not verbs: `thaws ice` and `cracks glass`
+  go. `shields target…` and `interrupts flame, frost` are covered by the
+  counter kinds. `needs two to hold it` is stale.
+- `freeze` goes; `set x.frozen: yes` says it.
+- `cast.spell` and `cast.outcome` are `threat.name` and `threat.outcome`;
+  the `absorbed` built-in is `threat.outcome == absorb`; `hask casts last`
+  is `~ acts last`; `through mirror` is `~ requires mirror`; `hinted` is
+  `me.asked_hint`.
+- Kept: `encounter`, `pattern`, `pin`, `skip`, the `round` tag.
+- Targeting and spreading, for any act (proposed with `define`, below):
+  `~ at enemy here` gives `target`; `~ then after 0.5s: …`; `~ spreads 2
+  to nearest enemy ~ every 0.3s`, with `hop` counting the hops, for chain
+  lightning, a fire moving room to room, a rumour among gnomes.
+
+**`define`** (proposed 20 Nov 2026, not decided; `docs/define.md`): an
+Inker's own declaration word, built on a general one, with typed fields
+and the verb the platform shows. `define spell: act ~ verb cast ~ field
+power: number`, a `:: spell [define]` passage for what every spell does,
+read as `self.power`. The compiler lowers a spell to an act with
+`"defined_as": "spell"`; the engine never sees the word. It names what the
+general words can already say and adds nothing they cannot, so it comes
+after the encounter milestone, tested by writing Ex 2's duel both ways.
 
 ### Not in v0.6
 
 - v0.7: `~ conflict` on scenes; facets.
 - Dropped: automatic forks; `~ canon`; `refute`; `any` as a quantifier.
-- **The duel** (Ex 2's spell vocabulary: `thaws ice`, `absorbs spells` and
-  five more) is not planned; it stays untyped in the IR and the
-  interpreter refuses it as not supported.
+- (The duel moved into v0.6 on 20 Nov 2026: the encounter milestone,
+  above.)
 
 Smaller things noted on the way:
 

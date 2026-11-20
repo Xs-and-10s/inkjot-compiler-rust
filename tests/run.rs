@@ -462,6 +462,7 @@ cohort: 1..=2
 clock: 0..=3 ~ shown as "hour"
 place hall: "the hall"
 resource vults: 3 ~ refill each chronon
+default cost: vults
 resource rewinds: 1 ~ max 1
 rewind: echo
 ~ back 1..=2
@@ -602,6 +603,7 @@ character bo: "Bo" ~ playable
 place yard: "the yard"
 place shed: "the shed"
 resource vults: 10 ~ per character ~ refill each chronon
+default cost: vults
 item pin: "a hairpin" ~ lockpick ~ in yard
 state count: 0
 act take: cost 0
