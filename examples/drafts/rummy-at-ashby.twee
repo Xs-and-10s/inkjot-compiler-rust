@@ -11,9 +11,9 @@ Rummy at Ashby
 
 :: Inklink [config]
 (((
-A card game inside a story: a sketch for v0.6's decks and piles, written
-as a scene that could sit between Littlejon's ch7 and ch8. Corin needs the
-ferry; the ferryman will only take a stranger across for a win at rummy.
+A card game inside a story: a sketch for v0.6's decks and piles. Nell is
+running from the bailiffs with her grandmother's ghost for company, and the
+ferryman will only take a stranger across for a win at rummy.
 
 What it tries: `deck`, `pile`, `meld`, card effects (`shuffle`, `deal`,
 `draw`, `lay down`, `discard`, `turn up`), Links made one per thing with
@@ -22,10 +22,10 @@ a few header effects. None of it is in v0.5.
 )))
 kind: story-game
 mode: solo
-pov: corin
-character corin: "Brother Corin" ~ playable
+pov: nell
+character nell: "Nell Ashdown" ~ playable
 npc tobin: "Old Tobin, the ferryman" ~ in yard
-npc ixe: "Ixë" ~ in yard ~ unseen in sun
+npc gran: "Gran’s ghost" ~ in yard ~ unseen in sun
 place yard: "the yard of the Ferry Inn"
 
 state ferry_paid: no
@@ -54,7 +54,7 @@ meld run: 3.. ~ same suit ~ in sequence ~ ace low
 :: ferry
 Ashby is a ferry, an inn, and a great deal of brown river. The ferryman sits at a table in the inn yard in full sun, shuffling a pack of cards so old that the kings have no faces left.
 
-“Two of you?” he says, looking at Corin, and then, puzzled, at the empty air beside him, where a voice has just said *good afternoon*. “I don’t take strangers over. Not this week. Red cloaks came through asking after a boy.” He squares the deck. “But I’m a sporting man. One hand of rummy. You win, I row you over and I never saw you. I win, you sit in my kitchen till the red cloaks come back.”
+“Two of you?” he says, looking at Nell, and then, puzzled, at the empty air beside her, where an old woman’s voice has just said *good afternoon*. “I don’t take strangers over. Not this week. Bailiffs came through asking after a girl.” He squares the deck. “But I’m a sporting man. One hand of rummy. You win, I row you over and I never saw you. I win, you sit in my kitchen till the bailiffs come back.”
 
 > [[Sit down and deal->rummy]] ~ id sit_down
 ~ choice proactive ~ weighs truth ~ stakes self ~ predict 90%
@@ -64,7 +64,7 @@ Ashby is a ferry, an inn, and a great deal of brown river. The ferryman sits at 
 The game's own header sets the table. `players` names who sits at it, in
 order; the pov goes first. Effects in a header run once, on arrival.
 )))
-players: corin, tobin
+players: nell, tobin
 shuffle stock
 deal 7 from stock to each hand
 turn up top of stock onto discard
@@ -84,7 +84,7 @@ Old Tobin holds {count tobin.hand} cards.
 He has laid down {list tobin.laid}.
 
 [if peeked]
-Ixë’s voice, very low, at your ear: “He holds {list tobin.hand}.”
+Gran’s voice, very low, at your ear: “He holds {list tobin.hand}, dear.”
 
 [end]
 > [[Draw from the stock->rummy:drawn]] ~ draw top of stock into my hand ~ id draw_stock
@@ -92,14 +92,14 @@ Ixë’s voice, very low, at your ear: “He holds {list tobin.hand}.”
 > [[Take {top of discard} from the discard->rummy:drawn]] ~ draw top of discard into my hand ~ id draw_discard
 ~ when count discard > 0
 ~ choice proactive
-> [[“Ixë. Go round behind him.”->rummy:peek]] ~ id cheat
+> [[“Gran. Go round behind him.”->rummy:peek]] ~ id cheat
 ~ when not peeked
-~ choice proactive ~ weighs truth ~ arc corin falls ~ stakes self ~ predict 50%
+~ choice proactive ~ weighs truth ~ arc nell falls ~ stakes self ~ predict 50%
 
 :: rummy:peek [act]
 set peeked: yes
 --
-Nobody sees Ixë walk round the table. Nobody sees anything at all, in this sun.
+Nobody sees Gran drift round the table. Nobody ever sees her, in the daytime.
 
 Old Tobin frowns, and scratches the back of his neck, as if a draught had touched it.
 
@@ -149,7 +149,7 @@ set ferry_paid: yes when count my hand == 0
 [if count my hand == 0]
 You lay down your last card. Old Tobin looks at the table for a long moment, then laughs, and slaps it with his flat hand.
 
-“Well,” he says. “I’ve been beaten by a boy and a draught. I’ll fetch the oars.”
+“Well,” he says. “I’ve been beaten by a girl and a draught. I’ll fetch the oars.”
 
 [else]
 Tobin lays down the last of his hand with a little flourish. “Rummy,” he says, kindly. “Kitchen’s through there. There’s soup.”
@@ -159,12 +159,12 @@ Tobin lays down the last of his hand with a little flourish. “Rummy,” he say
 > [[Go into the kitchen->kitchen]] ~ when not ferry_paid ~ id kitchen ~ choice inactive
 
 :: across [ending]
-The river is wide and brown and slow, and halfway over, Corin starts laughing and can’t stop.
+The river is wide and brown and slow, and halfway over, Nell starts laughing and can’t stop.
 
 [if peeked]
-“You cheated an old man out of a ferry ride,” says the empty air in the bow.
+“You cheated an old man out of a ferry ride,” says the empty air in the bow, sounding pleased.
 
-“*You* cheated,” says the Prince of the House of Aur. “I only asked.”
+“*You* cheated,” says Nell. “I only asked.”
 
 :: kitchen [ending]
-The soup is very good. The red cloaks come back at dusk.
+The soup is very good. The bailiffs come back at dusk.

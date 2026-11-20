@@ -4,32 +4,14 @@ Examples written ahead of the language, the way Ex 1 to 3 were written
 before the compiler existed. They do not pass `inkjot check` 0.5, and the
 tests leave them out. Each one says what it needs.
 
-## Ex 4: Littlejon (`ex4-littlejon.twee`)
+## Ex 4: withdrawn
 
-A `story` in eight chapters, built to test Inquests. Chapter One is Mark's
-first draft of *Darklands: Winter 1*, unchanged; the rest is an imagined
-novella grown from it.
-
-What `inkjot check` 0.5 refuses, which v0.6 has to add:
-
-| Refused | Count | v0.6 |
-|---|---|---|
-| `format-version: 0.6.0` | 1 | the version |
-| `state widow_freed: no` (and reading it) | 4 + 12 | `state` beside `fact` |
-| `~ id free_the_widow` | 25 | optional Link ids |
-| `~ inquest by monkeypaw ~ rejoin ch5` | 1 | MonkeyPaw forks |
-| `theme hunger: "Bloodlust, or restraint"` | 6 | themes, for analysis |
-| `~ beat`, `~ weighs`, `~ arc`, `~ stakes`, `~ plants`, `~ pays off`, `~ predict`, `~ lasting` | 98 | analysis tags (never change play) |
-| `~ inquest`, `~ inquest for obey` | 8 notices | Inquests (flow D) |
-
-`pending: tragic ~ by monkeypaw ~ fallback ch5 ~ timeout 1m` is accepted as
-reserved. Prose uses `*italic*`, which v0.6 renders.
-
-Revised 16 Nov 2026: Mother Maud is a Mother Superior whose abbey was
-seized; her age and Ixë's are left open; Eyrad is an Elder, ages when he
-uses the Light, and carries no staff; the ch4 fork is the MonkeyPaw's; a
-reader who burned the book in ch3 meets a real choice in ch8 (a bluff that
-works, or a fight that ends in `ending_den`).
+Ex 4 was a novella built on a chapter of an unpublished novel. It has been
+taken out of this public repository (20 Nov 2026); a new `story` written
+for Inquests will take its place. What it taught the design (forks that
+stand in for an offered Link, `~ inquest for`, Link ids, MonkeyPaw slots,
+analysis tags, emphasis) is recorded in the working doc and in the IR 3
+requests.
 
 ## Ex 5: Thistledown (`ex5-thistledown.twee`)
 
@@ -79,10 +61,10 @@ v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
 
 ## Rummy at Ashby (`rummy-at-ashby.twee`)
 
-A card game inside a story: a scene that could sit between Littlejon's ch7
-and ch8. Corin plays the ferryman for passage, and may ask Ixë, unseen in
-the sun, to read the old man's hand. A sketch for decks and piles: `deck`,
-`pile` (`~ face down`, `~ per player`, `~ private`), `meld` (`set`, `run`),
+A card game inside a story. Nell, running from the bailiffs, plays the
+ferryman for passage, and may ask her grandmother's ghost, unseen by day,
+to read the old man's hand. A sketch for decks and piles: `deck`, `pile`
+(`~ face down`, `~ per player`, `~ private`), `meld` (`set`, `run`),
 `shuffle`, `deal`, `draw`, `turn up`, `lay down`, `discard`, and Links made
 one per thing with `~ for each m in melds(my hand)`. The opponent plays by
 a few header effects, in order.
