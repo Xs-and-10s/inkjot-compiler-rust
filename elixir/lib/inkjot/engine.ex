@@ -40,6 +40,7 @@ defmodule Inkjot.Engine do
           {:take_link, String.t()}
           | {:answer, [String.t()]}
           | {:vote, who :: String.t(), how :: String.t(), proof :: [String.t()]}
+          | {:take_fork, fork :: String.t(), from :: String.t() | nil}
 
   @type code ::
           :bad_ir
@@ -125,6 +126,31 @@ defmodule Inkjot.Engine do
   @doc "Do one thing: take a Link, answer an input, or vote."
   @spec act(state(), action()) :: {:ok, state()} | refused()
   defdelegate act(state, action), to: Native
+
+  @doc """
+  The forks behind one offered Link, in the order the Inker wrote them.
+  `from` is the passage the Linker is asking from, when it is not this
+  state's Nib (`~ inquest from`): pass the state of that earlier visit.
+  Forks are never in `view/1`; ask for them one Link at a time.
+  """
+  @spec forks(state(), String.t(), String.t() | nil) :: {:ok, [link()]} | refused()
+  def forks(state, link, from \\ nil), do: Native.forks(state, link, from)
+
+  @doc "May any fork be taken here, asking from `from` (or from here)?"
+  @spec any_forks(state(), String.t() | nil) :: {:ok, boolean()} | refused()
+  def any_forks(state, from \\ nil), do: Native.any_forks(state, from)
+
+  @doc "Take a fork an Inquest showed. Spending an Inquest is the platform's."
+  @spec take_fork(state(), String.t(), String.t() | nil) :: {:ok, state()} | refused()
+  def take_fork(state, fork, from \\ nil), do: Native.take_fork(state, fork, from)
+
+  @doc "The passages whose forks may be asked for from `nib`."
+  @spec asked_from(inklink(), String.t()) :: [String.t()]
+  defdelegate asked_from(inklink, nib), to: Native
+
+  @doc "The whole story as a graph: `%{nodes: [...], edges: [...]}`."
+  @spec map(inklink()) :: %{nodes: [map()], edges: [map()]}
+  defdelegate map(inklink), to: Native
 
   @doc "Rebuild a reading from its log: the state after `upto` actions, or all."
   @spec replay(inklink(), non_neg_integer(), start(), [action()], non_neg_integer() | nil) ::

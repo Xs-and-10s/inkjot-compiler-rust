@@ -36,12 +36,13 @@ mod events;
 
 pub use events::{catalogue_markdown, Event, EventType, CATALOGUE};
 
+use std::collections::BTreeMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 
 use crate::json::{self, Value};
 use crate::run::{Ask, Run, Story};
-pub use crate::run::{Para, Span};
+pub use crate::run::{Edge, Node, Para, Span, StoryMap};
 
 /// The engine's version. Logs recorded under one version replay the same
 /// way under it; the platform records it with every reading.
@@ -157,6 +158,9 @@ pub struct Meta {
     pub tags: Vec<String>,
     /// The engine that read it: [`ENGINE_VERSION`].
     pub engine: u32,
+    /// Inquests a reading has: the `inquests` resource, when the Inklink
+    /// declares it and hides at least one fork. `None`: no Inquests.
+    pub inquests: Option<u32>,
 }
 
 /// A loaded IR. Cheap to clone: every state shares one.
@@ -200,6 +204,7 @@ impl Inklink {
                 playable: story.playable(),
                 tags: config_tags(ir),
                 engine: ENGINE_VERSION,
+                inquests: inquests(ir).filter(|_| story.has_forks()),
             };
             Ok(Inklink {
                 story: Arc::new(story),
@@ -210,6 +215,18 @@ impl Inklink {
 
     pub fn meta(&self) -> &Meta {
         &self.meta
+    }
+
+    /// The whole story as a graph: passages, and the Links, forks, `next:`s
+    /// and ways between them.
+    pub fn map(&self) -> StoryMap {
+        self.story.map()
+    }
+
+    /// The passages whose forks may be asked for from `nib` (`~ inquest
+    /// from nib`). Static: it depends on the story, not the reading.
+    pub fn asked_from(&self, nib: &str) -> Vec<String> {
+        self.story.asked_from(nib)
     }
 
     /// Begin a reading. The seed decides every roll and shuffle.
@@ -231,8 +248,10 @@ impl Inklink {
                 return Err(classify(&run, why, RefusedKind::StoryError));
             }
             let view = see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            let forks = forks_of(&mut run, &view)
+                .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
             let mut ending = None;
-            let events = events::events(&mut run, &view, &mut ending);
+            let events = events::events(&mut run, &view, &mut ending, Value::obj::<&str>([]));
             Ok(State {
                 inklink: self.clone(),
                 seed,
@@ -242,6 +261,7 @@ impl Inklink {
                 view,
                 events,
                 ending,
+                forks,
             })
         })
     }
@@ -298,6 +318,20 @@ fn setting<'a>(ir: &'a Value, name: &str) -> Option<&'a str> {
         .as_str()
 }
 
+/// `resource inquests: 3`.
+fn inquests(ir: &Value) -> Option<u32> {
+    ir.get("config")?
+        .as_arr()?
+        .iter()
+        .find(|s| {
+            s.get("declare").and_then(Value::as_str) == Some("resource")
+                && s.get("id").and_then(Value::as_str) == Some("inquests")
+        })?
+        .get("value")?
+        .as_u64()
+        .map(|n| n as u32)
+}
+
 fn config_tags(ir: &Value) -> Vec<String> {
     let tags = ir
         .get("config")
@@ -352,6 +386,10 @@ pub enum Action {
         how: String,
         proof: Vec<String>,
     },
+    /// Take a fork an Inquest showed. `from` is the passage the Linker asked
+    /// from, when it is a later one (`~ inquest from`); the state taken from
+    /// is then the earlier visit's.
+    TakeFork { fork: String, from: Option<String> },
 }
 
 /// A Link as the Linker sees it.
@@ -396,6 +434,9 @@ pub struct State {
     events: Vec<Event>,
     /// The last finale reached in this reading.
     ending: Option<String>,
+    /// The forks behind each offered Link here, worked out with the view,
+    /// so asking for them is a read. Never part of the view.
+    forks: BTreeMap<String, Vec<Link>>,
 }
 
 impl std::fmt::Debug for State {
@@ -453,6 +494,44 @@ impl State {
         self.act(&Action::Answer(words.to_vec()))
     }
 
+    /// The forks that stand in for the offered Link `link`, in the order
+    /// the Inker wrote them. `from`: the passage the Linker is asking from,
+    /// when it is not this state's Nib. Forks are never in the view: they
+    /// cross only when asked for, one Link's at a time.
+    pub fn forks(&self, link: &str, from: Option<&str>) -> Result<Vec<Link>, Refused> {
+        guarded(|| {
+            let from = from.filter(|f| *f != self.view.nib);
+            if from.is_none() {
+                return Ok(self.forks.get(link).cloned().unwrap_or_default());
+            }
+            let mut run = self.run.clone();
+            let found = run
+                .forks(link, from)
+                .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            Ok(found
+                .into_iter()
+                .map(|(id, label)| Link { id, label })
+                .collect())
+        })
+    }
+
+    /// May any fork be taken here, asking from `from` (or from here)?
+    pub fn any_forks(&self, from: Option<&str>) -> Result<bool, Refused> {
+        let mut any = false;
+        for link in &self.view.links {
+            any = any || !self.forks(&link.id, from)?.is_empty();
+        }
+        Ok(any)
+    }
+
+    /// Take a fork an Inquest showed.
+    pub fn take_fork(&self, fork: &str, from: Option<&str>) -> Result<State, Refused> {
+        self.act(&Action::TakeFork {
+            fork: fork.to_string(),
+            from: from.map(str::to_string),
+        })
+    }
+
     /// Do one thing, on a copy. `self` is never changed.
     pub fn act(&self, action: &Action) -> Result<State, Refused> {
         guarded(|| {
@@ -464,13 +543,20 @@ impl State {
                 Action::Vote { who, how, proof } => {
                     (run.vote(who, how, proof), RefusedKind::BadAnswer)
                 }
+                Action::TakeFork { fork, from } => {
+                    let from = from.as_deref().filter(|f| *f != self.view.nib);
+                    (run.choose_fork(fork, from), RefusedKind::StoryError)
+                }
             };
             if let Err(why) = done {
                 return Err(classify(&run, why, otherwise));
             }
             let view = see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            let forks = forks_of(&mut run, &view)
+                .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
             let mut ending = self.ending.clone();
-            let events = events::events(&mut run, &view, &mut ending);
+            let changes = changes(&self.run.tracked(), &run.tracked());
+            let events = events::events(&mut run, &view, &mut ending, changes);
             let mut actions = self.actions.clone();
             actions.push(action.clone());
             Ok(State {
@@ -482,6 +568,7 @@ impl State {
                 view,
                 events,
                 ending,
+                forks,
             })
         })
     }
@@ -500,6 +587,24 @@ impl State {
             )),
             Action::Vote { .. } if !asks(true) => {
                 Err(refused(RefusedKind::NotAsking, "no jury is sitting here"))
+            }
+            Action::TakeFork { fork, from } => {
+                let mut shown = false;
+                for link in &self.view.links {
+                    shown = shown
+                        || self
+                            .forks(&link.id, from.as_deref())?
+                            .iter()
+                            .any(|f| f.id == *fork);
+                }
+                if shown {
+                    Ok(())
+                } else {
+                    Err(refused(
+                        RefusedKind::NotOffered,
+                        format!("no fork `{fork}` can be taken here"),
+                    ))
+                }
             }
             _ => Ok(()),
         }
@@ -529,6 +634,58 @@ fn see(run: &mut Run) -> Result<View, String> {
         asks,
         over,
     })
+}
+
+/// How the tracked values changed: `{"leo.trust": [2, 3]}`, a value that
+/// is new reading `null` before.
+fn changes(
+    before: &BTreeMap<String, crate::run::V>,
+    after: &BTreeMap<String, crate::run::V>,
+) -> Value {
+    let mut out = Vec::new();
+    for (key, now) in after {
+        let then = before.get(key);
+        if then != Some(now) {
+            let then = then.map_or(Value::Null, json_of);
+            out.push((key.clone(), Value::Arr(vec![then, json_of(now)])));
+        }
+    }
+    for (key, then) in before {
+        if !after.contains_key(key) {
+            out.push((key.clone(), Value::Arr(vec![json_of(then), Value::Null])));
+        }
+    }
+    Value::Obj(out)
+}
+
+/// A value as JSON: a number is a number, an id or text a string.
+fn json_of(v: &crate::run::V) -> Value {
+    use crate::run::V;
+    match v {
+        V::Null => Value::Null,
+        V::Bool(b) => Value::Bool(*b),
+        V::Num(n) if n.fract() == 0.0 && n.abs() < 1e15 => Value::Num((*n as i64).to_string()),
+        V::Num(n) => Value::Num(n.to_string()),
+        V::Str(s) | V::Id(s) => Value::str(s),
+        V::List(items) => Value::Arr(items.iter().map(json_of).collect()),
+        other => Value::str(other.to_string()),
+    }
+}
+
+/// The forks behind each offered Link in `view`, asked from here.
+fn forks_of(run: &mut Run, view: &View) -> Result<BTreeMap<String, Vec<Link>>, String> {
+    let mut out = BTreeMap::new();
+    for link in &view.links {
+        let found: Vec<Link> = run
+            .forks(&link.id, None)?
+            .into_iter()
+            .map(|(id, label)| Link { id, label })
+            .collect();
+        if !found.is_empty() {
+            out.insert(link.id.clone(), found);
+        }
+    }
+    Ok(out)
 }
 
 /// Name an interpreter error: the step limit, an unsupported feature, or

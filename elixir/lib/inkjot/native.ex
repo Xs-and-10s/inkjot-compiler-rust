@@ -24,6 +24,11 @@ defmodule Inkjot.Native do
   def ending(_state), do: err()
   def act(_state, _action), do: err()
   def take_link(_state, _id), do: err()
+  def forks(_state, _link, _from), do: err()
+  def any_forks(_state, _from), do: err()
+  def take_fork(_state, _fork, _from), do: err()
+  def asked_from(_inklink, _nib), do: err()
+  def map(_inklink), do: err()
   def replay(_inklink, _seed, _start, _actions, _upto), do: err()
   def replay_all(_inklink, _seed, _start, _actions), do: err()
 

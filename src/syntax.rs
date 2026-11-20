@@ -18,6 +18,8 @@ pub(crate) const DECLS: &[&str] = &[
     "item",
     "fact",
     "state",
+    "theme",
+    "brief",
     "fuse",
     "character",
     "npc",
@@ -82,6 +84,8 @@ pub(crate) const SETTINGS: &[&str] = &[
     "timeout",
     "param",
     "title",
+    // A slot a generated fork fills: `pending: tragic ~ by monkeypaw`.
+    "pending",
     // `[test]` passages.
     "given",
     "answer",
@@ -125,6 +129,10 @@ pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "ret
 pub(crate) const LINK_CLAUSES: &[&str] = &[
     "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
     "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch", "id",
+    // Inquests: where a fork's pending slot rejoins, its brief, who wrote it.
+    "rejoin", "brief", "credit",
+    // Analysis: read by the Inker's reports, never by play.
+    "beat", "weighs", "arc", "stakes", "plants", "pays", "predict", "lasting", "tone", "reveals",
     "pass", "release", "requires", "once", "loud", "quiet", "choice",
 ];
 
@@ -133,6 +141,24 @@ pub(crate) const INPUTS: &[&str] = &[
     "name", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret", "roll",
     "note",
 ];
+
+/// Who may write a fork: the Inker, or a role the platform fills. Roles
+/// never name people.
+pub(crate) const ROLES: &[&str] = &["inker", "monkeypaw", "ghostwriter", "storyteller"];
+
+/// The analysis tags' closed vocabularies.
+pub(crate) const BEATS: &[&str] = &[
+    "opening",
+    "inciting",
+    "turn",
+    "midpoint",
+    "crisis",
+    "climax",
+    "resolution",
+];
+pub(crate) const ARCS: &[&str] = &["rises", "falls", "holds"];
+pub(crate) const STAKES: &[&str] = &["self", "other", "world"];
+pub(crate) const TONES: &[&str] = &["dark", "warm", "tense", "light"];
 
 /// How `{x.aka}` picks a name: `~ pick cycle`.
 pub(crate) const AKA_PICKS: &[&str] = &["shuffled", "cycle", "random", "first"];

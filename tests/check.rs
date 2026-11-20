@@ -626,7 +626,7 @@ fn a_hint_link_needs_hints_to_spend() {
 }
 
 #[test]
-fn an_inquest_is_reserved_not_a_hint() {
+fn an_inquest_is_a_fork_not_a_hint() {
     let ex2 = include_str!("../examples/ex2-the-ninefold-cell.twee");
     let forked = ex2.replace(
         "> [[Ask for a hint->here]] ~ hint ~ when hints > 0",
@@ -634,10 +634,11 @@ fn an_inquest_is_reserved_not_a_hint() {
     );
     let report = inkjot::check(&forked);
     assert!(report.ok(), "{:#?}", report.diags);
+    // A fork with no `resource inquests` can never be asked for: noted.
     assert!(report
         .diags
         .iter()
-        .any(|d| d.msg.contains("reserved for Inquests")));
+        .any(|d| d.msg.contains("`resource inquests: n`")));
     // `inquest:` is no longer a header line: hints are `hint:`.
     let old = ex2.replacen("hint: ", "inquest: ", 1);
     assert!(!inkjot::check(&old).ok());

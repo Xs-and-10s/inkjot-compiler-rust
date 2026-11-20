@@ -26,6 +26,7 @@ mod atoms {
         ok,
         error,
         take_link,
+        take_fork,
         answer,
         vote,
         nib,
@@ -182,6 +183,7 @@ fn action_term<'a>(env: Env<'a>, a: &Action) -> Term<'a> {
         Action::TakeLink(id) => (atoms::take_link(), id).encode(env),
         Action::Answer(words) => (atoms::answer(), words).encode(env),
         Action::Vote { who, how, proof } => (atoms::vote(), who, how, proof).encode(env),
+        Action::TakeFork { fork, from } => (atoms::take_fork(), fork, from).encode(env),
     }
 }
 
@@ -210,6 +212,14 @@ fn decode_action(t: Term) -> NifResult<Action> {
     match (parts.len(), tag) {
         (2, a) if a == atoms::take_link() => Ok(Action::TakeLink(parts[1].decode()?)),
         (2, a) if a == atoms::answer() => Ok(Action::Answer(parts[1].decode()?)),
+        (2, a) if a == atoms::take_fork() => Ok(Action::TakeFork {
+            fork: parts[1].decode()?,
+            from: None,
+        }),
+        (3, a) if a == atoms::take_fork() => Ok(Action::TakeFork {
+            fork: parts[1].decode()?,
+            from: parts[2].decode()?,
+        }),
         (4, a) if a == atoms::vote() => Ok(Action::Vote {
             who: parts[1].decode()?,
             how: parts[2].decode()?,
@@ -287,7 +297,59 @@ fn meta<'a>(env: Env<'a>, inklink: InklinkRef) -> Term<'a> {
             ("playable", m.playable.encode(env)),
             ("tags", m.tags.encode(env)),
             ("engine", m.engine.encode(env)),
+            ("inquests", m.inquests.encode(env)),
         ],
+    )
+}
+
+/// The passages whose forks may be asked for from `nib`.
+#[rustler::nif]
+fn asked_from(inklink: InklinkRef, nib: String) -> Vec<String> {
+    inklink.0.asked_from(&nib)
+}
+
+/// The story as a graph: `%{nodes: [...], edges: [...]}`.
+#[rustler::nif(schedule = "DirtyCpu")]
+fn map<'a>(env: Env<'a>, inklink: InklinkRef) -> Term<'a> {
+    let m = inklink.0.map();
+    let nodes: Vec<Term<'a>> = m
+        .nodes
+        .iter()
+        .map(|n| {
+            atom_map(
+                env,
+                &[
+                    ("id", n.id.encode(env)),
+                    ("title", n.title.encode(env)),
+                    ("tags", n.tags.encode(env)),
+                ],
+            )
+        })
+        .collect();
+    let edges: Vec<Term<'a>> = m
+        .edges
+        .iter()
+        .map(|e| {
+            atom_map(
+                env,
+                &[
+                    ("from", e.from.encode(env)),
+                    ("to", e.to.encode(env)),
+                    (
+                        "kind",
+                        Atom::from_str(env, e.kind).expect("an atom").encode(env),
+                    ),
+                    ("id", e.id.encode(env)),
+                    ("label", e.label.encode(env)),
+                    ("stands_in_for", e.stands_in_for.encode(env)),
+                    ("conditional", e.conditional.encode(env)),
+                ],
+            )
+        })
+        .collect();
+    atom_map(
+        env,
+        &[("nodes", nodes.encode(env)), ("edges", edges.encode(env))],
     )
 }
 
@@ -353,6 +415,45 @@ fn act<'a>(env: Env<'a>, state: StateRef, action: Term<'a>) -> NifResult<Term<'a
 #[rustler::nif(schedule = "DirtyCpu")]
 fn take_link<'a>(env: Env<'a>, state: StateRef, id: String) -> Term<'a> {
     state_result(env, state.0.take_link(&id))
+}
+
+/// The forks behind one offered Link: `{:ok, [%{id, label, runs}]}`.
+/// `from`: the passage asked from, when it is not this state's Nib.
+#[rustler::nif]
+fn forks<'a>(env: Env<'a>, state: StateRef, link: String, from: Option<String>) -> Term<'a> {
+    match state.0.forks(&link, from.as_deref()) {
+        Ok(found) => {
+            let found: Vec<Term<'a>> = found
+                .iter()
+                .map(|l| {
+                    atom_map(
+                        env,
+                        &[
+                            ("id", l.id.encode(env)),
+                            ("label", l.label.plain().encode(env)),
+                            ("runs", runs_term(env, &l.label)),
+                        ],
+                    )
+                })
+                .collect();
+            ok(env, found.encode(env))
+        }
+        Err(r) => refused_term(env, &r),
+    }
+}
+
+/// May any fork be taken here, asking from `from`?
+#[rustler::nif]
+fn any_forks<'a>(env: Env<'a>, state: StateRef, from: Option<String>) -> Term<'a> {
+    match state.0.any_forks(from.as_deref()) {
+        Ok(any) => ok(env, any.encode(env)),
+        Err(r) => refused_term(env, &r),
+    }
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn take_fork<'a>(env: Env<'a>, state: StateRef, fork: String, from: Option<String>) -> Term<'a> {
+    state_result(env, state.0.take_fork(&fork, from.as_deref()))
 }
 
 /// Rebuild a reading from its log: the state after the first `upto`

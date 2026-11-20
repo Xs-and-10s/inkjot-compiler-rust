@@ -634,6 +634,8 @@ impl Builder {
         let mut out: Vec<Value> = Vec::new();
         // Derived Link ids seen so far: `ch2->ch3` twice is `ch2->ch3#2`.
         let mut derived: HashMap<String, usize> = HashMap::new();
+        // The offered Link a fork stands in for, unless it names one.
+        let mut last_offered: Option<String> = None;
         let mut i = 0;
         // An author's note runs from `[note]` to the next modifier. It is
         // for the Inker, so it never reaches the IR.
@@ -652,7 +654,22 @@ impl Builder {
             if t.is_empty() {
                 continue;
             } else if t.starts_with('>') {
-                out.push(self.link(p, t, &more, &mut derived));
+                let mut link = self.link(p, t, &more, &mut derived);
+                let id = link.get("id").and_then(Value::as_str).map(str::to_string);
+                match &mut link {
+                    Value::Obj(pairs) if pairs.iter().any(|(k, _)| k == "inquest") => {
+                        if let Some((_, Value::Obj(fields))) =
+                            pairs.iter_mut().find(|(k, _)| k == "inquest")
+                        {
+                            if !fields.iter().any(|(k, _)| k == "stands_in_for") {
+                                let offered = last_offered.clone().map_or(Value::Null, Value::str);
+                                fields.insert(0, ("stands_in_for".into(), offered));
+                            }
+                        }
+                    }
+                    _ => last_offered = id,
+                }
+                out.push(link);
             } else if t.starts_with('[') && !t.starts_with("[[") && t.ends_with(']') {
                 in_note = t[1..]
                     .split([';', ']'])
@@ -728,6 +745,13 @@ impl Builder {
         let mut extra: Vec<(String, Value)> = Vec::new();
         let mut overrides: Vec<&str> = Vec::new();
         let mut inker_id: Option<String> = None;
+        // A fork: `~ inquest …`, and what a pending one needs.
+        let mut fork: Option<Vec<(String, Value)>> = None;
+        let mut pending: Vec<(String, Value)> = Vec::new();
+        let mut credit: Option<String> = None;
+        // Analysis tags, for the Inker's reports.
+        let mut analysis: Vec<(String, Value)> = Vec::new();
+        let list = |rest: &str| strings(rest.split(',').map(str::trim));
 
         for c in &clauses {
             let text = c.text.as_str();
@@ -750,7 +774,38 @@ impl Builder {
                 "choice" => choice = Some(rest.to_string()),
                 "with" => extra.push(("with".into(), parameters(rest))),
                 "id" => inker_id = Some(rest.to_string()),
-                "switch" | "pass" | "hint" | "inquest" | "release" => kind = word,
+                "switch" | "pass" | "hint" | "release" => kind = word,
+                "inquest" => {
+                    let fields = fork.get_or_insert_with(Vec::new);
+                    let (how, value) = rest.split_once(' ').unwrap_or((rest, ""));
+                    match how {
+                        "for" => fields.push(("stands_in_for".into(), Value::str(value.trim()))),
+                        "from" => fields.push(("from".into(), list(value))),
+                        "by" => pending.push(("by".into(), Value::str(value.trim()))),
+                        _ => {}
+                    }
+                }
+                "rejoin" => pending.push(("rejoin".into(), list(rest))),
+                "brief" => pending.push(("brief".into(), Value::str(rest))),
+                "credit" => credit = Some(rest.to_string()),
+                "beat" | "stakes" | "tone" | "reveals" => {
+                    analysis.push((word.into(), Value::str(rest)))
+                }
+                "weighs" => analysis.push(("weighs".into(), list(rest))),
+                "plants" => analysis.push(("plants".into(), list(rest))),
+                "pays" => analysis.push((
+                    "pays_off".into(),
+                    list(rest.strip_prefix("off").unwrap_or(rest).trim()),
+                )),
+                "arc" => {
+                    let (who, way) = rest.split_once(' ').unwrap_or((rest, ""));
+                    analysis.push((
+                        "arc".into(),
+                        Value::obj([("who", Value::str(who)), ("way", Value::str(way.trim()))]),
+                    ));
+                }
+                "predict" => analysis.push(("predict".into(), token(rest.trim_end_matches('%')))),
+                "lasting" => analysis.push(("lasting".into(), Value::Bool(true))),
                 "become" | "order" | "by" | "chance" | "after" | "requires" => {
                     let mut values = words(rest);
                     let value = if values.len() == 1 {
@@ -862,6 +917,19 @@ impl Builder {
             pairs.insert(3, ("lib".into(), Value::str(&p.name)));
         }
         pairs.extend(extra);
+        // A fork: who wrote it, where else it may be asked from, and, if it
+        // is a slot not written yet, who fills it and where it rejoins.
+        if let Some(mut fields) = fork {
+            let writer = credit.unwrap_or_else(|| "inker".to_string());
+            fields.push(("credit".into(), Value::str(writer)));
+            if !pending.is_empty() {
+                fields.push(("pending".into(), Value::Obj(pending)));
+            }
+            pairs.push(("inquest".into(), Value::Obj(fields)));
+        }
+        if !analysis.is_empty() {
+            pairs.push(("analysis".into(), Value::Obj(analysis)));
+        }
         Value::Obj(pairs)
     }
 }

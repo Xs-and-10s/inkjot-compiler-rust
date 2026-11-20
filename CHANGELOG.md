@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Inkjot v0.6, milestone 18c
+
+- Inquests: a fork is a Link with `~ inquest` (`for id`, `from passage`,
+  `by role ~ rejoin passage ~ brief name`, `~ credit role`), lowered to an
+  `inquest` field; `kind: "inquest"` is retired. The checker refuses forks
+  in a cohort, a fork with no offered Link to stand in for, and a pending
+  fork with nowhere to rejoin; it notes Links without ids beside forks (#28).
+- `theme` and `brief` declarations; analysis tags on Links (`beat`,
+  `weighs`, `arc`, `stakes`, `plants`, `pays off`, `predict`, `lasting`,
+  `tone`, `reveals`), checked, in an `analysis` object (#28).
+- `~ track` on a value: `nib_shown` reports its `changes` (#28).
+- The engine: `forks`, `any_forks`, `take_fork`, `asked_from`, `map()`,
+  `Meta.inquests`, `Action::TakeFork`; the same through the NIF (#28).
+
 ### Inkjot v0.6, milestone 18b
 
 - Emphasis (`*italic*`, `**bold**`, `***both***`) is lowered to styled runs

@@ -12,6 +12,7 @@ mod events;
 mod hints;
 mod inputs;
 mod limits;
+mod map;
 mod prose;
 mod senses;
 pub mod test;
@@ -25,6 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::json::Value;
 pub use inputs::Ask;
+pub use map::{Edge, Node, StoryMap};
 pub use prose::{Para, Span};
 pub use value::V;
 
@@ -43,6 +45,7 @@ struct Decl {
 #[derive(Debug, Clone)]
 struct Passage {
     tags: Vec<String>,
+    title: Option<String>,
     header: Vec<Value>,
     body: Vec<Value>,
 }
@@ -52,6 +55,8 @@ struct Passage {
 pub struct Story {
     decls: BTreeMap<String, Decl>,
     passages: BTreeMap<String, Passage>,
+    /// The passages' names, in the order the source has them.
+    order: Vec<String>,
     start: String,
     povs: Vec<String>,
     /// Where each pov starts, from `start: a for x, b for y`.
@@ -120,6 +125,7 @@ impl Story {
         let mut story = Story {
             decls: BTreeMap::new(),
             passages: BTreeMap::new(),
+            order: Vec::new(),
             start: f(ir, "start").as_str().unwrap_or("").to_string(),
             povs: Vec::new(),
             start_for: BTreeMap::new(),
@@ -143,10 +149,12 @@ impl Story {
             let name = f(p, "name").as_str().unwrap_or("").to_string();
             let header = f(p, "header").as_arr().unwrap_or(&[]).to_vec();
             story.statements(&header, Some(&name));
+            story.order.push(name.clone());
             story.passages.insert(
                 name,
                 Passage {
                     tags: strs(f(p, "tags")),
+                    title: f(p, "title").as_str().map(str::to_string),
                     header,
                     body: f(p, "body").as_arr().unwrap_or(&[]).to_vec(),
                 },
@@ -260,6 +268,29 @@ impl Story {
     /// The `pov:` setting: who a Linker looks through, the default first.
     pub fn povs(&self) -> &[String] {
         &self.povs
+    }
+
+    /// The passages whose forks may be asked for from `nib`: the ones
+    /// whose `~ inquest from` names it.
+    pub fn asked_from(&self, nib: &str) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for (name, p) in &self.passages {
+            let asks = p.body.iter().any(|n| {
+                n.get("inquest")
+                    .is_some_and(|i| strs(f(i, "from")).iter().any(|x| x == nib))
+            });
+            if asks && !out.contains(name) {
+                out.push(name.clone());
+            }
+        }
+        out
+    }
+
+    /// Does any passage hide a fork?
+    pub fn has_forks(&self) -> bool {
+        self.passages
+            .values()
+            .any(|p| p.body.iter().any(|n| n.get("inquest").is_some()))
     }
 
     /// The characters marked `~ playable`, whom a lobby lets a Linker pick.
@@ -647,6 +678,26 @@ impl Run {
         std::mem::take(&mut self.noted)
     }
 
+    /// The values the Inker marked `~ track`, by path: `leo.trust`,
+    /// `crossed`. The engine reports how an action changed them.
+    pub fn tracked(&self) -> BTreeMap<String, V> {
+        let ids: Vec<&String> = self
+            .story
+            .decls
+            .iter()
+            .filter(|(_, d)| strs(f(&d.fields, "tags")).iter().any(|t| t == "track"))
+            .map(|(id, _)| id)
+            .collect();
+        self.vals
+            .iter()
+            .filter(|(key, _)| {
+                let last = key.rsplit('.').next().unwrap_or(key);
+                ids.iter().any(|id| *id == *key || *id == last)
+            })
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     /// The passages the last action entered, in order.
     pub fn trail(&self) -> &[String] {
         &self.trail
@@ -781,6 +832,10 @@ impl Run {
             return Ok(out);
         }
         for link in self.links.clone() {
+            // A fork is hidden: only an Inquest shows it.
+            if link.get("inquest").is_some() {
+                continue;
+            }
             if self.available(&link)? {
                 let id = f(&link, "id").as_str().unwrap_or("").to_string();
                 let label = self.label_of(&link)?;
@@ -790,9 +845,86 @@ impl Run {
         Ok(out)
     }
 
+    /// The forks that stand in for the offered Link `link_id`, in the order
+    /// written, as `(id, label)`. With `from`, asked from a later passage:
+    /// only forks whose `~ inquest from` names it. A fork is there only
+    /// while its offered Link is, and while its own conditions hold.
+    pub fn forks(&mut self, link_id: &str, from: Option<&str>) -> R<Vec<(String, Para)>> {
+        let mut out = Vec::new();
+        if self.waiting() || self.paused.is_some() {
+            return Ok(out);
+        }
+        let links = self.links.clone();
+        let Some(offered) = links
+            .iter()
+            .find(|l| l.get("inquest").is_none() && f(l, "id").as_str() == Some(link_id))
+        else {
+            return Ok(out);
+        };
+        if !self.available(offered)? {
+            return Ok(out);
+        }
+        let here = self.here().to_string();
+        for link in &links {
+            let Some(inquest) = link.get("inquest") else {
+                continue;
+            };
+            if f(inquest, "stands_in_for").as_str() != Some(link_id) {
+                continue;
+            }
+            let askable = match from {
+                None => true,
+                Some(nib) if nib == here => true,
+                Some(nib) => strs(f(inquest, "from")).iter().any(|p| p == nib),
+            };
+            if askable && self.available(link)? {
+                let id = f(link, "id").as_str().unwrap_or("").to_string();
+                out.push((id, self.label_of(link)?));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Is any fork here to be had, asked from `from` (or from here)?
+    pub fn any_forks(&mut self, from: Option<&str>) -> R<bool> {
+        for (id, _) in self.offers()? {
+            if !self.forks(&id, from)?.is_empty() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Take a fork an Inquest showed.
+    pub fn choose_fork(&mut self, id: &str, from: Option<&str>) -> R<()> {
+        self.begin_action();
+        let mut offered = Vec::new();
+        for (link_id, _) in self.offers()? {
+            offered.extend(self.forks(&link_id, from)?.into_iter().map(|(f, _)| f));
+        }
+        if !offered.iter().any(|f| f == id) {
+            return Err(format!("no fork `{id}` can be taken here"));
+        }
+        let link = self
+            .links
+            .iter()
+            .find(|l| f(l, "id").as_str() == Some(id))
+            .cloned()
+            .ok_or_else(|| format!("there is no fork `{id}` here"))?;
+        self.take(&link)?;
+        self.settle_deaths()
+    }
+
     /// Take the available Link with this id.
     pub fn choose(&mut self, id: &str) -> R<()> {
         self.begin_action();
+        if self
+            .links
+            .iter()
+            .any(|l| f(l, "id").as_str() == Some(id) && l.get("inquest").is_some())
+        {
+            return Err(format!("`{id}` is a fork: only an Inquest takes it"));
+        }
         let link = self
             .links
             .iter()
