@@ -59,6 +59,14 @@ quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
 margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.
 v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
 
+## Ex 2's duel, four ways (`ex2-duel-*.twee`)
+
+The duel of Ex 2 rewritten for the encounter milestone: once in general
+words (`ex2-duel-general.twee`), then once for each step of the `define`
+proposal (`-step1-like`, `-step2-fields`, `-step3-define`), each holding
+only what differs from the step before. What they showed is in
+`docs/define.md`: the general draft is the one to build.
+
 ## Rummy at Ashby (`rummy-at-ashby.twee`)
 
 A card game inside a story. Nell, running from the bailiffs, plays the

@@ -222,19 +222,29 @@ analysis of 20 Nov 2026):
   is `~ acts last`; `through mirror` is `~ requires mirror`; `hinted` is
   `me.asked_hint`.
 - Kept: `encounter`, `pattern`, `pin`, `skip`, the `round` tag.
-- Targeting and spreading, for any act (proposed with `define`, below):
-  `~ at enemy here` gives `target`; `~ then after 0.5s: …`; `~ spreads 2
-  to nearest enemy ~ every 0.3s`, with `hop` counting the hops, for chain
-  lightning, a fire moving room to room, a rumour among gnomes.
+- Targeting and spreading, for any act or Link: `~ at enemy here` gives
+  `target`, one Link per target, `{target}` in the label; `~ then after
+  0.5s: …`; `~ spreads 2 to nearest enemy ~ every 0.3s`, with `hop`
+  counting the hops, for chain lightning, a fire moving room to room, a
+  rumour among gnomes.
+- `~ answered by prevent, block, cover, absorb` on a threat;
+  `threat.target`; `on absorb with lumen`.
+- **Link groups**: a `>` line with clauses and no Link applies them to the
+  Links below it, up to a blank line (`> ~ for eldric ~ when not
+  eldric.frozen`).
+- The draft: `examples/drafts/ex2-duel-general.twee`. It also fixes two
+  bugs in the duel (`sanctum:shatter` naming no mirror; the cover line
+  always saying Roland).
 
-**`define`** (proposed 20 Nov 2026, not decided; `docs/define.md`): an
-Inker's own declaration word, built on a general one, with typed fields
-and the verb the platform shows. `define spell: act ~ verb cast ~ field
-power: number`, a `:: spell [define]` passage for what every spell does,
-read as `self.power`. The compiler lowers a spell to an act with
-`"defined_as": "spell"`; the engine never sees the word. It names what the
-general words can already say and adds nothing they cannot, so it comes
-after the encounter milestone, tested by writing Ex 2's duel both ways.
+**`define`** (proposed 20 Nov 2026; `docs/define.md`): an Inker's own
+declaration word, built on a general one, with typed fields and the verb
+the platform shows, lowered by the compiler so the engine never sees it.
+Planned in three steps: `like` for acts, typed fields, then the word.
+**Tested on Ex 2's duel the same day** (`examples/drafts/ex2-duel-*`):
+every step made the duel longer, and what it needed was general words and
+Link groups. So `define` waits: Ex 9, written in general words first, is
+its next test (a spellbook with many spells); if step 3 comes back, it
+builds on an archetype rather than a kind.
 
 ### Not in v0.6
 

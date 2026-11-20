@@ -122,6 +122,13 @@ expect: gate.scale_seal
 expect: knight.fixed
 expect: not roland.dead
 
+:: the_host_hums_the_frost_line_in_the_gallery [test]
+start: gate ~ as roland
+expect: not roland.knows.rhyme_frost
+do: "Go to the Gallery of Guests"
+expect text: "…and frost for the brave…"
+expect: roland.knows.rhyme_frost
+
 :: here_has_takes_a_kind [test]
 start: gallery ~ as eldric
 expect: here.has(statue)

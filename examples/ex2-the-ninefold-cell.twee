@@ -216,6 +216,7 @@ on start
 
 on enter gallery when gallery_mirror.open
 ~ then say self "(humming) …and frost for the brave…"
+~ then learn rhyme_frost
 
 on raise cleverness
 ~ then say self "Oh, nicely done. Nicely."
