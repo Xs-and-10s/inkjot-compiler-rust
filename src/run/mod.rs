@@ -487,7 +487,7 @@ impl Run {
                     }
                     // Facts come from the archetype first, then the item, then `with`.
                     let like = field("like").as_str().unwrap_or("");
-                    for source in [story.field(like, "facts"), field("facts"), field("with")] {
+                    for source in [story.field(like, "state"), field("state"), field("with")] {
                         if let Value::Obj(facts) = source {
                             for (name, v) in facts {
                                 self.vals.insert(format!("{id}.{name}"), self.constant(v));
@@ -495,7 +495,7 @@ impl Run {
                         }
                     }
                 }
-                "fact" | "state" => {
+                "state" => {
                     let v = self.constant(field("value"));
                     // A fact declared in a passage belongs to its place, or to the
                     // character or NPC whose margin it is: `orrery.ember`, `vell.cornered`.

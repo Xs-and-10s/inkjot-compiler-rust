@@ -14,7 +14,7 @@ use crate::twee::{self, Line, Passage};
 use crate::{expr, json};
 
 /// The Inkjot version this compiler targets.
-pub const VERSION: &str = "0.5";
+pub const VERSION: &str = "0.6";
 
 #[derive(Debug, Default, Clone)]
 pub struct Stats {
@@ -449,6 +449,14 @@ impl Checker {
         }
         match fields.get("format-version") {
             Some(v) if v.starts_with(VERSION) => {}
+            Some(v) if v.starts_with("0.5") => self.err(
+                p.line,
+                1,
+                format!(
+                    "this file targets Inkjot {v}; this compiler reads {VERSION}.x. \
+                     `inkjot migrate` rewrites a v0.5 file for v0.6"
+                ),
+            ),
             Some(v) => self.err(
                 p.line,
                 1,
@@ -600,6 +608,13 @@ impl Checker {
             *self.stretch.entry(kw.to_string()).or_default() += 1;
             return;
         }
+        if RESERVED_LATER.contains(&kw) {
+            return self.err(
+                head.line,
+                head.col,
+                format!("`{kw}` is reserved for a part of Inkjot v0.6 that is not built yet"),
+            );
+        }
         let rest = head.text[kw.len()..].trim_start();
         let rest_col = head.col + cols(&head.text[..head.text.len() - rest.len()]);
 
@@ -684,7 +699,7 @@ impl Checker {
                 c.line,
                 c.col + 8,
             ),
-            ["knows", clue] => self.need(clue, &["clue"], "clue", c.line, c.col + 6),
+            ["knows", fact] => self.need(fact, &["fact"], "fact", c.line, c.col + 6),
             ["moves", ..] => self.moves(&c.text[5..], c.line, c.col + 5),
             _ => {}
         }
@@ -714,6 +729,13 @@ impl Checker {
                 head.line,
                 rest_col,
                 format!("`{kind}` needs a name: `{kind} name: …`"),
+            );
+        }
+        if RESERVED.contains(&name) {
+            return self.err(
+                head.line,
+                rest_col,
+                format!("`{name}` is a reserved word and cannot name a {kind}"),
             );
         }
         let after = rest[name.len()..].trim_start();
@@ -961,12 +983,12 @@ impl Checker {
         let word_col = |n: usize| col + cols(&core[..core.find(words[n]).unwrap_or(0)]);
         let arg = |n: usize| words.get(n).copied().unwrap_or("");
         match verb {
-            "learn" => self.need(arg(1), &["clue"], "clue", line, col + 6),
+            "learn" => self.need(arg(1), &["fact"], "fact", line, col + 6),
             "teach" => {
                 if words.len() < 3 {
-                    self.err(line, col, "`teach` is written `teach who clue`");
+                    self.err(line, col, "`teach` is written `teach who fact`");
                 } else {
-                    self.need(arg(2), &["clue"], "clue", line, word_col(2));
+                    self.need(arg(2), &["fact"], "fact", line, word_col(2));
                 }
             }
             "gain" | "give" => self.need(arg(1), &["item"], "item", line, col + 5),
@@ -1376,7 +1398,7 @@ impl Checker {
                     }
                 }
                 "end" | "continue" | "cont" => *if_seen = false,
-                "append" | "once" | "note" | "todo" | "fixme" | "verse" => {}
+                "append" | "once" | "note" | "todo" | "fix" | "verse" => {}
                 "after" => {
                     if !is_duration(rest) {
                         self.err(line, pcol, "`[after]` needs a time such as `2s` or `400ms`");

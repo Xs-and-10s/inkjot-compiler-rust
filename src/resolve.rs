@@ -111,12 +111,12 @@ fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
             // `who.holds.any(tag)` is a call, not an item named `any`.
             if let Expr::Member(_, verb) = target.as_ref() {
                 let kind = match verb.as_str() {
-                    "knows" => Some("clue"),
+                    "knows" => Some("fact"),
                     "holds" if member != "any" => Some("item"),
                     _ => None,
                 };
                 if let Some(kind) = kind {
-                    let known_item = kind == "clue" && lookup.is_kind(member, "item");
+                    let known_item = kind == "fact" && lookup.is_kind(member, "item");
                     if !lookup.is_kind(member, kind) && !known_item {
                         out.push(Problem {
                             at: root(e),
@@ -200,7 +200,7 @@ mod tests {
             BUILTINS.contains(&name) || ["door", "secret", "key", "evidence"].contains(&name)
         }
         fn is_kind(&self, name: &str, kind: &str) -> bool {
-            matches!((name, kind), ("secret", "clue") | ("key", "item"))
+            matches!((name, kind), ("secret", "fact") | ("key", "item"))
         }
     }
 

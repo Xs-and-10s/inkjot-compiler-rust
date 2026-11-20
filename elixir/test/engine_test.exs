@@ -220,7 +220,7 @@ defmodule Inkjot.EngineTest do
   Round and Round
 
   :: StoryData
-  {"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+  {"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
 
   :: Inklink [config]
   kind: story

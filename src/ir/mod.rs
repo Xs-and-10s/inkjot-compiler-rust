@@ -138,6 +138,26 @@ pub(crate) fn expression(text: &str) -> Value {
     }
 }
 
+/// What a `state` may hold, from its starting value: `boolean`, `integer`,
+/// `decimal`, `text`, `id` (a name, or `nothing`), `range`, `list`, or
+/// `expression` for anything worked out.
+fn type_of(value: &Value) -> &'static str {
+    match value {
+        Value::Bool(_) => "boolean",
+        Value::Num(n) if n.contains('.') => "decimal",
+        Value::Num(_) => "integer",
+        Value::Str(_) => "id",
+        Value::Obj(pairs) => match pairs.first().map(|(k, _)| k.as_str()) {
+            Some("str") => "text",
+            Some("range") => "range",
+            Some("list") => "list",
+            Some("neg") if matches!(&pairs[0].1, Value::Num(_)) => "integer",
+            _ => "expression",
+        },
+        _ => "expression",
+    }
+}
+
 /// Lower an expression tree to JSON.
 ///
 /// - a name is a string: `"me"`; `yes` and `no` are `true` and `false`
@@ -452,7 +472,11 @@ impl Builder {
         f.add("id", Value::str(id.trim()));
         // What follows the colon depends on what is being declared.
         match kw {
-            "fact" => f.add("value", expression(value)),
+            "state" => {
+                let value = expression(value);
+                f.add("type", Value::str(type_of(&value)));
+                f.add("value", value);
+            }
             "stat" => f.add("range", expression(value)),
             "fuse" => f.add("start", token(value)),
             "way" => {
@@ -574,7 +598,7 @@ impl Builder {
             } else if t.starts_with('[') && !t.starts_with("[[") && t.ends_with(']') {
                 in_note = t[1..]
                     .split([';', ']'])
-                    .any(|part| matches!(part.trim(), "note" | "todo" | "fixme"));
+                    .any(|part| matches!(part.trim(), "note" | "todo" | "fix"));
                 if !in_note {
                     out.push(modifier(t));
                 }

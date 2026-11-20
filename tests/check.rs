@@ -6,7 +6,7 @@ const BASE: &str = r#":: StoryTitle
 A Small Hall
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "hall"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
 
 :: Inklink [config]
 kind: story
@@ -15,11 +15,11 @@ pov: ann
 place great_hall: "the hall"
 place cellar: "the cellar"
 way stair: great_hall - cellar ~ open when stair_clear
-fact stair_clear: no
+state stair_clear: no
 character ann: "Ann" ~ playable
 npc bob: "Bob" ~ in great_hall
 item key: "a key" ~ in great_hall
-clue secret: "A secret."
+fact secret: "A secret." ~ clue
 act examine: cost 1
 list notes: "notes"
 
@@ -183,11 +183,11 @@ fn speaker_must_be_declared() {
 }
 
 #[test]
-fn learned_clue_must_be_declared() {
+fn a_learned_fact_must_be_declared() {
     assert_broken(
         "learn secret",
         "learn secrets",
-        "`secrets` is not a declared clue",
+        "`secrets` is not a declared fact",
     );
 }
 
@@ -261,7 +261,7 @@ fn config_rules() {
 #[test]
 fn story_data_is_checked() {
     assert_broken_elsewhere(
-        "\"format-version\": \"0.5.0\"",
+        "\"format-version\": \"0.6.0\"",
         "\"format-version\": \"0.4.0\"",
         "targets Inkjot 0.4.0",
     );
@@ -278,7 +278,7 @@ fn duplicates_are_reported() {
     assert!(errors(&src)
         .iter()
         .any(|(_, m)| m.contains("two passages named `hall`")));
-    let src = BASE.replacen("clue secret:", "item key: \"another\"\nclue secret:", 1);
+    let src = BASE.replacen("fact secret:", "item key: \"another\"\nfact secret:", 1);
     assert!(errors(&src)
         .iter()
         .any(|(_, m)| m.contains("item `key` is declared twice")));
@@ -363,7 +363,7 @@ fn names_in_expressions_must_resolve() {
     assert_broken(
         "[if me.knows.secret but",
         "[if me.knows.secrt but",
-        "`secrt` is not a declared clue",
+        "`secrt` is not a declared fact",
     );
     assert_broken(
         "when me.is(ann)",
@@ -463,14 +463,14 @@ const COMMENTED: &str = r#":: StoryTitle
 Comments
 
 :: StoryData
-{"ifid": "x", "format": "Inkjot", "format-version": "0.5.0", "start": "room"}
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "room"}
 
 :: Inklink [config]
 kind: story
 mode: solo
 pov: ann
 character ann: "Ann" ~ playable ~ ((the only one))
-fact lit: no ~ ((a line comment after a tilde))
+state lit: no ~ ((a line comment after a tilde))
 ((a whole-line comment, with an undeclared_name in it))
 
 :: room
@@ -595,7 +595,7 @@ fn text_takes_double_quotes_and_thousands_take_a_mark() {
     assert!(errors.is_empty(), "{errors:#?}");
     // `1'000'000` is a million, in a declaration and in an expression.
     let src = COMMENTED
-        .replace("fact lit: no", "fact lit: no\nfact big: 1'000'000")
+        .replace("state lit: no", "state lit: no\nstate big: 1'000'000")
         .replace(
             "let both: not ((lit or lit) and lit)",
             "let both: big == 1'000'000",
@@ -663,4 +663,68 @@ fn once_per_day_needs_days_on_the_clock() {
     assert!(inkjot::check(&with_days).ok());
     let odd = ex2.replace("~ rewind ~ once per turn", "~ rewind ~ once per fortnight");
     assert!(!inkjot::check(&odd).ok());
+}
+
+#[test]
+fn a_v05_file_is_pointed_at_migrate() {
+    let errs = errors(&BASE.replace("\"0.6.0\"", "\"0.5.0\""));
+    assert_eq!(errs.len(), 1, "{errs:?}");
+    assert!(errs[0].1.contains("`inkjot migrate`"), "{errs:?}");
+}
+
+#[test]
+fn a_reserved_word_cannot_name_a_thing() {
+    for word in ["you", "it", "period", "knowledge"] {
+        assert_broken_elsewhere(
+            "list notes: \"notes\"",
+            &format!("list notes: \"notes\"\nlist {word}: \"x\""),
+            &format!("`{word}` is a reserved word and cannot name a list"),
+        );
+    }
+}
+
+#[test]
+fn a_statement_from_later_in_v06_says_so() {
+    assert_broken_elsewhere(
+        "act examine: cost 1",
+        "act examine: cost 1\nrule x: y",
+        "`rule` is reserved for a part of Inkjot v0.6 that is not built yet",
+    );
+}
+
+/// `i`, `you`, `myself` and `yourself` are the pov, and the first person's
+/// verbs are the third's: the IR says `me`, `knows`, `holds`, `is`.
+#[test]
+fn every_name_for_the_pov_is_me() {
+    let src = BASE
+        .replace(
+            "[if me.knows.secret but not stair_clear]",
+            "[if i.know.secret and you.knows.secret and not myself.hold.key and yourself.is(ann) and i.am(ann)]",
+        );
+    assert!(errors(&src).is_empty(), "{:?}", errors(&src));
+    let ir = inkjot::build(&src).unwrap().to_string();
+    let modifier = ir
+        .lines()
+        .find(|l| l.contains("\"if\""))
+        .unwrap_or_default()
+        .to_string();
+    for word in [
+        "\"i\"",
+        "\"you\"",
+        "\"myself\"",
+        "\"yourself\"",
+        "\"know\"",
+        "\"hold\"",
+        "\"am\"",
+    ] {
+        assert!(!ir.contains(word), "{word} reached the IR: {modifier}");
+    }
+}
+
+#[test]
+fn fix_is_an_authors_note() {
+    let src = BASE.replace("[end]", "[end]\n[fix]\nA rough line.\n");
+    assert!(errors(&src).is_empty(), "{:?}", errors(&src));
+    let ir = inkjot::build(&src).unwrap().to_string();
+    assert!(!ir.contains("A rough line."));
 }
