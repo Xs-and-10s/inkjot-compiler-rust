@@ -41,6 +41,7 @@ use std::sync::Arc;
 
 use crate::json::{self, Value};
 use crate::run::{Ask, Run, Story};
+pub use crate::run::{Para, Span};
 
 /// The engine's version. Logs recorded under one version replay the same
 /// way under it; the platform records it with every reading.
@@ -357,7 +358,8 @@ pub enum Action {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Link {
     pub id: String,
-    pub label: String,
+    /// The label, with its styles: `Para::plain()` reads it as text.
+    pub label: Para,
 }
 
 /// What the Linker sees now.
@@ -372,7 +374,7 @@ pub struct View {
     /// The clock's stop.
     pub now: u32,
     /// The paragraphs shown by the last action (or the start).
-    pub text: Vec<String>,
+    pub text: Vec<Para>,
     /// The Links offered.
     pub links: Vec<Link>,
     /// The inputs open, and what they accept.
@@ -508,9 +510,9 @@ impl State {
 /// offered now. Every path to a state goes through here once per action,
 /// so a replay looks exactly as often as the reading did.
 fn see(run: &mut Run) -> Result<View, String> {
-    let text = run.take_output();
+    let text = run.take_text();
     let links: Vec<Link> = run
-        .choices()?
+        .offers()?
         .into_iter()
         .map(|(id, label)| Link { id, label })
         .collect();

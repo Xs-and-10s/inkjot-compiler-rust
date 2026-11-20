@@ -755,6 +755,21 @@ impl Checker {
             }
         };
         let value_col = rest_col + cols(&rest[..rest.len() - value.len()]);
+        // Quoted text in the value and in clauses that hold text, not
+        // conditions: labels, `shown as`, `formally`, list entries.
+        if value.contains('"') {
+            self.strings(value, head.line, value_col);
+        }
+        for c in &s.clauses[1..] {
+            let text = c.text.as_str();
+            if text.starts_with('"')
+                || text.starts_with("shown as ")
+                || text.starts_with("formally ")
+                || text.starts_with("holds ")
+            {
+                self.strings(text, c.line, c.col);
+            }
+        }
         match kind {
             "way" => self.places(value, " - ", head.line, value_col),
             // A map names a region and lays its places out in rows: `~ a | b | c`.
@@ -815,6 +830,7 @@ impl Checker {
             None => ("", rest_col),
         };
         match kw {
+            "hint" => self.strings(value, line, vcol),
             // A passage's own title, for the Linker: `title: "The Millpond"`.
             "title" => {
                 if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
@@ -992,6 +1008,7 @@ impl Checker {
             return self.err(line, col, format!("`{shown}` is not an effect"));
         }
         let core = before_when(text);
+        self.strings(core, line, col);
         let words: Vec<&str> = core.split_whitespace().collect();
         let word_col = |n: usize| col + cols(&core[..core.find(words[n]).unwrap_or(0)]);
         let arg = |n: usize| words.get(n).copied().unwrap_or("");
@@ -1113,6 +1130,8 @@ impl Checker {
         self.stats.links += 1;
         if label.trim().is_empty() {
             self.err(l.no, cols(&text[..open]) + 3, "this Link has no label");
+        } else {
+            self.inserts(label, l.no, cols(&text[..open]) + 3);
         }
         let target = target.trim();
         let tcol = cols(&text[..target_at]) + 1;
@@ -1217,13 +1236,43 @@ impl Checker {
 
     /// Every `{…}` in a line of prose.
     fn inserts(&mut self, text: &str, line: usize, col: usize) {
+        match crate::text::split(text) {
+            Err((at, why)) => self.err(line, col + cols(&text[..at]), why),
+            Ok(pieces) => {
+                for p in pieces {
+                    if let crate::text::Piece::Code(code, at) = p {
+                        self.insert(&code, line, col + cols(&text[..at]));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every quoted string in `text`: its braces hold expressions, checked
+    /// like any other.
+    fn strings(&mut self, text: &str, line: usize, col: usize) {
         let mut from = 0;
-        while let Some(i) = text[from..].find('{') {
+        while let Some(i) = text[from..].find('"') {
             let open = from + i;
-            let Some(close) = text[open..].find('}').map(|j| open + j) else {
-                return self.err(line, col + cols(&text[..open]), "this `{` is never closed");
+            let Some(close) = crate::text::string_end(text, open) else {
+                return self.err(
+                    line,
+                    col + cols(&text[..open]),
+                    "this string is never closed",
+                );
             };
-            self.insert(&text[open + 1..close], line, col + cols(&text[..open]) + 1);
+            let inner = &text[open + 1..close];
+            let inner_col = col + cols(&text[..open + 1]);
+            match crate::text::split(inner) {
+                Err((at, why)) => self.err(line, inner_col + cols(&inner[..at]), why),
+                Ok(pieces) => {
+                    for p in pieces {
+                        if let crate::text::Piece::Code(code, at) = p {
+                            self.expr(&code, line, inner_col + cols(&inner[..at]));
+                        }
+                    }
+                }
+            }
             from = close + 1;
         }
     }

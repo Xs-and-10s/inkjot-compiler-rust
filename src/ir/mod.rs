@@ -116,11 +116,44 @@ fn split_when(text: &str) -> (&str, Option<Value>) {
     }
 }
 
-/// The text inside the first pair of double quotes, if any.
+/// The text inside the first pair of double quotes, if any, as written:
+/// braces may hold quotes of their own, and escapes are left in.
 fn quoted(text: &str) -> Option<&str> {
-    let start = text.find('"')? + 1;
-    let end = start + text[start..].find('"')?;
-    Some(&text[start..end])
+    let start = text.find('"')?;
+    let end = crate::text::string_end(text, start)?;
+    Some(&text[start + 1..end])
+}
+
+/// Quoted text as the IR keeps it: a plain string, or, when it has braces,
+/// `{"text": ["Keeper of ", {"value": "here"}]}`, worked out when used.
+pub(crate) fn text_value(inner: &str) -> Value {
+    use crate::text::{plain, split, Piece};
+    let Ok(pieces) = split(inner) else {
+        return Value::str(inner);
+    };
+    if pieces.iter().all(|p| matches!(p, Piece::Lit(_))) {
+        let s: String = pieces
+            .iter()
+            .map(|p| match p {
+                Piece::Lit(l) => plain(l),
+                Piece::Code(..) => String::new(),
+            })
+            .collect();
+        return Value::str(s);
+    }
+    let parts = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(plain(&l)),
+            Piece::Code(code, _) => Value::obj([("value", expression(&code))]),
+        })
+        .collect();
+    Value::obj([("text", Value::Arr(parts))])
+}
+
+/// Quoted text, if there is any, as [`text_value`] keeps it.
+fn quoted_text(text: &str) -> Option<Value> {
+    quoted(text).map(text_value)
 }
 
 // ---------------------------------------------------------------- expressions
@@ -549,7 +582,7 @@ impl Builder {
             "goal" | "reaction" | "checkpoint" => {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
-            "hint" => f.add("hint", Value::str(quoted(value).unwrap_or(value))),
+            "hint" => f.add("hint", quoted_text(value).unwrap_or(Value::str(value))),
             "tags" => {
                 let all =
                     std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
@@ -790,7 +823,7 @@ impl Builder {
             ("type".into(), Value::str("link")),
             ("id".into(), Value::str(&id)),
             ("id_from".into(), Value::str(id_from)),
-            ("label".into(), Value::str(label.trim())),
+            ("label".into(), parts(label.trim())),
             ("target".into(), Value::str(target.trim())),
             ("kind".into(), Value::str(kind)),
             (
@@ -942,7 +975,7 @@ pub(crate) fn effect(text: &str) -> Value {
         }
         "say" => {
             pairs.push(("who".into(), Value::str(first_word(rest))));
-            pairs.push(("text".into(), quoted(rest).map_or(Value::Null, Value::str)));
+            pairs.push(("text".into(), quoted_text(rest).unwrap_or(Value::Null)));
         }
         _ => {
             let mut args = words(rest);
@@ -965,7 +998,7 @@ fn clause(text: &str) -> Value {
         return Value::obj([("then", effect(e))]);
     }
     if text.starts_with('"') {
-        return Value::obj([("label", quoted(text).map_or(Value::Null, Value::str))]);
+        return Value::obj([("label", quoted_text(text).unwrap_or(Value::Null))]);
     }
     for lead in ["hidden", "fixed", "offstage"] {
         if let Some(e) = text
@@ -1077,22 +1110,16 @@ fn modifier(text: &str) -> Value {
 
 /// A line of prose as parts: plain strings, and one object per `{insert}`.
 fn parts(text: &str) -> Value {
-    let mut out = Vec::new();
-    let mut rest = text;
-    while let Some(open) = rest.find('{') {
-        let Some(close) = rest[open..].find('}').map(|i| open + i) else {
-            break;
-        };
-        if open > 0 {
-            out.push(Value::str(&rest[..open]));
-        }
-        out.push(insert(&rest[open + 1..close]));
-        rest = &rest[close + 1..];
-    }
-    if !rest.is_empty() {
-        out.push(Value::str(rest));
-    }
-    Value::Arr(out)
+    use crate::text::{emphasis, split, Piece};
+    let pieces = split(text).unwrap_or_else(|_| vec![Piece::Lit(text.to_string())]);
+    let raw: Vec<Value> = pieces
+        .into_iter()
+        .map(|p| match p {
+            Piece::Lit(l) => Value::str(l),
+            Piece::Code(code, _) => insert(&code),
+        })
+        .collect();
+    Value::Arr(emphasis(raw))
 }
 
 /// One `{insert}`: a named insert, or `{"value": expression}`.

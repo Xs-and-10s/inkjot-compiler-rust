@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use super::{cost, effect, expression, quoted, token, word, words};
+use super::{cost, effect, expression, quoted, quoted_text, token, word, words};
 use crate::json::Value;
 use crate::syntax::{is_ident, top_mask};
 
@@ -257,7 +257,7 @@ impl<'a> Fields<'a> {
             } else {
                 "label"
             };
-            self.add(key, Value::str(quoted(text).unwrap_or(text)));
+            self.add(key, quoted_text(text).unwrap_or(Value::str(text)));
             return;
         }
         // A map row: `orrery | gallery | gate`.
@@ -310,7 +310,7 @@ impl<'a> Fields<'a> {
             Shape::Flag => Value::Bool(true),
             Shape::Id => Value::str(rest),
             Shape::Ids => ids(rest),
-            Shape::Text => Value::str(quoted(rest).unwrap_or(rest)),
+            Shape::Text => quoted_text(rest).unwrap_or(Value::str(rest)),
             Shape::Expr => expression(rest),
             Shape::Token => token(rest),
             Shape::Words => Value::Arr(words(rest)),
@@ -350,7 +350,7 @@ impl<'a> Fields<'a> {
                     };
                     let mut entry = vec![("id".to_string(), Value::str(id))];
                     if let Some(label) = label {
-                        entry.push(("label".to_string(), Value::str(label)));
+                        entry.push(("label".to_string(), super::text_value(label)));
                     }
                     if let Some(mark) = mark {
                         entry.push(("mark".to_string(), Value::str(mark)));

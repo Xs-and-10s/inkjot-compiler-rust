@@ -77,14 +77,15 @@ impl Run {
                 None => continue,
             };
             for (i, stmt) in header.iter().enumerate() {
-                let Some(text) = stmt.get("hint").and_then(Value::as_str) else {
+                let Some(hint) = stmt.get("hint") else {
                     continue;
                 };
                 if self.heard.contains(&(player.clone(), nib.clone(), i)) {
                     continue;
                 }
                 if self.hint_applies(stmt)? {
-                    return Ok(Some((nib, i, text.to_string())));
+                    let text = self.text_of(hint)?;
+                    return Ok(Some((nib, i, text)));
                 }
             }
         }
@@ -128,7 +129,7 @@ impl Run {
         let left = self.hints_left()?;
         self.vals.insert(key, V::Num(left - 1.0));
         self.heard.insert((self.player(), nib, i));
-        self.output.push(text);
+        self.output.push(text.into());
         Ok(())
     }
 }
