@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Drafts
+
+- Ex 2's duel written four ways, to test the `define` proposal: in general
+  words, and with each of its three steps (`examples/drafts/ex2-duel-*`).
+  The findings, in `docs/define.md`: the general words win; `define` waits
+  for an Inklink with a spellbook. Link groups and `~ at` on Links join the
+  encounter milestone's plan.
+- Ex 2: the Host's humming in the Gallery teaches the rhyme's frost line,
+  which nothing taught before, so "You know his rhyme, every line" can be
+  shown.
+
 ### Inkjot v0.6, milestone 18d
 
 - Costs name their resource: `default cost: vults` in the config, and a

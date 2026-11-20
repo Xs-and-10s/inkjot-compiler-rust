@@ -82,10 +82,9 @@ of the same length; one that pairs with nothing stays a literal `*`.
 
 | Source | Part |
 |---|---|
-
-| Source | Part |
-|---|---|
 | `{present}` | `{"insert": "present"}` |
+| `{leo.aka}` | `{"value": {"get": ["leo", "aka"]}}` |
+| `{all leo.aka}` | `{"value": {"get": ["leo", "aka"]}, "all": true}`: every name, not one picked |
 | `{embed nib: "x"}` | `{"insert": "embed", "nib": "x"}` |
 | `{list the_list ~ one per line}` | `{"insert": "list", "list": "the_list", "options": ["one per line"]}` |
 | `{name input for: me.name, max: 24}` | `{"insert": "name input", "args": {"for": {"get": ["me", "name"]}, "max": 24}}` |
@@ -95,8 +94,6 @@ The jury's and the inputs' arguments are typed: a number is a number,
 `'quoted'` text is text, and anything else is an expression. Other inserts
 with arguments (`{reveal link: …}`, `{sound effect: …}`) keep them as text
 for now.
-| `{leo.aka}` | `{"value": {"get": ["leo", "aka"]}}` |
-| `{all leo.aka}` | `{"value": {"get": ["leo", "aka"]}, "all": true}`: every name, not one picked |
 
 **`modifier`**
 

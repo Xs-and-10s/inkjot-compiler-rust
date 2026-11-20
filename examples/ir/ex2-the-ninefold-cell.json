@@ -1418,6 +1418,11 @@
               "who": "self",
               "text": "(humming) …and frost for the brave…",
               "when": null
+            },
+            {
+              "do": "learn",
+              "args": ["rhyme_frost"],
+              "when": null
             }
           ],
           "once": false,

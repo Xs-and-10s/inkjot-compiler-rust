@@ -460,6 +460,22 @@ impl Arith {
     }
 }
 
+/// A number as the reader sees it: `1'008`, with a mark every three digits.
+fn shown(n: i64) -> String {
+    let digits = n.abs().to_string();
+    let mut out = String::new();
+    for (i, d) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push('\'');
+        }
+        out.push(d);
+    }
+    if n < 0 {
+        out.insert(0, '-');
+    }
+    out
+}
+
 fn arith() -> impl Strategy<Value = Arith> {
     let leaf = prop_oneof![
         (0..10i64).prop_map(Arith::Num),
@@ -523,6 +539,7 @@ proptest! {
         let text = outcomes[0].transcript.join("\n");
         let before = e.value([0, 0, 0]);
         let after = e.value([1, 0, 0]);
+        let (before, after) = (shown(before), shown(after));
         let then_line = format!("Then: {before} and {before}.");
         let now_line = format!("Now: {before} and {after}.");
         prop_assert!(text.contains(&then_line), "{}\n{}", e.source(), text);
