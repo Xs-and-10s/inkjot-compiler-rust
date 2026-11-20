@@ -28,6 +28,19 @@
 - `docs/platform/`: the platform's handoff (the event log, how it calls
   the engine, IR 3 requests, follow-ups) (#24).
 
+### The NIF
+
+- `Inkjot.Engine`: the engine inside the BEAM, as a Rustler NIF
+  (`native/inkjot_nif`). `mix.exs` sits at the root and the Elixir code
+  under `elixir/`, so the platform depends on this repository directly.
+  States and Inklinks are resources; the calls that play the story run on
+  dirty CPU schedulers; refusals are `{:error, {code, message, at}}`;
+  events come back as maps with string keys. Also `build/1` (#25).
+- History snapshots are shared behind `Arc`s, so a clone of a long run
+  stays cheap: a Link 300 in to Ex 1 went from 25 ms to 0.5 ms (#25).
+- The workspace: `inkjot` stays dependency-free; Rustler is only in
+  `inkjot_nif` (#25).
+
 ### Licence
 
 - The code is now `MIT OR Apache-2.0`. The example Inklinks are CC BY 4.0

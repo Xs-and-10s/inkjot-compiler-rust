@@ -6,6 +6,11 @@ description = "Compiler for Inkjot, the Twee 3 dialect behind Inklinks"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Xs-and-10s/inkjot-compiler-rust"
 
+[workspace]
+# The compiler and engine (this package) has no dependencies. The NIF that
+# puts the engine inside the BEAM is its own crate, with Rustler.
+members = [".", "native/inkjot_nif"]
+
 [lib]
 name = "inkjot"
 path = "src/lib.rs"

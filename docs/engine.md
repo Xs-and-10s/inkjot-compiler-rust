@@ -1,7 +1,8 @@
 # The engine
 
 `inkjot::engine` is the interpreter as a program that plays Inklinks calls
-it: the Inklinks platform, through a Rustler NIF (milestone 17), or a test.
+it: the Inklinks platform, through the NIF (`Inkjot.Engine`, below), or a
+test.
 It sits on top of `inkjot::run` and adds four promises, each under a
 property test in `tests/engine.rs`.
 
@@ -184,25 +185,88 @@ thread.
 
 ## Costs
 
-`take_link` clones the run. The run keeps a snapshot of the world at the
-start of every turn (for rewinds and echoes), so a clone costs more as a
-reading goes on. That is fine for stories of the length of Ex 1 to 3;
-milestone 17 measures it through the NIF, and sharing snapshots behind
-`Arc`s is the fix if it is needed.
+`take_link` clones the run and plays on the clone. The run keeps a
+snapshot of the world at the start of every turn (for rewinds and echoes);
+the snapshots sit behind `Arc`s, so a clone copies pointers to them, not
+the snapshots. Measured through the NIF (release, a small cloud machine),
+on the examples:
 
-## For the NIF (milestone 17)
+| Call | Ex 1 (109 KB IR) | Ex 2 (239 KB) | Ex 3 (71 KB) |
+|---|---|---|---|
+| `load` | 2.6 ms | 5.1 ms | 1.3 ms |
+| `start` | 0.25 ms | 0.17 ms | 0.04 ms |
+| `take_link`, 30 Links in | 0.22 ms | 0.20 ms | |
+| `take_link`, 400 Links in | 0.51 ms | 0.25 ms | |
+| `view` | 13 µs | 3 µs | 2 µs |
+| `replay` of 30 actions | 8.2 ms | 6.7 ms | 0.4 ms (8) |
 
-- A two-crate workspace: `inkjot`, which stays dependency-free, and
-  `inkjot_nif`, which depends on it and on Rustler.
-- `Inklink` and `State` as `ResourceArc`s; the Elixir side holds handles,
-  never copies.
-- `load` and `replay` on dirty CPU schedulers: they can take longer than
-  a millisecond. `take_link` and `answer` usually do not, but the step limit
-  is the bound, not the usual case; measure, and move them too if needed.
-- Build the NIF in release mode. Dirty scheduler stacks are small (set by
-  `+sssdcpu`); the step limit keeps the engine's stack use bounded, but a
-  debug build uses several times more.
-- `Refused` becomes `{:error, {code, message, at}}`.
+Before the snapshots were shared, a Link 300 in to Ex 1 took 25 ms. What
+still grows is what NPCs have seen (Ex 1's sightings, one entry per person
+per turn), copied into each new snapshot. Sharing it the same way is the
+next step if a long game needs it.
+
+## The NIF
+
+`Inkjot.Engine` (in `elixir/`, with `mix.exs` at the root of this
+repository) wraps `native/inkjot_nif`, a Rustler crate. The `inkjot` crate
+itself stays dependency-free: Rustler is only in `inkjot_nif`.
+
+```elixir
+# The platform's mix.exs
+{:inkjot, github: "Xs-and-10s/inkjot-compiler-rust", branch: "main"}  # or a tag, once there is one
+```
+
+It needs Elixir 1.15 or later and a Rust toolchain (1.91 or later) where it
+is compiled: Rustler builds the crate in release mode with `mix compile`.
+
+```elixir
+{:ok, inklink} = Inkjot.Engine.load(File.read!("ex3.json"))
+{:ok, state} = Inkjot.Engine.start(inklink, 42, %{})
+%{nib: nib, links: links, text: text} = Inkjot.Engine.view(state)
+{:ok, next} = Inkjot.Engine.take_link(state, hd(links).id)
+[%{"type" => "nib_shown", "origin" => "engine", "data" => data} | _] = Inkjot.Engine.events(next)
+{:ok, again} = Inkjot.Engine.replay(inklink, 42, %{}, Inkjot.Engine.actions(next))
+```
+
+| Call | Returns | Scheduler |
+|---|---|---|
+| `build(source)` | `{:ok, ir_json}` or `{:error, [message]}` | dirty CPU |
+| `load(ir_json)` | `{:ok, inklink}` | dirty CPU |
+| `meta(inklink)` | a map with atom keys | normal |
+| `start(inklink, seed, start \\ %{})` | `{:ok, state}` | dirty CPU |
+| `view(state)` | a map with atom keys | normal |
+| `events(state)` | a list of maps with string keys, as the platform's log stores them | normal |
+| `actions(state)`, `seed(state)`, `ending(state)` | the log | normal |
+| `take_link(state, id)`, `act(state, action)` | `{:ok, state}` | dirty CPU |
+| `replay(inklink, seed, start, actions, upto \\ nil)` | `{:ok, state}` | dirty CPU |
+| `replay_all(inklink, seed, start, actions)` | `{:ok, [state]}` | dirty CPU |
+| `engine_version()` | `1` | normal |
+
+- **Handles.** An `inklink` and a `state` are resources: references the
+  Elixir side holds, never copies. The BEAM frees them when nothing holds
+  them. Keep one state per Nib shown, if going back needs it.
+- **Terms.** `start` is `%{nib: _, pov: _, hints: _}`, every key optional.
+  An action is `{:take_link, id}`, `{:answer, [word]}` or
+  `{:vote, who, how, [proof]}`. A refusal is
+  `{:error, {code, message, at}}`. A term of the wrong shape raises
+  `ArgumentError`.
+- **Schedulers.** Every call that plays the story or reads a whole file runs
+  on a dirty CPU scheduler. A Link takes 0.2 to 0.6 ms (above): under the
+  1 ms a NIF may hold a normal scheduler, but too close, and it grows with
+  a long game. A dirty call costs a few microseconds more. The calls that
+  only read a state take microseconds and run on normal schedulers.
+- **Stack.** The step limit keeps the engine's stack small in a release
+  build, so a `next:` loop is refused on a scheduler thread too.
+  `Inkjot.Native` always builds in release mode.
+- **Tests** (`mix test`, `elixir/test/`): StreamData properties over
+  random readings of Ex 1 to 3 (replay gives the same views and events;
+  acting never changes a state; a Link not offered is refused; every event
+  is in the catalogue), a `next:` loop refused with the VM alive, and a
+  Link under a millisecond deep into Ex 1.
+
+The platform's stub engine can serve as an oracle: run its Ex 3 scenarios
+against `Inkjot.Engine`, and compare the two engines' views over random
+readings.
 
 ## Not yet
 
@@ -212,3 +276,5 @@ milestone 17 measures it through the NIF, and sharing snapshots behind
   for the platform's path tree and the Inker's path analytics: an engine
   call, `map()`, built with IR 3.
 - **`snapshot`/`restore`**, once readings get long enough to need them.
+- **Precompiled NIFs** (`rustler_precompiled`), so the platform's build
+  needs no Rust toolchain.

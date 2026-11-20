@@ -1,0 +1,16 @@
+[package]
+name = "inkjot_nif"
+version = "0.5.0"
+edition = "2021"
+description = "The Inkjot engine as an Erlang NIF, for the Inklinks platform"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Xs-and-10s/inkjot-compiler-rust"
+publish = false
+
+[lib]
+name = "inkjot_nif"
+crate-type = ["cdylib"]
+
+[dependencies]
+inkjot = { path = "../.." }
+rustler = "0.38"
