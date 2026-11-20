@@ -27,7 +27,14 @@
 //!   not fit, an action that runs past the step limit, even a bug in the
 //!   interpreter (a caught panic). A refused call changes nothing.
 //!
+//! Each state also carries the [`Event`]s the action that made it caused,
+//! for the platform's log (see [`events`]).
+//!
 //! This is a solo engine. Cohort play (seats, shared acts) comes later.
+
+mod events;
+
+pub use events::{catalogue_markdown, Event, EventType, CATALOGUE};
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
@@ -223,6 +230,8 @@ impl Inklink {
                 return Err(classify(&run, why, RefusedKind::StoryError));
             }
             let view = see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            let mut ending = None;
+            let events = events::events(&mut run, &view, &mut ending);
             Ok(State {
                 inklink: self.clone(),
                 seed,
@@ -230,6 +239,8 @@ impl Inklink {
                 actions: Vec::new(),
                 run,
                 view,
+                events,
+                ending,
             })
         })
     }
@@ -252,6 +263,27 @@ impl Inklink {
                 .map_err(|r| Refused { at: Some(i), ..r })?;
         }
         Ok(state)
+    }
+
+    /// Rebuild a reading from its log, keeping every state on the way:
+    /// the start, then one per action. Going back needs earlier states,
+    /// and their events, concatenated, are the reading's engine events.
+    pub fn replay_all(
+        &self,
+        seed: u64,
+        start: &Start,
+        actions: &[Action],
+    ) -> Result<Vec<State>, Refused> {
+        let mut states = vec![self.start(seed, start)?];
+        for (i, action) in actions.iter().enumerate() {
+            let next = states
+                .last()
+                .expect("the start is always there")
+                .act(action)
+                .map_err(|r| Refused { at: Some(i), ..r })?;
+            states.push(next);
+        }
+        Ok(states)
     }
 }
 
@@ -333,7 +365,7 @@ pub struct Link {
 pub struct View {
     /// The Nib the pov is at.
     pub nib: String,
-    /// Its tags: `finale`, `ending`, `act`.
+    /// Its tags: `finale`, `epilogue`, `act`.
     pub tags: Vec<String>,
     /// Who the Linker is looking through.
     pub pov: String,
@@ -358,6 +390,10 @@ pub struct State {
     actions: Vec<Action>,
     run: Run,
     view: View,
+    /// What the action that made this state caused.
+    events: Vec<Event>,
+    /// The last finale reached in this reading.
+    ending: Option<String>,
 }
 
 impl std::fmt::Debug for State {
@@ -367,6 +403,7 @@ impl std::fmt::Debug for State {
             .field("start", &self.start)
             .field("actions", &self.actions)
             .field("view", &self.view)
+            .field("events", &self.events)
             .finish_non_exhaustive()
     }
 }
@@ -374,6 +411,17 @@ impl std::fmt::Debug for State {
 impl State {
     pub fn view(&self) -> &View {
         &self.view
+    }
+
+    /// The engine's events from the action that made this state (or from
+    /// the start), in order.
+    pub fn events(&self) -> &[Event] {
+        &self.events
+    }
+
+    /// The last finale this reading reached, if any.
+    pub fn ending(&self) -> Option<&str> {
+        self.ending.as_deref()
     }
 
     /// The log: every action taken since the start, in order.
@@ -419,6 +467,8 @@ impl State {
                 return Err(classify(&run, why, otherwise));
             }
             let view = see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            let mut ending = self.ending.clone();
+            let events = events::events(&mut run, &view, &mut ending);
             let mut actions = self.actions.clone();
             actions.push(action.clone());
             Ok(State {
@@ -428,6 +478,8 @@ impl State {
                 actions,
                 run,
                 view,
+                events,
+                ending,
             })
         })
     }

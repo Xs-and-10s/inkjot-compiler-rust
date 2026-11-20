@@ -150,7 +150,8 @@ When a property finds a bug, fix it and add a plain test for it in
 | `src/check.rs` | Statements, Links, bodies, and name resolution |
 | `src/ir/mod.rs` | Lowering to the JSON IR |
 | `src/ir/clauses.rs` | The phrase vocabulary for typed fields |
-| `src/engine.rs` | The engine: the interpreter as the platform calls it |
+| `src/engine/mod.rs` | The engine: the interpreter as the platform calls it |
+| `src/engine/events.rs` | The engine's events, and their catalogue |
 | `src/run/mod.rs` | The interpreter over the IR |
 | `src/run/value.rs` | Values while a story runs |
 | `src/run/events.rs` | `on` handlers: what happens when something happens |

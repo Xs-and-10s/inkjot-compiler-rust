@@ -526,7 +526,7 @@ Three revolutionaries are looking at you with very large eyes. On the mantel, Le
 
 > [[The end->the_list]]
 
-:: the_list [epilogue]
+:: the_list [epilogue finale]
 Jojo’s list, as of this evening:
 
 {list the_list ~ one per line}

@@ -15,6 +15,19 @@
   hasher (#23).
 - An `Ask` carries its prompt (#23).
 
+### Engine events
+
+- Each state carries the events the action that made it caused:
+  `nib_shown`, `ending_reached`, `reading_finished`, and from the
+  interpreter `checkpoint_reached`, `died`, `rewound`, `echo_ended` and
+  `turn_ended`. `engine::CATALOGUE` lists them with their keys (#24).
+- `Inklink::replay_all` returns every state of a reading (#24).
+- `[finale]` is an ending; `[epilogue]` a coda. Ex 2's endings are now
+  `[finale]` (and `fallen` is not); Ex 3's `the_list` is
+  `[epilogue finale]` (#24).
+- `docs/platform/`: the platform's handoff (the event log, how it calls
+  the engine, IR 3 requests, follow-ups) (#24).
+
 ### Licence
 
 - The code is now `MIT OR Apache-2.0`. The example Inklinks are CC BY 4.0

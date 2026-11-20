@@ -314,6 +314,12 @@ dice pick at the start, so the culprit can change from run to run.
 everyone has moved, they all go to the `[finale]` passage no Link leads to
 (Ex 1's `terminus`, not its `verdict`).
 
+A `[finale]` is an ending, and its name is the ending's id. An Inklink may
+have many, reached by Links (Ex 2's three, Ex 1's `verdict`) or by the clock
+(Ex 1's `terminus`). An `[epilogue]` is a coda after one: each finale may lead
+to its own, or to a run of them, and the ending stays the finale. A
+passage may be both (Ex 3's `the_list`).
+
 ## Time: checkpoints and rewinds
 
 The interpreter keeps a log, as the paper Conductor did: a snapshot of the
