@@ -5,6 +5,7 @@
 
 pub mod check;
 pub mod diag;
+pub mod engine;
 pub mod expr;
 pub mod ir;
 pub mod json;

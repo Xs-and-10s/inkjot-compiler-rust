@@ -28,7 +28,7 @@ use super::{f, place_of, strs, Local, Run, R, V};
 use crate::json::Value;
 
 /// A Linker who is not the one being served right now.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct Seat {
     links: Vec<Value>,
     output: Vec<String>,
@@ -38,6 +38,7 @@ pub(super) struct Seat {
 }
 
 /// A shared act waiting to be settled.
+#[derive(Clone)]
 pub(super) struct Claim {
     /// The character reaching for it.
     who: String,

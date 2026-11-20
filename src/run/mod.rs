@@ -220,6 +220,25 @@ impl Story {
     fn has_tag(&self, id: &str, tag: &str) -> bool {
         strs(self.field(id, "tags")).iter().any(|t| t == tag)
     }
+
+    /// A passage's tags: `[act]`, `[finale]`. None for a passage that is
+    /// not there.
+    pub fn passage_tags(&self, passage: &str) -> &[String] {
+        self.passages.get(passage).map_or(&[], |p| &p.tags)
+    }
+
+    /// The `pov:` setting: who a Linker looks through, the default first.
+    pub fn povs(&self) -> &[String] {
+        &self.povs
+    }
+
+    /// The characters marked `~ playable`, whom a lobby lets a Linker pick.
+    pub fn playable(&self) -> Vec<String> {
+        self.ids_of("character")
+            .into_iter()
+            .filter(|c| self.has_tag(c, "playable"))
+            .collect()
+    }
 }
 
 /// What an NPC saw at the end of one turn: the turn, and each person in
@@ -248,6 +267,7 @@ struct Entry {
 }
 
 /// A story being played.
+#[derive(Clone)]
 pub struct Run {
     story: Arc<Story>,
     /// Who the Linker is looking through. Empty before a lobby picks someone.
@@ -329,6 +349,31 @@ pub struct Run {
     seen: BTreeMap<String, Vec<senses::SeenMove>>,
     /// Uses of acts that rewind: the player's, so a rewind keeps them.
     player_uses: BTreeMap<String, V>,
+    /// What the action in hand has done so far, against the step limit.
+    work: Work,
+}
+
+/// The most passages one action may enter. A `next:` that leads back to
+/// where it came from would otherwise recurse until the stack runs out, and
+/// a stack overflow ends the whole process: nothing can catch it.
+pub const MAX_ENTERED: u32 = 64;
+
+/// The most expressions one action may evaluate.
+pub const MAX_STEPS: u64 = 100_000;
+
+/// What one action has done: the passages entered and the expressions
+/// evaluated. Every action (`start`, `choose`, `answer`, `vote`) begins at
+/// zero; past either limit, the action fails.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Work {
+    pub entered: u32,
+    pub steps: u64,
+}
+
+impl Work {
+    pub fn over_limit(&self) -> bool {
+        self.entered > MAX_ENTERED || self.steps > MAX_STEPS
+    }
 }
 
 impl Run {
@@ -381,6 +426,7 @@ impl Run {
             no_hints: false,
             seen: BTreeMap::new(),
             player_uses: BTreeMap::new(),
+            work: Work::default(),
         };
         run.init();
         run.place_npcs();
@@ -521,6 +567,7 @@ impl Run {
 
     /// Begin at `passage`, or at the story's start, looking through `who`.
     pub fn start(&mut self, passage: Option<&str>, who: Option<&str>) -> R<()> {
+        self.work = Work::default();
         if let Some(who) = who {
             self.pov = who.to_string();
         }
@@ -542,6 +589,16 @@ impl Run {
         // The log begins where play does.
         self.history = vec![self.snapshot()];
         Ok(())
+    }
+
+    /// The story being played.
+    pub fn story(&self) -> &Story {
+        &self.story
+    }
+
+    /// What the last action did, against the step limit.
+    pub fn work(&self) -> Work {
+        self.work
     }
 
     /// The text shown since this was last called.
@@ -623,6 +680,7 @@ impl Run {
 
     /// Take the available Link with this id.
     pub fn choose(&mut self, id: &str) -> R<()> {
+        self.work = Work::default();
         let link = self
             .links
             .iter()
@@ -1014,6 +1072,13 @@ impl Run {
             .passages
             .get(passage)
             .ok_or_else(|| format!("there is no passage `{passage}`"))?;
+        self.work.entered += 1;
+        if self.work.entered > MAX_ENTERED {
+            return Err(format!(
+                "this action entered more than {MAX_ENTERED} passages, the step limit; \
+                 check for a `next:` that leads back where it came from"
+            ));
+        }
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
@@ -1887,6 +1952,12 @@ impl Run {
 
     /// Evaluate a lowered expression.
     pub fn eval(&mut self, e: &Value) -> R<V> {
+        self.work.steps += 1;
+        if self.work.steps > MAX_STEPS {
+            return Err(format!(
+                "this action evaluated more than {MAX_STEPS} expressions, the step limit"
+            ));
+        }
         let Value::Obj(pairs) = e else {
             return Ok(match e {
                 Value::Str(name) => self.name(name)?,
