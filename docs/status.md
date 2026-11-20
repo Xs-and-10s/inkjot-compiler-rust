@@ -63,9 +63,10 @@ Smaller things noted on the way:
 - **The story map.** The platform will want the whole story (passages,
   Links, forks) as a graph: a path tree a Linker may look at after a
   reading, and later path analytics for the Inker. Either an engine call or
-  a documented part of the IR. The lean is an engine call (`map()`): it can
-  add edges the IR only implies (`next:`, acts that move, the ways of a
-  map) without the platform learning the IR's insides. Decide with IR 3.
+  a documented part of the IR. Decided (20 Nov): an engine call
+  (`map()`), so it can add edges the IR only implies (`next:`, acts that
+  move, the ways of a map) without the platform learning the IR's
+  insides. Built with IR 3, when forks exist.
 - **Whether a step reports what it changed** (`platform/events.md` §9.8):
   waits for a way to mark tracked values in v0.6.
 

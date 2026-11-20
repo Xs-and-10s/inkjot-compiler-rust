@@ -136,6 +136,12 @@ passage may be both (Ex 3's `the_list`). `ending_reached` is reported on
 arriving at a finale; `reading_finished` names the last finale reached,
 which the ratings box is about.
 
+Epilogues are ordinary passages, joined by Links: each finale may lead to
+its own, several may share one, and a finale may lead to a run of them
+(how the hero's story ends, then that the villain lived, then a hint of
+the next book). The ending stays the last `[finale]` passed, so tag only
+the true ending `[finale]`, and the epilogues after it `[epilogue]`.
+
 **Not yet.** Whether a step reports what it changed (events.md §9.8) waits
 for a way to mark values worth tracking (`~ track`?) in v0.6. Cohort play
 will add locks, claims and clashes, in a stream of the shared world.
@@ -203,6 +209,6 @@ milestone 17 measures it through the NIF, and sharing snapshots behind
 - **Cohort play**: seats, shared acts and stops, through the engine.
 - **Inquests** (IR 3, milestone 18): `asked_from`, `forks`, `take_fork`.
 - **The story map**: the whole story (passages, Links, forks) as a graph,
-  for the platform's path tree and the Inker's path analytics. An engine
-  call or a documented part of the IR; see `status.md`.
+  for the platform's path tree and the Inker's path analytics: an engine
+  call, `map()`, built with IR 3.
 - **`snapshot`/`restore`**, once readings get long enough to need them.
