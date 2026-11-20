@@ -122,7 +122,9 @@ backslash, and `\*` an asterisk that is not emphasis.
   (`plural(n, "mouse", "mice")` for an irregular one); `capital(x)`
   capitalizes the first letter.
 - **Emphasis** (`*italic*`, `**bold**`, `***both***`) is kept as styles, in
-  prose and labels. The terminal and `expect text:` see plain text; struck
+  prose, Link labels, and quoted text that is read: a `say` line, a hint, a
+  fact's text, a description, a list entry. A name (`label`, `shown as`) and
+  a value (`set motto: "…"`) keep their asterisks. The terminal and `expect text:` see plain text; struck
   list entries read `~~like this~~`.
 
 **Names, as the reader knows them.** `{marge}` and `@marge` show what she is

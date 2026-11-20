@@ -291,7 +291,8 @@ enum Local {
 #[derive(Debug, Clone)]
 struct Entry {
     id: String,
-    label: Option<String>,
+    /// The entry's own text, as the IR has it: plain or styled.
+    label: Option<Value>,
     mark: Option<String>,
     struck: bool,
 }
@@ -677,20 +678,25 @@ impl Run {
         std::mem::take(&mut self.output)
     }
 
-    /// Show a paragraph of plain text.
-    pub(super) fn say_line(&mut self, line: impl Into<String>) {
-        self.output.push(Para::plain_text(line));
-    }
-
     /// A text field as it reads now: plain text, or `{"text": […]}` worked
     /// out.
     pub(super) fn text_of(&mut self, v: &Value) -> R<String> {
+        Ok(self.text_para(v)?.plain())
+    }
+
+    /// A text field as it reads now, with its styles: `"*Wanted*: {who}"`.
+    pub(super) fn text_para(&mut self, v: &Value) -> R<Para> {
         match v {
-            Value::Str(s) => Ok(s.clone()),
-            Value::Null => Ok(String::new()),
+            Value::Str(s) => Ok(Para::plain_text(s.clone())),
+            Value::Null => Ok(Para::default()),
+            Value::Obj(_) if v.get("text").is_some() => {
+                let mut out = Para::default();
+                self.parts(f(v, "text"), &[], false, &mut out, &mut Vec::new())?;
+                Ok(out)
+            }
             other => {
                 let v = self.eval(other)?;
-                Ok(self.show(&v))
+                Ok(Para::plain_text(self.show(&v)))
             }
         }
     }
@@ -1652,25 +1658,27 @@ impl Run {
                 }
                 "list" => {
                     let name = f(part, "list").as_str().unwrap_or("");
-                    let lines: Vec<Para> = self
-                        .lists
-                        .get(name)
-                        .map(|entries| {
-                            entries
-                                .iter()
-                                .map(|e| {
-                                    let mut label =
-                                        e.label.clone().unwrap_or_else(|| self.label(&e.id));
-                                    if let Some(mark) = &e.mark {
-                                        label = format!("{label} ({mark})");
-                                    }
-                                    let mut line = Para::default();
-                                    line.push(&label, if e.struck { &["struck"] } else { &[] });
-                                    line
-                                })
-                                .collect()
-                        })
-                        .unwrap_or_default();
+                    let entries = self.lists.get(name).cloned().unwrap_or_default();
+                    let mut lines: Vec<Para> = Vec::new();
+                    for e in entries {
+                        let mut label = match &e.label {
+                            Some(text) => self.text_para(text)?,
+                            None => Para::plain_text(self.label(&e.id)),
+                        };
+                        if let Some(mark) = &e.mark {
+                            label.push(&format!(" ({mark})"), &[]);
+                        }
+                        // A struck entry is struck all through.
+                        let mut line = Para::default();
+                        for span in label.runs {
+                            let mut style = span.style.clone();
+                            if e.struck {
+                                style.push("struck");
+                            }
+                            line.push(&span.text, &style);
+                        }
+                        lines.push(line);
+                    }
                     if !quiet {
                         self.output.extend(lines);
                     }
@@ -1964,8 +1972,9 @@ impl Run {
                     V::Id(id) => self.label(&id),
                     _ => self.label(who),
                 };
-                let text = self.text_of(f(e, "text"))?;
-                self.say_line(format!("{who}: {text}"));
+                let mut line = Para::plain_text(format!("{who}: "));
+                line.extend(self.text_para(f(e, "text"))?);
+                self.output.push(line);
             }
             "stop" | "nothing" => {}
             other => {
@@ -2187,19 +2196,7 @@ impl Run {
         Ok(match op.as_str() {
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
             // `"Keeper of {here}"`: worked out now, each part shown as text.
-            "text" => {
-                let mut out = String::new();
-                for part in items {
-                    match part.get("value") {
-                        Some(v) => {
-                            let v = self.eval(v)?;
-                            out.push_str(&self.show(&v));
-                        }
-                        None => out.push_str(part.as_str().unwrap_or("")),
-                    }
-                }
-                V::Str(out)
-            }
+            "text" => V::Str(self.text_para(e)?.plain()),
             "if" => {
                 let pick = if self.eval(&items[0])?.truthy() { 1 } else { 2 };
                 self.eval(&items[pick])?
@@ -2730,7 +2727,7 @@ fn place_of(passage: &str) -> &str {
 fn entry(v: &Value) -> Entry {
     Entry {
         id: f(v, "id").as_str().unwrap_or("").to_string(),
-        label: f(v, "label").as_str().map(str::to_string),
+        label: v.get("label").cloned(),
         mark: f(v, "mark").as_str().map(str::to_string),
         struck: false,
     }
@@ -2744,11 +2741,11 @@ fn entry_from_words(words: &[Value], mark: Option<String>) -> Entry {
         .unwrap_or("")
         .trim_end_matches(':')
         .to_string();
-    let label = words
-        .get(1)
-        .and_then(|w| w.get("str"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    // `{"str": "the vet"}`, or text with braces, `{"text": […]}`.
+    let label = words.get(1).and_then(|w| match w.get("str") {
+        Some(s) => Some(s.clone()),
+        None => w.get("text").map(|_| w.clone()),
+    });
     Entry {
         id,
         label,

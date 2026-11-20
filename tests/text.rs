@@ -241,3 +241,64 @@ fn aka_picks_and_reveals_are_checked() {
     let nobody = NAMES.replace("reveal widow", "reveal widdow");
     assert!(errors(&nobody)[0].contains("`widdow` is not a declared thing"));
 }
+
+const READ: &str = r#":: StoryTitle
+Quoted
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "deck"}
+
+:: Inklink [config]
+kind: story
+mode: solo
+pov: nell
+character nell: "Nell" ~ playable
+npc tobin: "*Old* Tobin" ~ in deck
+place deck: "the deck"
+state motto: "*never* literal"
+fact ship: "She sailed on the *Endeavour*." ~ clue
+list log: "the log" ~ holds entry: "a **bold** entry"
+
+:: deck
+learn ship
+say tobin "Mind the *rope*, {nell}."
+--
+{list log}
+Motto: {motto}.
+"#;
+
+/// Text that is read takes emphasis: a `say`, a fact's text, a list entry.
+/// A name does not, and a value is data.
+#[test]
+fn quoted_text_that_is_read_takes_emphasis() {
+    assert_eq!(errors(READ), Vec::<String>::new());
+    let inklink = Inklink::from_ir(&build(READ).unwrap()).unwrap();
+    let deck = inklink.start(1, &Start::default()).unwrap();
+    let text = &deck.view().text;
+    let styled = |p: &inkjot::engine::Para| -> Vec<(String, Vec<&str>)> {
+        p.runs
+            .iter()
+            .map(|r| (r.text.clone(), r.style.clone()))
+            .collect()
+    };
+    let said = text
+        .iter()
+        .find(|p| p.plain().contains("Mind the"))
+        .unwrap();
+    assert_eq!(said.plain(), "*Old* Tobin: Mind the rope, Nell.");
+    assert!(styled(said).contains(&("rope".into(), vec!["italic"])));
+    let entry = text.iter().find(|p| p.plain().contains("entry")).unwrap();
+    assert!(styled(entry).contains(&("bold".into(), vec!["bold"])));
+    let motto = text
+        .iter()
+        .find(|p| p.plain().starts_with("Motto"))
+        .unwrap();
+    assert_eq!(motto.plain(), "Motto: *never* literal.");
+    let ir = build(READ).unwrap();
+    assert!(has(
+        &ir,
+        &json(
+            r#"{"text": ["She sailed on the ", {"style": ["italic"], "parts": ["Endeavour"]}, "."]}"#
+        )
+    ));
+}
