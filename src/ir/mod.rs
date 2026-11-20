@@ -46,7 +46,7 @@ struct ActDef {
 
 struct Builder {
     acts: HashMap<String, ActDef>,
-    /// Names of declared stats and resources: `wits`, `hp`, `vults`.
+    /// Names of declared stats and resources: `wits`, `hp`.
     stats: HashSet<String>,
     default_clash: String,
 }
@@ -348,11 +348,11 @@ impl Builder {
                         let total: u64 = list
                             .split(',')
                             .filter_map(|act| b.acts.get(act.trim()))
-                            .filter_map(|def| def.cost.first()?.get("vults")?.as_u64())
+                            .filter_map(|def| def.cost.first()?.get("amount")?.as_u64())
                             .sum();
                         let mut def = b.act_def(s);
                         if def.cost.is_empty() {
-                            def.cost.push(Value::obj([("vults", num(total))]));
+                            def.cost.push(Value::obj([("amount", num(total))]));
                         }
                         b.acts.insert(name.trim().to_string(), def);
                     }
@@ -1036,7 +1036,7 @@ fn cost(text: &str) -> Value {
     let (core, when) = split_when(text);
     let words: Vec<&str> = core.split_whitespace().collect();
     let mut pairs = vec![(
-        "vults".to_string(),
+        "amount".to_string(),
         words.first().map_or(Value::Null, |w| token(w)),
     )];
     for pair in words[words.len().min(1)..].chunks(2) {

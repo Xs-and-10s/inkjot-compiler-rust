@@ -19,6 +19,7 @@ clock: 0..=5 ~ shown as "stop" ~ advance consensus ~ turn limit 24h
 start: lounge@0
 default clash: random_winner
 default moves: walk, dash
+default cost: vults
 
 place sleeper: "the sleeper car"
 place dining: "the dining car"

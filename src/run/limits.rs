@@ -66,11 +66,10 @@ impl Run {
             });
             return Ok(everyone);
         }
-        // `requires full vults`: handled where the cost is, for moves too.
+        // `requires full vults`: as much of that resource as it holds full.
         if names.first().map(String::as_str) == Some("full") {
-            let full = self.constant(self.story.field("vults", "value")).num();
-            let have = self.vals.get(&format!("{actor}.vults")).and_then(V::num);
-            return Ok(have.zip(full).is_none_or(|(h, f)| h >= f));
+            let resource = names.get(1).cloned().unwrap_or_default();
+            return Ok(self.is_full(actor, &resource));
         }
         // `requires lockpick`: hold it, or something tagged so.
         for need in names {

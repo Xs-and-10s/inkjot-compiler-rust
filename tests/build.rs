@@ -132,7 +132,7 @@ fn a_link_is_expanded_with_its_acts_defaults() {
         "kind": "act",
         "act": "ask",
         "arg": null,
-        "cost": [{"vults": 1}, {"vults": 2, "when": {"is": ["me", "rook"]}}],
+        "cost": [{"amount": 1}, {"amount": 2, "when": {"is": ["me", "rook"]}}],
         "scope": "private",
         "capacity": null,
         "clash": "none",
@@ -171,7 +171,7 @@ fn a_combo_costs_the_sum_of_its_acts() {
     let ir = ir(NAMES[1]);
     let lance = ir.get("acts").and_then(|a| a.get("ember_lance")).unwrap();
     let cost = lance.get("cost").and_then(Value::as_arr).unwrap();
-    assert_eq!(cost[0].get("vults").and_then(Value::as_u64), Some(30)); // spark + gust + spark
+    assert_eq!(cost[0].get("amount").and_then(Value::as_u64), Some(30)); // spark + gust + spark
 }
 
 #[test]

@@ -95,8 +95,14 @@ running the three examples.
   the character or NPC whose margin it is: `orrery.ember`, `vell.cornered`.
 - **In reach**: a `take` Link is offered while the item lies in this place, or
   is held by an NPC who is here (that is how Wren lifts the letter).
-- **Costs**: the last cost entry whose condition holds applies; `rest` takes
-  everything left. A Link the pov cannot afford is not offered.
+- **Costs** spend the resource the config names, `default cost: vults`;
+  without one, acts cost nothing (`inkjot check` says so). The last cost
+  entry whose condition holds applies; `rest` takes everything left. A Link
+  the pov cannot afford is not offered.
+- **Reserved resource names.** Three resources belong to the player, not
+  the world, and the engine reads them by name: `rewinds` (charges to go
+  back), `hints` and `inquests`. A rewind does not restore them. Every
+  other name is the Inker's.
 - **`[lib everywhere]`** passages add their Links to every passage.
 - **Randomness** comes from the run's seed, so the same seed and the same
   choices always give the same story. A bare `d6` or `d20` rolls a die each
@@ -216,7 +222,8 @@ An act's own clauses are checked before its Link is offered:
 - `requires lockpick`: the actor holds that item, or one tagged so.
   `requires pov.all here`: every pov is alive and in the actor's place.
   `requires pov.all alive`: every pov is alive, wherever they are.
-  `requires full vults`: the actor has every vult.
+  `requires full vults`: the actor has as much of that resource as it
+  holds when full.
 - `cost 30 from each`: every pov pays, so every pov must be able to.
 - `once`: each character may do it once a reading. `once per turn` (or
   `per chronon`, or the clock's own word): once a turn. `once per day`:

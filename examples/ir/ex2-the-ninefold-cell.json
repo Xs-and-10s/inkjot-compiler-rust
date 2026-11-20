@@ -52,6 +52,7 @@
       "value": ["walk"]
     },
     {"setting": "default", "of": "clash", "value": "none"},
+    {"setting": "default", "of": "cost", "value": "vults"},
     {
       "declare": "stat",
       "id": "wits",
@@ -280,6 +281,12 @@
       "refill": "chronon"
     },
     {
+      "declare": "state",
+      "id": "hushed",
+      "type": "boolean",
+      "value": false
+    },
+    {
       "declare": "resource",
       "id": "hp",
       "per": "character",
@@ -391,7 +398,7 @@
       "declare": "act",
       "id": "walk",
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "steps": 1
     },
@@ -399,21 +406,21 @@
       "declare": "act",
       "id": "examine",
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ]
     },
     {
       "declare": "act",
       "id": "take",
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ]
     },
     {
       "declare": "act",
       "id": "read",
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "check": {
         ">=": ["wits", 3]
@@ -423,7 +430,7 @@
       "declare": "act",
       "id": "lift",
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "check": {
         ">=": ["might", 4]
@@ -433,7 +440,7 @@
       "declare": "act",
       "id": "push",
       "cost": [
-        {"vults": 40}
+        {"amount": 40}
       ],
       "check": {
         ">=": ["might", 5]
@@ -443,7 +450,7 @@
       "declare": "act",
       "id": "force",
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "check": {
         ">=": ["might", 4]
@@ -454,7 +461,7 @@
       "declare": "act",
       "id": "pick",
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "check": {
         ">=": ["wits", 3]
@@ -466,21 +473,21 @@
       "declare": "act",
       "id": "crank",
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ]
     },
     {
       "declare": "act",
       "id": "climb",
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ]
     },
     {
       "declare": "act",
       "id": "observe",
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "min": 10,
       "watches": true
@@ -489,21 +496,21 @@
       "declare": "act",
       "id": "strike",
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ]
     },
     {
       "declare": "act",
       "id": "guard",
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ]
     },
     {
       "declare": "act",
       "id": "together",
       "cost": [
-        {"vults": 30, "from": "each"}
+        {"amount": 30, "from": "each"}
       ],
       "requires": [
         {
@@ -836,7 +843,7 @@
   "acts": {
     "backward_knot": {
       "cost": [
-        {"vults": 40}
+        {"amount": 40}
       ],
       "scope": null,
       "capacity": null,
@@ -846,7 +853,7 @@
     },
     "chill": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -856,7 +863,7 @@
     },
     "climb": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -866,7 +873,7 @@
     },
     "crank": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -876,7 +883,7 @@
     },
     "ember_lance": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -886,7 +893,7 @@
     },
     "examine": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -896,7 +903,7 @@
     },
     "force": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -908,7 +915,7 @@
     },
     "frostglass": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -918,7 +925,7 @@
     },
     "guard": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -928,7 +935,7 @@
     },
     "gust": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -938,7 +945,7 @@
     },
     "hush": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -948,7 +955,7 @@
     },
     "lift": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -960,7 +967,7 @@
     },
     "lodestone": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -970,7 +977,7 @@
     },
     "mend": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -980,7 +987,7 @@
     },
     "observe": {
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "scope": null,
       "capacity": null,
@@ -990,7 +997,7 @@
     },
     "pick": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -1002,7 +1009,7 @@
     },
     "push": {
       "cost": [
-        {"vults": 40}
+        {"amount": 40}
       ],
       "scope": null,
       "capacity": null,
@@ -1014,7 +1021,7 @@
     },
     "read": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -1026,7 +1033,7 @@
     },
     "rime_shield": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -1036,7 +1043,7 @@
     },
     "second_dawn": {
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "scope": null,
       "capacity": null,
@@ -1046,7 +1053,7 @@
     },
     "spark": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -1056,7 +1063,7 @@
     },
     "strike": {
       "cost": [
-        {"vults": 20}
+        {"amount": 20}
       ],
       "scope": null,
       "capacity": null,
@@ -1066,7 +1073,7 @@
     },
     "take": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -1076,7 +1083,7 @@
     },
     "thunderclap": {
       "cost": [
-        {"vults": 30}
+        {"amount": 30}
       ],
       "scope": null,
       "capacity": null,
@@ -1086,7 +1093,7 @@
     },
     "together": {
       "cost": [
-        {"vults": 30, "from": "each"}
+        {"amount": 30, "from": "each"}
       ],
       "scope": null,
       "capacity": null,
@@ -1096,7 +1103,7 @@
     },
     "tug": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -1106,7 +1113,7 @@
     },
     "vigil": {
       "cost": [
-        {"vults": "rest"}
+        {"amount": "rest"}
       ],
       "scope": null,
       "capacity": null,
@@ -1116,7 +1123,7 @@
     },
     "walk": {
       "cost": [
-        {"vults": 10}
+        {"amount": 10}
       ],
       "scope": null,
       "capacity": null,
@@ -1141,7 +1148,7 @@
           "declare": "act",
           "id": "spark",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip"],
           "label": "a snap of heat and light at a point you can see"
@@ -1150,7 +1157,7 @@
           "declare": "act",
           "id": "chill",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip"],
           "label": "frost on a surface, or a mouthful of water turned to ice"
@@ -1159,7 +1166,7 @@
           "declare": "act",
           "id": "gust",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip"],
           "label": "one breath of wind, enough to snuff a candle across a room"
@@ -1168,7 +1175,7 @@
           "declare": "act",
           "id": "mend",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip"],
           "label": "knits a small break: a torn page, a cracked pin, a split lip"
@@ -1177,7 +1184,7 @@
           "declare": "act",
           "id": "tug",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip"],
           "label": "an unseen pull on something lighter than a book, within sight"
@@ -1186,7 +1193,7 @@
           "declare": "act",
           "id": "hush",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "tags": ["cantrip", "quiet"],
           "label": "swallows one sound for a moment"
@@ -1259,7 +1266,7 @@
           "declare": "act",
           "id": "lodestone",
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "tags": ["spell"],
           "learned_from": "lodestone",
@@ -1295,7 +1302,7 @@
           "declare": "act",
           "id": "second_dawn",
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "min": 20,
           "tags": ["prayer", "rewind", "once"],
@@ -1305,7 +1312,7 @@
           "declare": "act",
           "id": "vigil",
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "min": 20,
           "tags": ["prayer"]
@@ -1988,7 +1995,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2012,7 +2019,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2036,7 +2043,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2060,7 +2067,7 @@
           "act": "tug",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2095,7 +2102,7 @@
           "act": "tug",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2130,7 +2137,7 @@
           "act": "climb",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -2154,7 +2161,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -2192,7 +2199,7 @@
           "act": "lift",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -2601,7 +2608,7 @@
           "act": "lift",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -2631,7 +2638,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2669,7 +2676,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 0}
+            {"amount": 0}
           ],
           "scope": "private",
           "capacity": null,
@@ -2697,7 +2704,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2725,7 +2732,7 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -2753,7 +2760,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -2786,7 +2793,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -3292,8 +3299,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": "rest"}
+            {"amount": 30},
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -3321,8 +3328,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": 40}
+            {"amount": 30},
+            {"amount": 40}
           ],
           "scope": "private",
           "capacity": null,
@@ -3361,7 +3368,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -3385,7 +3392,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -3420,7 +3427,7 @@
           "act": "chill",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -3448,7 +3455,7 @@
           "act": "lift",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -3487,7 +3494,7 @@
           "act": "spark",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -3522,7 +3529,7 @@
           "act": "vigil",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -4069,7 +4076,7 @@
           "act": "walk",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -4097,7 +4104,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -4164,7 +4171,7 @@
           "act": "take",
           "arg": "lamp_oil",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -4188,7 +4195,7 @@
           "act": "read",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -4216,8 +4223,8 @@
           "act": "lift",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": 50}
+            {"amount": 30},
+            {"amount": 50}
           ],
           "scope": "private",
           "capacity": null,
@@ -4245,7 +4252,7 @@
           "act": "together",
           "arg": null,
           "cost": [
-            {"vults": 30, "from": "each"}
+            {"amount": 30, "from": "each"}
           ],
           "scope": "private",
           "capacity": null,
@@ -4283,7 +4290,7 @@
           "act": "read",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -4318,7 +4325,7 @@
           "act": "pick",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -4348,8 +4355,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": 40}
+            {"amount": 30},
+            {"amount": 40}
           ],
           "scope": "private",
           "capacity": null,
@@ -4793,7 +4800,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -4819,7 +4826,7 @@
           "act": "climb",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -4852,7 +4859,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -4881,7 +4888,7 @@
           "act": "take",
           "arg": "abelard_sword",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -4907,7 +4914,7 @@
           "act": "climb",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -4933,7 +4940,7 @@
           "act": "walk",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5212,7 +5219,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5236,7 +5243,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5260,7 +5267,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5284,7 +5291,7 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -5312,7 +5319,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5345,7 +5352,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5378,7 +5385,7 @@
           "act": "mend",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -5990,7 +5997,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6014,7 +6021,7 @@
           "act": "crank",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6051,7 +6058,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6075,7 +6082,7 @@
           "act": "spark",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6099,7 +6106,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -6132,7 +6139,7 @@
           "act": "take",
           "arg": "heart",
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6158,8 +6165,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": "rest"}
+            {"amount": 30},
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -6198,7 +6205,7 @@
           "act": "observe",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -6713,7 +6720,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6737,7 +6744,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -6763,7 +6770,7 @@
           "act": "push",
           "arg": null,
           "cost": [
-            {"vults": 40}
+            {"amount": 40}
           ],
           "scope": "private",
           "capacity": null,
@@ -6791,7 +6798,7 @@
           "act": "push",
           "arg": null,
           "cost": [
-            {"vults": 40}
+            {"amount": 40}
           ],
           "scope": "private",
           "capacity": null,
@@ -6834,7 +6841,7 @@
           "act": "observe",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -7187,7 +7194,7 @@
           "act": "examine",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -7211,7 +7218,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 0}
+            {"amount": 0}
           ],
           "scope": "private",
           "capacity": null,
@@ -7239,7 +7246,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -7274,7 +7281,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -7302,7 +7309,7 @@
           "act": "walk",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -7342,7 +7349,7 @@
           "act": "observe",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -7630,7 +7637,7 @@
           "act": "backward_knot",
           "arg": null,
           "cost": [
-            {"vults": 40}
+            {"amount": 40}
           ],
           "scope": "private",
           "capacity": null,
@@ -7669,7 +7676,7 @@
           "act": "second_dawn",
           "arg": null,
           "cost": [
-            {"vults": "rest"}
+            {"amount": "rest"}
           ],
           "scope": "private",
           "capacity": null,
@@ -7847,7 +7854,7 @@
           "act": "walk",
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -8011,7 +8018,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 0}
+            {"amount": 0}
           ],
           "scope": "private",
           "capacity": null,
@@ -8331,7 +8338,7 @@
           "act": "ember_lance",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -8357,7 +8364,7 @@
           "act": "rime_shield",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -8382,7 +8389,7 @@
           "act": "rime_shield",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -8407,7 +8414,7 @@
           "act": "frostglass",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8432,7 +8439,7 @@
           "act": "frostglass",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8457,7 +8464,7 @@
           "act": "thunderclap",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -8481,7 +8488,7 @@
           "act": "lodestone",
           "arg": null,
           "cost": [
-            {"vults": 30}
+            {"amount": 30}
           ],
           "scope": "private",
           "capacity": null,
@@ -8507,7 +8514,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 10}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -8542,7 +8549,7 @@
           "act": "strike",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8589,7 +8596,7 @@
           "act": "guard",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8617,7 +8624,7 @@
           "act": "guard",
           "arg": null,
           "cost": [
-            {"vults": 20}
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8652,8 +8659,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": 20}
+            {"amount": 30},
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8683,8 +8690,8 @@
           "act": "force",
           "arg": null,
           "cost": [
-            {"vults": 30},
-            {"vults": 20}
+            {"amount": 30},
+            {"amount": 20}
           ],
           "scope": "private",
           "capacity": null,
@@ -8721,7 +8728,7 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 0}
+            {"amount": 0}
           ],
           "scope": "private",
           "capacity": null,
@@ -8747,8 +8754,8 @@
           "act": null,
           "arg": null,
           "cost": [
-            {"vults": 30, "from": "roland"},
-            {"vults": 20, "from": "eldric"}
+            {"amount": 30, "from": "roland"},
+            {"amount": 20, "from": "eldric"}
           ],
           "scope": "private",
           "capacity": null,

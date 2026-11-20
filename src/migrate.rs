@@ -12,6 +12,7 @@
 //! | `[fixme]` | `[fix]` |
 //! | `~ aka in order` / `~ aka shuffled` / `~ aka random` | `~ pick cycle` / `~ pick shuffled` / `~ pick random` |
 //! | a brace in quoted text: `"{"` | `"\{"` (v0.6 strings interpolate) |
+//! | `resource vults: 3` (costs spent vults) | `resource vults: 3` and `default cost: vults` |
 //!
 //! Only statements are rewritten, found the way the checker finds them, so
 //! prose that happens to start with "fact" is left alone. What cannot be
@@ -57,6 +58,32 @@ pub fn migrate(src: &str) -> Migrated {
             continue;
         }
         let (stmts, body) = gather(p, &mut scratch);
+        // v0.5 costs always spent vults; v0.6 asks the Inker to say so.
+        let names_cost = stmts.iter().any(|s| {
+            s.kw == "default"
+                && s.clauses[0].text["default".len()..]
+                    .trim_start()
+                    .starts_with("cost")
+        });
+        if p.has_tag("config") && !names_cost {
+            let vults = stmts.iter().find(|s| {
+                s.kw == "resource"
+                    && s.clauses[0].text["resource".len()..]
+                        .trim_start()
+                        .split([':', ' ', '~'])
+                        .next()
+                        == Some("vults")
+            });
+            if let Some(s) = vults {
+                let last = s
+                    .clauses
+                    .iter()
+                    .map(|c| c.line)
+                    .max()
+                    .unwrap_or(s.clauses[0].line);
+                lines[last - 1].push_str("\ndefault cost: vults");
+            }
+        }
         for s in &stmts {
             let head = &s.clauses[0];
             let raw = &mut lines[head.line - 1];

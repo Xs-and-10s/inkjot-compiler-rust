@@ -123,7 +123,7 @@ left out of the IR.
   "kind": "act",
   "act": "ask",
   "arg": null,
-  "cost": [ {"vults": 1}, {"vults": 2, "when": {"is": ["me", "rook"]}} ],
+  "cost": [ {"amount": 1}, {"amount": 2, "when": {"is": ["me", "rook"]}} ],
   "scope": "private",
   "capacity": null,
   "clash": "none",
@@ -145,7 +145,7 @@ left out of the IR.
 | `lib` | Present when the Link lives in a `[lib]` passage that cells embed |
 | `kind` | `act` when the Link uses an act; `go` for a plain move; or `switch`, `pass`, `hint`, `release`. A fork keeps its own kind: being a fork is the `inquest` field |
 | `act`, `arg` | The act or combo, and its argument (`take cufflink`) |
-| `cost` | The act's costs, then the Link's. **The last entry whose `when` holds applies.** `vults` is a number or `"rest"`; `per` and `from` appear when written |
+| `cost` | The act's costs, then the Link's. **The last entry whose `when` holds applies.** `amount` is a number or `"rest"`; `per` and `from` appear when written. What is spent is the config's `default cost` (a `default` statement with `"of": "cost"`); without one, nothing is |
 | `scope`, `capacity`, `check`, `ends_turn` | The Link's own value, else the act's |
 | `clash` | The Link's own value; else the config's `default clash` for a shared Link; else `"none"` |
 | `when` | The Link's conditions, joined with `and` when there are several |
@@ -365,6 +365,9 @@ Inkjot v0.6, milestone 18:
   reserved header statement.
 - `reveal x` is an effect (`{"do": "reveal", "args": ["x"]}`); the
   `reveal:` setting is still the text's pacing.
+- A cost says how much, `{"amount": 2}`, not of what: the config's
+  `default cost: vults` names the resource. Nothing in the IR or the engine
+  is named after one Inklink's words; `hushed` is no longer built in.
 - `i`, `you`, `myself`, `yourself` are lowered as `me`; `know`, `hold`, `am`,
   `are` as `knows`, `holds`, `is`.
 

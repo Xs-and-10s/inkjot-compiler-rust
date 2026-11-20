@@ -21,6 +21,7 @@ clock: 0.. ~ shown as "turn"
 start: oubliette for roland, chapel for eldric
 default moves: walk
 default clash: none
+default cost: vults
 
 stat wits: 1..=5
 stat might: 1..=5
@@ -68,6 +69,7 @@ way great_door: gate - threshold
 way sanctum_stair: threshold - sanctum ~ one way
 
 resource vults: 60 ~ per character ~ refill each chronon
+state hushed: no
 resource hp: per character ~ refill on checkpoint ~ shown as "wounds left"
 resource hints: 3 ~ shared
 resource rewinds: 1 ~ per character ~ max 1
