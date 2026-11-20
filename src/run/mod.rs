@@ -75,6 +75,24 @@ fn f<'a>(v: &'a Value, key: &str) -> &'a Value {
     v.get(key).unwrap_or(&Value::Null)
 }
 
+/// An English plural: `card` → `cards`, `box` → `boxes`, `fly` → `flies`.
+fn plural_of(word: &str) -> String {
+    let ends = |s: &str| word.ends_with(s);
+    if ends("s") || ends("x") || ends("z") || ends("ch") || ends("sh") {
+        format!("{word}es")
+    } else if ends("y")
+        && !word
+            .chars()
+            .rev()
+            .nth(1)
+            .is_some_and(|c| "aeiou".contains(c))
+    {
+        format!("{}ies", &word[..word.len() - 1])
+    } else {
+        format!("{word}s")
+    }
+}
+
 /// A whole number, as the IR writes one.
 fn num(n: impl std::fmt::Display) -> Value {
     Value::Num(n.to_string())
@@ -1573,10 +1591,34 @@ impl Run {
         Ok((text, links))
     }
 
-    /// How a value reads in the story: an id reads as its label.
+    /// How a value reads in the story: an id reads as its label, a list as
+    /// "a, b and c", and a number of a thousand or more with `'` marks.
     fn show(&self, v: &V) -> String {
         match v {
             V::Id(id) => self.label(id),
+            V::List(items) => {
+                let shown: Vec<String> = items.iter().map(|i| self.show(i)).collect();
+                match shown.split_last() {
+                    None => String::new(),
+                    Some((last, [])) => last.clone(),
+                    Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                }
+            }
+            V::Num(n) if n.fract() == 0.0 && n.abs() >= 1000.0 && n.abs() < 1e15 => {
+                let digits = (n.abs() as i64).to_string();
+                let mut out = String::new();
+                for (i, d) in digits.chars().enumerate() {
+                    if i > 0 && (digits.len() - i) % 3 == 0 {
+                        out.push('\'');
+                    }
+                    out.push(d);
+                }
+                if *n < 0.0 {
+                    format!("-{out}")
+                } else {
+                    out
+                }
+            }
             other => other.to_string(),
         }
     }
@@ -2017,6 +2059,47 @@ impl Run {
         let named = |key: &str| f(f(e, "with"), key);
         Ok(match op.as_str() {
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
+            // `"Keeper of {here}"`: worked out now, each part shown as text.
+            "text" => {
+                let mut out = String::new();
+                for part in items {
+                    match part.get("value") {
+                        Some(v) => {
+                            let v = self.eval(v)?;
+                            out.push_str(&self.show(&v));
+                        }
+                        None => out.push_str(part.as_str().unwrap_or("")),
+                    }
+                }
+                V::Str(out)
+            }
+            "if" => {
+                let pick = if self.eval(&items[0])?.truthy() { 1 } else { 2 };
+                self.eval(&items[pick])?
+            }
+            // `plural(count tobin.hand, "card")`, or with the plural given:
+            // `plural(n, "mouse", "mice")`.
+            "plural" => {
+                let n = self.eval(&items[0])?.num().unwrap_or(0.0);
+                let one = self.eval(&items[1])?.to_string();
+                if n == 1.0 {
+                    V::Str(one)
+                } else {
+                    match items.get(2) {
+                        Some(many) => V::Str(self.eval(many)?.to_string()),
+                        None => V::Str(plural_of(&one)),
+                    }
+                }
+            }
+            "capital" => {
+                let v = self.eval(&items[0])?;
+                let s = self.show(&v);
+                let mut chars = s.chars();
+                V::Str(match chars.next() {
+                    Some(c) => c.to_uppercase().chain(chars).collect(),
+                    None => String::new(),
+                })
+            }
             // `roll d6`: under a `let`, rolled once; under a `get`, on every read.
             "roll" => {
                 let sides = x

@@ -182,6 +182,20 @@ pub fn lower(e: &Expr) -> Value {
             })
         }
         Expr::Str(s) => Value::obj([("str", Value::str(s))]),
+        // Text with braces: `{"text": ["Keeper of ", {"value": "here"}]}`.
+        Expr::Text(parts) => Value::obj([(
+            "text",
+            Value::Arr(
+                parts
+                    .iter()
+                    .map(|p| match p {
+                        crate::expr::TextPart::Lit(s) => Value::str(s),
+                        crate::expr::TextPart::Expr(e) => Value::obj([("value", lower(e))]),
+                    })
+                    .collect(),
+            ),
+        )]),
+        Expr::If(c, a, b) => one("if", vec![lower(c), lower(a), lower(b)]),
         // `yes` and `no` are Inkjot's booleans.
         Expr::Name(n, _) if n == "yes" => Value::Bool(true),
         Expr::Name(n, _) if n == "no" => Value::Bool(false),
