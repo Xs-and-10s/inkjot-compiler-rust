@@ -21,7 +21,7 @@
 //! (`pov`, `links`, `output`, `locals`). The others wait in [`Seat`]s, and
 //! [`Run::sit`] swaps them, like a context switch.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use super::agenda::Walker;
 use super::{f, place_of, strs, Local, Run, R, V};
@@ -32,7 +32,7 @@ use crate::json::Value;
 pub(super) struct Seat {
     links: Vec<Value>,
     output: Vec<String>,
-    locals: HashMap<String, Local>,
+    locals: BTreeMap<String, Local>,
     asking: Vec<Value>,
     paused: Option<super::inputs::Paused>,
 }
@@ -98,7 +98,7 @@ pub(super) fn verdicts(
     }
 }
 
-impl Run<'_> {
+impl Run {
     /// Seat several Linkers, one per character, all starting at `passage`
     /// (or each at their own `start:`). The first is served first.
     pub fn start_cohort(&mut self, passage: Option<&str>, who: &[&str]) -> R<()> {
@@ -511,11 +511,11 @@ impl Run<'_> {
             self.sit(&who)?;
             // The clock has run out: everyone goes to the finale.
             if let Some(finale) = &finale {
-                self.enter(finale, HashMap::new())?;
+                self.enter(finale, BTreeMap::new())?;
                 continue;
             }
             match self.arrival_at(&to, self.chronon) {
-                Some(cell) => self.enter(&cell, HashMap::new())?,
+                Some(cell) => self.enter(&cell, BTreeMap::new())?,
                 // Past the last stop (an act that ends the turn, taken at
                 // the end): they stay in the passage they were in.
                 None => {

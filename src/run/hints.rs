@@ -29,15 +29,15 @@
 //! Hints are not Inquests. An Inquest asks the story to diverge from its
 //! canon where the Inker hid a fork (`~ inquest`); it is reserved, not run.
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use super::{f, place_of, Run, R, V};
 use crate::json::Value;
 
 /// A hint heard: by which player, from which Nib, which line of its header.
-pub(super) type Heard = HashSet<(String, String, usize)>;
+pub(super) type Heard = BTreeSet<(String, String, usize)>;
 
-impl Run<'_> {
+impl Run {
     /// The Linker turns hints off for this Inklink: no hint is offered.
     pub fn turn_off_hints(&mut self) {
         self.no_hints = true;
@@ -149,9 +149,9 @@ mod tests {
     #[test]
     fn a_linker_can_turn_hints_off() {
         let ir = crate::build(EX2).unwrap();
-        let story = Story::new(&ir).unwrap();
+        let story = std::sync::Arc::new(Story::new(&ir).unwrap());
         let offered = |off: bool| {
-            let mut run = Run::new(&story, 1);
+            let mut run = Run::new(story.clone(), 1);
             if off {
                 run.turn_off_hints();
             }
@@ -176,8 +176,8 @@ mod tests {
             picks in proptest::collection::vec((any::<bool>(), 0..20usize), 0..80),
         ) {
             let ir = crate::build(EX2).unwrap();
-            let story = Story::new(&ir).unwrap();
-            let mut run = Run::new(&story, seed);
+            let story = std::sync::Arc::new(Story::new(&ir).unwrap());
+            let mut run = Run::new(story.clone(), seed);
             run.start(None, None).unwrap();
             let start = left(&run);
             let mut low = start;

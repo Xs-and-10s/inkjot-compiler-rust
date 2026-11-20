@@ -76,9 +76,9 @@ fn a_run_is_deterministic() {
         .unwrap(),
     )
     .unwrap();
-    let story = Story::new(&ir).unwrap();
+    let story = std::sync::Arc::new(Story::new(&ir).unwrap());
     let play = || {
-        let mut run = Run::new(&story, 7);
+        let mut run = Run::new(story.clone(), 7);
         run.start(None, None).unwrap();
         let mut text = run.take_output();
         while let Some((id, _)) = run.choices().unwrap().last().cloned() {
@@ -169,8 +169,8 @@ proptest! {
         let (which, at, who) = starts()[start];
         let src = std::fs::read_to_string(format!("{}/examples/{}.twee", env!("CARGO_MANIFEST_DIR"), NAMES[which])).unwrap();
         let ir = inkjot::build(&src).unwrap();
-        let story = Story::new(&ir).unwrap();
-        let mut run = Run::new(&story, seed);
+        let story = std::sync::Arc::new(Story::new(&ir).unwrap());
+        let mut run = Run::new(story.clone(), seed);
         let mut steps = || -> Result<(), String> {
             run.start(at, who)?;
             for pick in &picks {
@@ -341,8 +341,8 @@ fn cohort_play(
     ))
     .unwrap();
     let ir = inkjot::build(&src).unwrap();
-    let story = Story::new(&ir).unwrap();
-    let mut run = Run::new(&story, seed);
+    let story = std::sync::Arc::new(Story::new(&ir).unwrap());
+    let mut run = Run::new(story.clone(), seed);
     let mut text = Vec::new();
     if let Err(why) = run.start_cohort(Some("lounge@0"), cast) {
         prop_assert!(why.contains("not supported"), "{why}");
@@ -546,9 +546,9 @@ fn inputs_and_ballots_refuse_what_does_not_fit() {
     ))
     .unwrap();
     let ir = inkjot::build(&src).unwrap();
-    let story = Story::new(&ir).unwrap();
+    let story = std::sync::Arc::new(Story::new(&ir).unwrap());
 
-    let mut run = Run::new(&story, 1);
+    let mut run = Run::new(story.clone(), 1);
     run.start(Some("cast"), None).unwrap();
     let someone = run
         .choices()
@@ -567,7 +567,7 @@ fn inputs_and_ballots_refuse_what_does_not_fit() {
         .unwrap_err()
         .contains("cannot be empty"));
 
-    let mut run = Run::new(&story, 1);
+    let mut run = Run::new(story.clone(), 1);
     run.start_cohort(Some("terminus"), &["ada", "rook"])
         .unwrap();
     let uncited = run

@@ -71,7 +71,7 @@ pub(super) fn is_input(v: &Value) -> bool {
         .is_some_and(|i| i == "accuse" || i.ends_with(" input"))
 }
 
-impl Run<'_> {
+impl Run {
     /// What the Linker being served is asked: one `(kind, prompt)` per open
     /// input, the first of which `answer` and `vote` fill.
     pub fn asking(&mut self) -> Vec<(String, String)> {

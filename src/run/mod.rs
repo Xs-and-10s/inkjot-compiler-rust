@@ -18,8 +18,9 @@ mod time;
 mod value;
 
 use events::Event;
+use std::sync::Arc;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::json::Value;
 pub use inputs::Ask;
@@ -47,12 +48,12 @@ struct Passage {
 /// A compiled Inklink, indexed for running.
 #[derive(Debug)]
 pub struct Story {
-    decls: HashMap<String, Decl>,
-    passages: HashMap<String, Passage>,
+    decls: BTreeMap<String, Decl>,
+    passages: BTreeMap<String, Passage>,
     start: String,
     povs: Vec<String>,
     /// Where each pov starts, from `start: a for x, b for y`.
-    start_for: HashMap<String, String>,
+    start_for: BTreeMap<String, String>,
     /// Every way between two places: `(way, from, to)`. A two-way way is
     /// listed in both directions; a `route` adds one way per step.
     ways: Vec<(String, String, String)>,
@@ -60,7 +61,7 @@ pub struct Story {
     /// margin it is in: that is who `self` means inside it.
     handlers: Vec<(Value, Option<String>)>,
     /// `default moves: walk, dash`, `default clash: random_winner`.
-    defaults: HashMap<String, Value>,
+    defaults: BTreeMap<String, Value>,
     /// Every `checkpoint name ~ on death in …` declaration.
     checkpoints: Vec<Value>,
     /// The `rewind:` setting, if the Inklink has one.
@@ -87,14 +88,14 @@ impl Story {
     /// Index a compiled IR. Fails if the IR is not one `inkjot build` made.
     pub fn new(ir: &Value) -> R<Story> {
         let mut story = Story {
-            decls: HashMap::new(),
-            passages: HashMap::new(),
+            decls: BTreeMap::new(),
+            passages: BTreeMap::new(),
             start: f(ir, "start").as_str().unwrap_or("").to_string(),
             povs: Vec::new(),
-            start_for: HashMap::new(),
+            start_for: BTreeMap::new(),
             ways: Vec::new(),
             handlers: Vec::new(),
-            defaults: HashMap::new(),
+            defaults: BTreeMap::new(),
             checkpoints: Vec::new(),
             rewind: None,
             shows_ballots: false,
@@ -247,24 +248,24 @@ struct Entry {
 }
 
 /// A story being played.
-pub struct Run<'s> {
-    story: &'s Story,
+pub struct Run {
+    story: Arc<Story>,
     /// Who the Linker is looking through. Empty before a lobby picks someone.
     pub pov: String,
     /// The passage each character is at.
-    at: HashMap<String, String>,
+    at: BTreeMap<String, String>,
     /// Where each NPC is.
-    place: HashMap<String, String>,
+    place: BTreeMap<String, String>,
     /// Every stored value, keyed by path: `grate_up`, `vell.cornered`, `roland.vults`.
-    vals: HashMap<String, V>,
-    knows: HashMap<String, BTreeSet<String>>,
+    vals: BTreeMap<String, V>,
+    knows: BTreeMap<String, BTreeSet<String>>,
     /// Who or where holds each item. An item with no entry is gone.
-    holder: HashMap<String, String>,
-    lists: HashMap<String, Vec<Entry>>,
-    visits: HashMap<String, u32>,
-    once: HashSet<String>,
+    holder: BTreeMap<String, String>,
+    lists: BTreeMap<String, Vec<Entry>>,
+    visits: BTreeMap<String, u32>,
+    once: BTreeSet<String>,
     /// `let`s and Link parameters of the passage being run.
-    locals: HashMap<String, Local>,
+    locals: BTreeMap<String, Local>,
     /// The `let`s being worked out right now, to catch one that uses itself.
     evaluating: Vec<String>,
     /// The Links of the passage the pov is at, as last rendered.
@@ -274,7 +275,7 @@ pub struct Run<'s> {
     chronon: u32,
     rng: u64,
     /// Per NPC: the order its `aka` names come out in, and how many are used.
-    aka: HashMap<String, (Vec<usize>, usize)>,
+    aka: BTreeMap<String, (Vec<usize>, usize)>,
     /// Failed `expect:` checks in the story's own passages.
     pub failures: Vec<String>,
     /// How many times each handler has fired, by its index in the story.
@@ -287,9 +288,9 @@ pub struct Run<'s> {
     /// Several Linkers: the characters seated, in order. Empty for one.
     order: Vec<String>,
     /// The seated Linkers not being served right now.
-    parked: HashMap<String, cohort::Seat>,
+    parked: BTreeMap<String, cohort::Seat>,
     /// Each Linker's move for this stop, once locked in.
-    committed: HashMap<String, Value>,
+    committed: BTreeMap<String, Value>,
     /// Shared acts waiting to be settled.
     claims: Vec<cohort::Claim>,
     /// While a claim is settled: who else reached for it (`{claimants}`)...
@@ -297,17 +298,17 @@ pub struct Run<'s> {
     /// ...and how it came out for this Linker: `(success, clashed)`.
     verdict: Option<(bool, bool)>,
     /// What each NPC saw at the end of each turn: who, holding what.
-    sightings: HashMap<String, Vec<Sighting>>,
+    sightings: BTreeMap<String, Vec<Sighting>>,
     /// The world at the start of every turn, oldest first.
     history: Vec<time::Snapshot>,
     /// Each checkpoint's snapshot: from the start, or from when it was reached.
-    saved: HashMap<String, time::Snapshot>,
+    saved: BTreeMap<String, time::Snapshot>,
     /// The checkpoints reached so far, in order.
     reached: Vec<String>,
     /// Linkers re-living an earlier stop, and which.
-    past: HashMap<String, u32>,
+    past: BTreeMap<String, u32>,
     /// Who dashed through each place, by the stop it was: `here.passed`.
-    passed: HashMap<(u32, String), Vec<String>>,
+    passed: BTreeMap<(u32, String), Vec<String>>,
     /// Characters who died during this Link, and where.
     dying: Vec<(String, String)>,
     /// While a rewind is announced: whose handlers do not see it.
@@ -317,7 +318,7 @@ pub struct Run<'s> {
     /// An arrival paused at a header input until it is answered.
     paused: Option<inputs::Paused>,
     /// The jury's ballots, by voter, until the jury decides.
-    ballots: HashMap<String, inputs::Ballot>,
+    ballots: BTreeMap<String, inputs::Ballot>,
     /// The jury's last count: `(who, how, votes)`, most votes first.
     tally: Vec<(String, String, usize)>,
     /// Hints heard: the player's, so a rewind keeps them.
@@ -325,60 +326,61 @@ pub struct Run<'s> {
     /// The Linker has turned hints off.
     no_hints: bool,
     /// The Linkers' moves each NPC saw this turn.
-    seen: HashMap<String, Vec<senses::SeenMove>>,
+    seen: BTreeMap<String, Vec<senses::SeenMove>>,
     /// Uses of acts that rewind: the player's, so a rewind keeps them.
-    player_uses: HashMap<String, V>,
+    player_uses: BTreeMap<String, V>,
 }
 
-impl<'s> Run<'s> {
+impl Run {
     /// A fresh run. The seed decides every roll and shuffle, so a run with
     /// the same seed and the same Links always goes the same way.
-    pub fn new(story: &'s Story, seed: u64) -> Run<'s> {
+    pub fn new(story: Arc<Story>, seed: u64) -> Run {
+        let pov = story.povs.first().cloned().unwrap_or_default();
         let mut run = Run {
             story,
-            pov: story.povs.first().cloned().unwrap_or_default(),
-            at: HashMap::new(),
-            place: HashMap::new(),
-            vals: HashMap::new(),
-            knows: HashMap::new(),
-            holder: HashMap::new(),
-            lists: HashMap::new(),
-            visits: HashMap::new(),
-            once: HashSet::new(),
-            locals: HashMap::new(),
+            pov,
+            at: BTreeMap::new(),
+            place: BTreeMap::new(),
+            vals: BTreeMap::new(),
+            knows: BTreeMap::new(),
+            holder: BTreeMap::new(),
+            lists: BTreeMap::new(),
+            visits: BTreeMap::new(),
+            once: BTreeSet::new(),
+            locals: BTreeMap::new(),
             evaluating: Vec::new(),
             links: Vec::new(),
             output: Vec::new(),
             chronon: 0,
             rng: seed.max(1),
-            aka: HashMap::new(),
+            aka: BTreeMap::new(),
             failures: Vec::new(),
             handler_counts: Vec::new(),
             firing: 0,
             started: false,
             via: None,
             order: Vec::new(),
-            parked: HashMap::new(),
-            committed: HashMap::new(),
+            parked: BTreeMap::new(),
+            committed: BTreeMap::new(),
             claims: Vec::new(),
             claimants: String::new(),
             verdict: None,
-            sightings: HashMap::new(),
+            sightings: BTreeMap::new(),
             history: Vec::new(),
-            saved: HashMap::new(),
+            saved: BTreeMap::new(),
             reached: Vec::new(),
-            past: HashMap::new(),
-            passed: HashMap::new(),
+            past: BTreeMap::new(),
+            passed: BTreeMap::new(),
             dying: Vec::new(),
             unseen_by: Vec::new(),
             asking: Vec::new(),
             paused: None,
-            ballots: HashMap::new(),
+            ballots: BTreeMap::new(),
             tally: Vec::new(),
             heard: Default::default(),
             no_hints: false,
-            seen: HashMap::new(),
-            player_uses: HashMap::new(),
+            seen: BTreeMap::new(),
+            player_uses: BTreeMap::new(),
         };
         run.init();
         run.place_npcs();
@@ -389,7 +391,7 @@ impl<'s> Run<'s> {
 
     /// Set every declared thing to its starting state.
     fn init(&mut self) {
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let characters = story.ids_of("character");
         let mut ids: Vec<&String> = story.decls.keys().collect();
         ids.sort();
@@ -536,7 +538,7 @@ impl<'s> Run<'s> {
                 before: false,
             })?;
         }
-        self.enter(&passage, HashMap::new())?;
+        self.enter(&passage, BTreeMap::new())?;
         // The log begins where play does.
         self.history = vec![self.snapshot()];
         Ok(())
@@ -562,7 +564,7 @@ impl<'s> Run<'s> {
     /// When the clock runs out, where everyone goes: the `[finale]` passage
     /// no Link leads to (Ex 1's `terminus`, not its `verdict`).
     fn finale(&self) -> Option<String> {
-        let targets: std::collections::HashSet<&str> = self
+        let targets: std::collections::BTreeSet<&str> = self
             .story
             .passages
             .values()
@@ -882,7 +884,7 @@ impl<'s> Run<'s> {
                 .iter()
                 .map(|(k, v)| (k.clone(), self.constant(v)))
                 .collect(),
-            _ => HashMap::new(),
+            _ => BTreeMap::new(),
         };
         match f(link, "kind").as_str() {
             Some("walk") => {
@@ -911,13 +913,13 @@ impl<'s> Run<'s> {
                 if self.story.field("walk", "ends_turn") == &Value::Bool(true) {
                     self.end_turn()?;
                 }
-                return self.enter(&to, HashMap::new());
+                return self.enter(&to, BTreeMap::new());
             }
             Some("switch") => {
                 let other = self.story.povs.iter().find(|p| **p != self.pov).cloned();
                 self.pov = other.ok_or("`switch` needs a second pov")?;
                 let at = self.here().to_string();
-                return self.enter(&at, HashMap::new());
+                return self.enter(&at, BTreeMap::new());
             }
             Some("pass") => self.end_turn()?,
             Some("hint") => self.give_hint()?,
@@ -978,7 +980,7 @@ impl<'s> Run<'s> {
         if self.last_stop().is_none_or(|last| self.chronon < last) {
             self.chronon += 1;
         }
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         for id in story.ids_of("resource") {
             if story.field(&id, "refill").as_str() == Some("chronon") {
                 let full = self.constant(story.field(&id, "value"));
@@ -1006,8 +1008,8 @@ impl<'s> Run<'s> {
     }
 
     /// Arrive at a passage: run its header, show its body, offer its Links.
-    fn enter(&mut self, passage: &str, params: HashMap<String, V>) -> R<()> {
-        let story = self.story;
+    fn enter(&mut self, passage: &str, params: BTreeMap<String, V>) -> R<()> {
+        let story = Arc::clone(&self.story);
         let p = story
             .passages
             .get(passage)
@@ -1063,7 +1065,7 @@ impl<'s> Run<'s> {
         start: usize,
         mut next: Option<String>,
     ) -> R<()> {
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let p = &story.passages[passage];
         let from = from.to_string();
         for (i, stmt) in p.header.iter().enumerate().skip(start) {
@@ -1087,7 +1089,7 @@ impl<'s> Run<'s> {
         self.asking.clear();
         let links = self.render(passage, false)?;
         if let Some(next) = next {
-            return self.enter(&next, HashMap::new());
+            return self.enter(&next, BTreeMap::new());
         }
         let now = self.here().to_string();
         if p.tags.iter().any(|t| t == "act") {
@@ -1097,7 +1099,7 @@ impl<'s> Run<'s> {
                 self.relist()?;
             } else {
                 // The act moved them: show where they are now.
-                return self.enter(&now, HashMap::new());
+                return self.enter(&now, BTreeMap::new());
             }
         } else {
             self.links = links;
@@ -1176,7 +1178,7 @@ impl<'s> Run<'s> {
     /// Links offered everywhere: the Links of `[lib everywhere]` passages,
     /// and a walk along each open way out of the pov's place.
     fn standing_links(&mut self) -> R<Vec<Value>> {
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let mut links = Vec::new();
         // In a lobby, before play begins, nothing stands everywhere.
         let in_lobby = story
@@ -1278,7 +1280,7 @@ impl<'s> Run<'s> {
     /// shown and nothing is used up: this only works out which Links are on
     /// offer now.
     fn render(&mut self, passage: &str, quiet: bool) -> R<Vec<Value>> {
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let p = story
             .passages
             .get(passage)
@@ -2185,7 +2187,7 @@ impl<'s> Run<'s> {
             V::List(items) if m == "count" => return Ok(V::Num(items.len() as f64)),
             _ => return Ok(V::Null),
         };
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         Ok(match (id.as_str(), m) {
             ("clock", "now") => V::Num(f64::from(self.when())),
             ("pov", _) => {

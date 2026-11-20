@@ -23,7 +23,7 @@
 use super::{f, strs, Run, R, V};
 use crate::json::Value;
 
-impl Run<'_> {
+impl Run {
     /// May the actor do this act now, as far as `requires`, `once` and
     /// `cost … from each` go?
     pub(super) fn act_allowed(&mut self, link: &Value, actor: &str) -> R<bool> {

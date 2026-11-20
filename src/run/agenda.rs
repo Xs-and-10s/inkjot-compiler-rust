@@ -31,7 +31,8 @@
 //! An `[archetype]` passage is an agenda shared by every NPC `like` it:
 //! the three statues of Ex 2 all follow `:: statue [archetype]`.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::Arc;
 
 use super::{f, place_of, strs, Event, Local, Run, R, V};
 use crate::json::Value;
@@ -67,10 +68,10 @@ impl Agenda {
     }
 }
 
-impl Run<'_> {
+impl Run {
     /// The agenda of `npc`, or `None` if it has none.
     fn agenda(&self, npc: &str) -> Option<Agenda> {
-        let story = self.story;
+        let story = Arc::clone(&self.story);
         let mut statements = Vec::new();
         let own = story
             .passages
@@ -303,7 +304,7 @@ impl Run<'_> {
         from: &str,
         via: Option<&str>,
         who: Walker,
-    ) -> R<HashMap<String, usize>> {
+    ) -> R<BTreeMap<String, usize>> {
         Ok(self.search(from, via, who)?.0)
     }
 
@@ -314,9 +315,9 @@ impl Run<'_> {
         from: &str,
         via: Option<&str>,
         who: Walker,
-    ) -> R<(HashMap<String, usize>, HashMap<String, String>)> {
-        let mut seen = HashMap::from([(from.to_string(), 0)]);
-        let mut parent = HashMap::new();
+    ) -> R<(BTreeMap<String, usize>, BTreeMap<String, String>)> {
+        let mut seen = BTreeMap::from([(from.to_string(), 0)]);
+        let mut parent = BTreeMap::new();
         let mut queue = VecDeque::from([from.to_string()]);
         while let Some(at) = queue.pop_front() {
             for (way, a, b) in self.story.ways.clone() {
@@ -525,7 +526,7 @@ mod tests {
     use super::Walker;
     use crate::run::{Run, Story};
     use proptest::prelude::*;
-    use std::collections::{HashMap, VecDeque};
+    use std::collections::{BTreeMap, VecDeque};
 
     /// A story that is nothing but `n` places and the given ways.
     fn map(n: usize, ways: &[(usize, usize, bool)]) -> String {
@@ -579,8 +580,8 @@ mod tests {
         fn routes_are_shortest_and_follow_the_ways((n, ways) in graphs(), to in 0..8usize) {
             let to = to % n;
             let ir = crate::build(&map(n, &ways)).map_err(|r| TestCaseError::fail(format!("{:?}", r.diags)))?;
-            let story = Story::new(&ir).unwrap();
-            let mut run = Run::new(&story, 1);
+            let story = std::sync::Arc::new(Story::new(&ir).unwrap());
+            let mut run = Run::new(story.clone(), 1);
             let want = shortest(n, &ways, 0);
             let route = run.route("p0", &format!("p{to}"), None, Walker::Npc).unwrap();
             match (route, want[to]) {
@@ -597,7 +598,7 @@ mod tests {
                 (got, want) => prop_assert!(false, "route {:?}, but the shortest path is {:?}", got, want),
             }
             // Distances agree with the reference everywhere.
-            let found: HashMap<String, usize> = run.distances("p0", None, Walker::Npc).unwrap();
+            let found: BTreeMap<String, usize> = run.distances("p0", None, Walker::Npc).unwrap();
             for (i, d) in want.iter().enumerate() {
                 prop_assert_eq!(found.get(&format!("p{i}")).copied(), *d);
             }
