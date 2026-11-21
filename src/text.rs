@@ -177,9 +177,10 @@ pub fn emphasis(parts: Vec<Value>) -> Vec<Value> {
     for i in 0..n {
         let before = i.checked_sub(1).map(|j| solid_end(&toks[j]));
         let after = toks.get(i + 1).map(solid_start);
-        if let Tok::Stars { opens, closes, .. } = &mut toks[i] {
-            *opens = after.unwrap_or(false);
-            *closes = before.unwrap_or(false);
+        // Only `*`, `**` and `***` are emphasis; a longer run is text.
+        if let Tok::Stars { n, opens, closes } = &mut toks[i] {
+            *opens = *n <= 3 && after.unwrap_or(false);
+            *closes = *n <= 3 && before.unwrap_or(false);
         }
     }
     // Pair runs: a closing run takes the nearest open run of its length.

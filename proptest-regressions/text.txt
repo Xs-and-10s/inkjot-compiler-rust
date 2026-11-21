@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 9c20ffb11898789239f8f0702386488c7d9e4a0f5438af41efc2f47061c18121 # shrinks to s = "\\*"
 cc 3c81cc46355e7c230fc5813ad8fa6bcc27a019d1d4740d58f826090c87373acf # shrinks to s = "*a**a**a*"
+cc 1ca3ee55214f132e8a9ce2427735757a3e767ab1cde64ae2fb320c6de5a10552 # shrinks to s = "****a****"

@@ -127,7 +127,8 @@ backslash, and `\*` an asterisk that is not emphasis.
 - **Helpers:** `plural(n, "card")` is "card" when `n` is 1, else "cards"
   (`plural(n, "mouse", "mice")` for an irregular one); `capital(x)`
   capitalizes the first letter.
-- **Emphasis** (`*italic*`, `**bold**`, `***both***`) is kept as styles, in
+- **Emphasis** (`*italic*`, `**bold**`, `***both***`; a run of four or
+  more asterisks is plain text) is kept as styles, in
   prose, Link labels, and quoted text that is read: a `say` line, a hint, a
   fact's text, a description, a list entry. A name (`label`, `shown as`) and
   a value (`set motto: "…"`) keep their asterisks. The terminal and `expect text:` see plain text; struck
