@@ -331,7 +331,9 @@ pub(crate) fn is_ident(s: &str) -> bool {
 
 pub(crate) fn is_duration(s: &str) -> bool {
     let digits = s.trim_end_matches("ms").trim_end_matches('s');
-    digits.len() < s.len() && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())
+    let (whole, frac) = digits.split_once('.').unwrap_or((digits, "0"));
+    let all_digits = |t: &str| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit());
+    digits.len() < s.len() && all_digits(whole) && all_digits(frac)
 }
 
 /// The target of a Link line: the `b` in `> [[a->b]]`.

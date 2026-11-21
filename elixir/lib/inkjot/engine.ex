@@ -53,10 +53,23 @@ defmodule Inkjot.Engine do
           | :panic
   @type refused :: {:error, {code(), String.t(), non_neg_integer() | nil}}
 
-  @typedoc "A stretch of text in one style: `italic`, `bold`, `struck`."
-  @type run :: %{text: String.t(), style: [String.t()]}
-  @typedoc "A paragraph: its plain text, and its styled runs."
-  @type paragraph :: %{plain: String.t(), runs: [run()]}
+  @typedoc """
+  A wait before a paragraph or run is shown, after what came before it:
+  `[after 2s]` is `%{ms: 2000, kind: "after"}`; `[beat 1s]` has kind
+  `"beat"`, a dramatic pause a runtime revealing on tap may let the reader
+  skip. A bare `[beat]` has `ms: 0`, the runtime's own length.
+  """
+  @type pause :: %{ms: non_neg_integer(), kind: String.t()} | nil
+  @typedoc """
+  A stretch of text in one style: `italic`, `bold`, `struck`. Its pause is
+  set only on a run appended after a wait (`[after 2s; append]`).
+  """
+  @type run :: %{text: String.t(), style: [String.t()], pause: pause()}
+  @typedoc """
+  A paragraph: its plain text, its styled runs, the wait before it, and
+  whether it is a line of verse (`[verse]`).
+  """
+  @type paragraph :: %{plain: String.t(), runs: [run()], pause: pause(), verse: boolean()}
   @type link :: %{id: String.t(), label: String.t(), runs: [run()]}
   @type ask :: %{
           kind: String.t(),

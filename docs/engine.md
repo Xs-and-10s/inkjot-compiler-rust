@@ -88,7 +88,7 @@ decides who sees them.
 | `tags` | Its tags: `finale`, `ending`, `epilogue`, `act`. |
 | `pov` | Who the Linker looks through. |
 | `now` | The clock's stop. |
-| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style }` with `style` from `italic`, `bold`, `struck`. `Para::plain()` reads one as text. |
+| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `struck`. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`) and `verse`; a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Pacing. |
 | `links` | The Links offered: `{ id, label }`, the label a `Para`. |
 | `asks` | The open inputs: `{ kind, prompt, options, methods, length, voted }`. |
 | `over` | Nothing offered, nothing asked: the reading has ended. |
@@ -237,7 +237,8 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
 {:ok, inklink} = Inkjot.Engine.load(File.read!("ex3.json"))
 {:ok, state} = Inkjot.Engine.start(inklink, 42, %{})
 %{nib: nib, links: links, text: text} = Inkjot.Engine.view(state)
-# text: [%{plain: "…", runs: [%{text: "…", style: ["italic"]}]}]
+# text: [%{plain: "…", runs: [%{text: "…", style: ["italic"], pause: nil}],
+#         pause: nil | %{ms: 2000, kind: "after"}, verse: false}]
 # links: [%{id: "…", label: "plain label", runs: [%{text, style}]}]
 {:ok, next} = Inkjot.Engine.take_link(state, hd(links).id)
 [%{"type" => "nib_shown", "origin" => "engine", "data" => data} | _] = Inkjot.Engine.events(next)
