@@ -14,6 +14,13 @@
 - *Mafia, by Lamplight*, drafted (`examples/drafts/ex7-mafia.twee`): ten
   syndicates, four that change the rules, three ways to moderate, and
   `where:` in nearly every Link. Linted with the other drafts.
+- Last bug pass: the Doppelgänger's swap now happens before the morning
+  report; debts fall due at nightfall, a full day after marking; the
+  syndicate's size counts players only, after the deal; teammates are
+  found by team (so the cult sees the cult); a saved guest keeps their
+  keepsake; a tied vote is drawn, so every game ends. `tests/ex7_rules.rs`
+  plays the rules out for every syndicate at 5 to 12 players: every game
+  ends, and both sides can win everywhere.
 
 ### Ex 8
 

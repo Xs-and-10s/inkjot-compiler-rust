@@ -78,17 +78,18 @@ npc lamplighter: "the Lamplighter" ~ voice
 (((The engine's own voice, when it moderates.)))
 
 (((
-The deck of roles, sized to the table: one in four is the syndicate,
+The deck of roles, sized to the players (not the Storyteller, who plays
+no role): one in four is the syndicate,
 rounded down, at least one; a Doctor and a Detective from five players up;
 everyone else is town. Dealt face down, one each, into a pile only its
 owner sees.
 )))
 deck roles
-~ card syndicate: max(1, cohort.size / 4)
+~ card syndicate: members
 ~ card doctor: 1
 ~ card detective: 1
 ~ card townsfolk: rest
-pile role ~ per player ~ private ~ face down ~ shown as "your card"
+pile role ~ per guest ~ private ~ face down ~ shown as "your card"
 
 (((
 The Heist Crew's game is played with keepsakes: everyone is dealt one,
@@ -96,7 +97,7 @@ and it lies face up in front of them.
 )))
 deck keepsakes
 ~ card locket, pocket_watch, signet_ring, cameo, silver_flask, music_box, opera_glasses, tin_soldier, compass, hatpin, fountain_pen, harmonica
-pile keepsake ~ per player ~ face up ~ shown as "keepsake"
+pile keepsake ~ per guest ~ face up ~ shown as "keepsake"
 pile haul ~ shown as "the haul"
 
 (((
@@ -110,12 +111,15 @@ state moderator: engine ~ of moderator
 list moderators: "how the game is told" ~ holds engine: "the Lamplighter (the engine)", monkeypaw: "MonkeyPaw, fresh each morning", storyteller: "a Storyteller at the table"
 state syndicate: nobody ~ of syndicate
 state victim: nobody ~ of guest
+state replacing: no
+state foreclosed: nothing
+state rumour_about: nobody ~ of guest
 state saved: nobody ~ of guest
 state lynched: nobody ~ of guest
 state whispered: no
 state chosen_special: nothing ~ of special
 list specials: "the special syndicates" ~ holds doppelganger: "the Doppelgänger Clan", collectors: "the Debt Collectors", cult: "the Cult of the Long Night", heist: "the Heist Crew", surprise: "Surprise us"
-get special_wanted: count(guest, where: it.wants_special) * 2 > cohort.size
+get special_wanted: count(guest, where: it.wants_special) * 2 > players
 state report: ""
 
 fact cult_secret: "The lamp turns. You see it now. You will vote as the lamp would have you vote." ~ secret
@@ -165,7 +169,8 @@ Who is on which team, read through `where:`. `alive` is a state; the
 syndicate's members are whoever holds a syndicate card, or (for the
 Cult) has been taken in since.
 )))
-get members: count(guest, where: it.role == syndicate)
+get players: count(guest)
+get members: max(1, players / 4)
 get town_left: count(guest, where: it.alive and it.team == town)
 get syndicate_left: count(guest, where: it.alive and it.team == syndicate)
 (((
@@ -208,8 +213,8 @@ asks for a special syndicate: then the table votes for one of the four.
 The lamps are lit. Somebody passes round a bottle. Somebody else says *all right, all right, who’s telling it*, and nobody wants to, and so it is decided.
 
 > [[Ask for a special syndicate->gathering]] ~ when not me.wants_special ~ then set me.wants_special: yes ~ id want_special
-> [[Draw the syndicate->drawn]] ~ when cohort.size >= 5 and not special_wanted ~ for cohort ~ then roll syndicate
-> [[Choose the special syndicate->choosing]] ~ when cohort.size >= 5 and special_wanted ~ for cohort
+> [[Draw the syndicate->drawn]] ~ when players >= 5 and not special_wanted ~ for cohort ~ then roll syndicate
+> [[Choose the special syndicate->choosing]] ~ when players >= 5 and special_wanted ~ for cohort
 
 :: choosing
 (((
@@ -218,7 +223,7 @@ chooses which, by simple majority. A tie is settled by drawing among the
 tied. "Surprise us" draws among all four.
 )))
 --
-{ballot for: chosen_special, from: specials, voters: cohort, ties: draw}
+{ballot for: chosen_special, from: specials, voters: all(guest), ties: draw}
 
 > [[Draw it->drawn]] ~ for cohort ~ when ballot.done ~ then roll syndicate where: it.special == chosen_special or (chosen_special == surprise and it.special != none)
 
@@ -262,7 +267,13 @@ You look round the table at every card. {list role of each guest ~ one per line}
 {present linker}, you turn your card over under your hand.
 
 [if me.role == syndicate]
-You are a **{syndicate.mafia}**. The others are {all(guest, where: it.team == syndicate and it != me)}{if syndicate_left == 1 then "nobody: you are alone" else ""}.
+You are a **{syndicate.mafia}**.
+
+[if me.role == syndicate and members == 1]
+You are alone. Nobody at this table is with you.
+
+[if me.role == syndicate and members > 1]
+The others are {all(guest, where: it.team == me.team and it != me)}.
 
 [if me.role == doctor]
 You are **{syndicate.doctor}**. Each night you may save someone; never the same one two nights running.
@@ -281,6 +292,13 @@ In front of you lies your keepsake: **{top of my keepsake}**.
 
 :: night
 (((
+Debts fall due at nightfall: a name marked last night, and not paid
+today, dies now.
+)))
+let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now - 1)
+set due.alive: no when syndicate.special == collectors
+set foreclosed: due when syndicate.special == collectors
+(((
 Night: each acts in private. Every target is `~ at guest` with a `where:`
 that says which guests may be picked. Links grouped by who may take them.
 The syndicate chooses together: `~ consensus` makes the Link a vote among
@@ -298,7 +316,8 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 > [[{capital(syndicate.kills)}: {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == doppelganger ~ consensus
-> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target
+> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: yes
+> [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: no
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus
 > [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set target.marked: yes ~ then set target.marked_since: clock.now
@@ -307,7 +326,7 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 > [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.voted_with(cult) ~ then set target.team: cult ~ then teach target cult_secret
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus
-> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target ~ then move top of target.keepsake to haul
+> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target
 
 > ~ for guest where: it.alive and it.role == doctor
 > [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ then set saved: target ~ then set me.saved_last: target
@@ -353,15 +372,26 @@ it is told, three ways. `report` holds the table's version; MonkeyPaw or
 the Storyteller may tell it differently.
 )))
 let flourish: one syndicate.deaths
+let killer: one(guest, where: it.team == syndicate and it.alive and it.chose_target(victim))
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
 set victim: nobody when victim == saved
 set victim.alive: no when victim != nobody and syndicate.special in [none, doppelganger]
+(((
+The Doppelgänger's swap happens before the report is written, so the
+report names the face on the body: the killer's old one.
+)))
+set killer.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
+set victim.shown_as: killer.name when syndicate.special == doppelganger and replacing and victim != nobody
+move top of victim.keepsake to haul when syndicate.special == heist and victim != nobody
 set report: "{victim} {flourish}." when victim != nobody
-set report: "Nobody died. {capital(saved.they)} will never know how close it came." when victim == nobody and saved != nobody and syndicate.special in [none, doppelganger]
+set report: "Nobody died. Someone at this table will never know how close it came." when victim == nobody and saved != nobody and syndicate.special in [none, doppelganger]
 --
-[if syndicate.special == doppelganger and victim != nobody; then play morning:replaced]
+[if syndicate.special == doppelganger and replacing and victim != nobody; then play morning:replaced]
 [if syndicate.special == collectors; then play morning:debts]
-[if syndicate.special == heist; then play morning:missing]
+[if syndicate.special == heist and victim != nobody; then play morning:missing]
+
+[if me.heard and rumour_about != nobody]
+Somebody leaned over at breakfast and told you something about {rumour_about}. You are not sure it is true. You are not sure it isn’t.
 
 [if moderator == engine]
 @lamplighter {report}
@@ -395,12 +425,9 @@ pending: by monkeypaw ~ brief morning ~ timeout 10s
 (((
 The Doppelgänger. The clan member who killed wears the victim's face from
 now on: the platform shows the killer's seat under the victim's name, and
-the morning reports the killer's old name as the dead. Names are swapped;
-roles are not.
+the morning reports the killer's old name as the dead. Names are swapped
+(in the morning's header); roles are not.
 )))
-let killer: one(guest, where: it.team == syndicate and it.alive and it.chose_target(victim))
-set killer.shown_as: victim.name
-set victim.shown_as: killer.name
 --
 At first light, under a dusting of snow on the terrace: {victim}. The face is {possessive(victim)} face. Everyone says so. Everyone is very sure.
 
@@ -412,11 +439,9 @@ pronouns would be the victim's, and would give the swap away.
 )))
 
 :: morning:debts
-let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now)
-set due.alive: no
 --
-[if count(due) > 0]
-@lamplighter {all due} did not pay. {capital(plural(count(due), "account"))} closed.
+[if count(foreclosed) > 0]
+@lamplighter At nightfall the Collectors called on {all foreclosed}. {capital(plural(count(foreclosed), "account"))} closed.
 
 [end]
 @lamplighter On the Collectors’ slate this morning: {all(guest, where: it.alive and it.marked)}.
@@ -443,6 +468,7 @@ You have five minutes. Make them count.
 
 :: day:whisper
 set whispered: yes
+set rumour_about: target
 set me.heard: yes
 --
 You lean to your neighbour and say, very quietly, something about {target} that you are not sure is true. By tomorrow it will be in the next ear, and the next.
@@ -453,31 +479,29 @@ You lean to your neighbour and say, very quietly, something about {target} that 
 :: vote
 (((
 The vote. Only the living vote, and not those who paid a debt today:
-`voters:` is a `where:` too. The dead watch.
+`voters:` is a `where:` too. The dead watch. A tie votes once more, then
+is drawn by lot among the tied: someone leaves the table every day, so
+every game ends, even one where nobody can be killed at night.
 )))
 --
-{accuse who: all(guest, where: it.alive), voters: all(guest, where: it.alive and not it.voteless), revote: 1}
+{accuse who: all(guest, where: it.alive), voters: all(guest, where: it.alive and not it.voteless), revote: 1, ties: draw}
 
 > [[The vote is counted->counted]] ~ for cohort ~ when accusation.done
 
 :: counted
 set lynched: accusation.who
-set lynched.alive: no when not accusation.hung
+set lynched.alive: no
 set each guest.voteless: no
 spreads 1 to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ then set it.heard: yes ~ when whispered
 --
 {ballots}
 
-[if accusation.hung]
-@lamplighter No one. The town goes to bed angry.
-
-[else]
 @lamplighter {lynched} it is. {capital(lynched.they)} turn{if lynched.pronouns == they then "" else "s"} over {possessive(lynched)} card:
 
-[if not accusation.hung and syndicate.special == doppelganger and lynched.shown_as != lynched.name]
+[if syndicate.special == doppelganger and lynched.shown_as != lynched.name]
 @lamplighter …and under the face of {lynched}, something else. {lynched.name}. A {syndicate.mafia}.
 
-[if not accusation.hung and not (syndicate.special == doppelganger and lynched.shown_as != lynched.name)]
+[if not (syndicate.special == doppelganger and lynched.shown_as != lynched.name)]
 @lamplighter {if lynched.team == town then syndicate.townsfolk else syndicate.mafia}.
 
 [end]
