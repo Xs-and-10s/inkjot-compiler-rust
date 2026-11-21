@@ -27,7 +27,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::json::Value;
 pub use inputs::Ask;
 pub use map::{Edge, Node, StoryMap};
-pub use prose::{Para, Span};
+pub use prose::{Para, Pause, Span};
 pub use value::V;
 
 /// An interpreter result. The error says what went wrong in plain words.
@@ -1634,10 +1634,15 @@ impl Run {
         let mut show = true;
         let mut last_if = true;
         let mut append = false;
+        // `[after 2s]`, `[beat 2s]`: waits for the next paragraph shown. A
+        // block that is not shown takes its pause with it.
+        let mut pause: Option<prose::Pause> = None;
+        let mut verse = false;
         for node in &p.body {
             match f(node, "type").as_str() {
                 Some("modifier") => {
                     append = false;
+                    verse = false;
                     for part in f(node, "parts").as_arr().unwrap_or(&[]) {
                         let when = f(part, "when");
                         match f(part, "name").as_str().unwrap_or("") {
@@ -1656,7 +1661,16 @@ impl Run {
                             }
                             "once" => show = show && first_visit,
                             "append" => append = true,
-                            _ => {} // after, beat, verse, reveal: presentation only
+                            name @ ("after" | "beat") => {
+                                let kind = if name == "after" { "after" } else { "beat" };
+                                // A bare `[beat]` is a beat of the runtime's own length.
+                                pause = match f(part, "time").as_str() {
+                                    Some(t) => prose::Pause::parse(t, kind),
+                                    None => Some(prose::Pause { ms: 0, kind }),
+                                };
+                            }
+                            "verse" => verse = true,
+                            _ => {} // reveal: the runtime's, by its mode
                         }
                     }
                 }
@@ -1688,6 +1702,8 @@ impl Run {
                         if quiet || text.is_blank() {
                             continue;
                         }
+                        text.pause = pause.take();
+                        text.verse = verse;
                         match self.output.last_mut() {
                             Some(last) if append && i == 0 => {
                                 last.push(" ", &[]);
@@ -1698,6 +1714,8 @@ impl Run {
                     }
                     append = false;
                 }
+                // Not shown: its pause goes with it.
+                Some("prose") | Some("speech") => pause = None,
                 _ => {}
             }
         }

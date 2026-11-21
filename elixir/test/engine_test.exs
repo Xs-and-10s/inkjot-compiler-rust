@@ -271,6 +271,43 @@ defmodule Inkjot.EngineTest do
     assert median < 1_000, "take_link took #{median} µs (median of 200)"
   end
 
+  @paced """
+  :: StoryTitle
+  Paced
+
+  :: StoryData
+  {"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "lounge"}
+
+  :: Inklink [config]
+  kind: story
+  mode: solo
+  pov: ann
+  character ann: "Ann" ~ playable
+
+  :: lounge
+  He winds it once, twice—
+
+  [after 2s; append]
+  The lights die.
+
+  [after 4s]
+  When they return, the Professor lies across the table.
+
+  [verse]
+  Flame for the fool,
+  """
+
+  test "pauses and verse reach the view" do
+    {:ok, ir} = Engine.build(@paced)
+    {:ok, inklink} = Engine.load(ir)
+    {:ok, state} = Engine.start(inklink, 1)
+
+    assert [first, second, verse] = Engine.view(state).text
+    assert %{pause: nil, verse: false, runs: [_, %{text: "The lights die.", pause: %{ms: 2000, kind: "after"}}]} = first
+    assert %{pause: %{ms: 4000, kind: "after"}} = second
+    assert %{plain: "Flame for the fool,", verse: true} = verse
+  end
+
   @ford """
   :: StoryTitle
   The Ford
@@ -307,7 +344,7 @@ defmodule Inkjot.EngineTest do
     view = Engine.view(ford)
     assert Enum.map(view.links, & &1.id) == ["pay"]
     assert [%{plain: "The ferryman holds out his hand.", runs: runs}] = view.text
-    assert %{text: "hand", style: ["italic"]} in runs
+    assert %{text: "hand", style: ["italic"], pause: nil} in runs
 
     assert {:ok, [%{id: "swim"}, %{id: "steal"}]} = Engine.forks(ford, "pay")
     assert {:ok, [%{id: "steal"}]} = Engine.forks(ford, "pay", "bank")

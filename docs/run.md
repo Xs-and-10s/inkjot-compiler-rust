@@ -138,6 +138,21 @@ backslash, and `\*` an asterisk that is not emphasis.
 name and `{marge.shown_as}` always what she is shown as. Ex 3's widow is
 "the Surviving Authority" to the cats from start to end.
 
+**Pacing.** The interpreter does not wait; it says where to. `[after 2s]`
+and `[beat 2s]` put a `pause` on the next paragraph shown: a wait after the
+paragraph before it, so two `[after 2s]` in a row show their paragraphs two
+and four seconds in. With `append` the wait falls inside the paragraph,
+on the run appended (Ex 1: "He winds it once, twice— *(two seconds)* The
+lights die."). `after` simply waits; `beat` is a dramatic pause, which a
+runtime that reveals on tap may let the reader skip; a bare `[beat]` is a
+beat of the runtime's own length (`ms: 0`). Times are `2s`, `1.5s` or
+`400ms`. A pause waits for the next paragraph that is shown: across a
+modifier line with nothing under it (`[after 2s]` then `[quote …]`), but
+not past a block that is not shown, which takes its pause with it. `[verse]`
+marks its paragraphs as lines of verse. The runtime does the waiting, lets
+a reader skip ahead, and shows everything at once for a reader who asks for
+reduced motion.
+
 **`aka`.** `{leo.aka}` picks one of his names by his `~ pick` policy:
 `shuffled` (the default: each name once, in a seeded order, then again),
 `cycle` (in the order written), `random` (any, each time) or `first`.
