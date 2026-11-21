@@ -231,3 +231,47 @@ encounter milestone, since they are in the duel.
   so one word can cover combos and acts: `spell ember_lance: spark, gust,
   spark` would mean `combo ember_lance: … ~ like spell`, the kind read from
   the form.
+
+## Ex 9's spellbook (21 Nov 2026)
+
+The test the revised recommendation asked for: many spells with numbers,
+one Linker who reads the book, spells offered everywhere. Ex 9,
+*Saltmarrow*, has nineteen, each with a cost and a range, and most with a
+power or a duration. Written both ways:
+
+| Draft | What it uses |
+|---|---|
+| `examples/drafts/ex9-saltmarrow.twee` | General words: each spell an act or combo with `~ spell` |
+| `examples/drafts/ex9-spellbook-define.twee` | Steps 2 and 3: `:: spell [define]`, built on an archetype, with fields `range`, `power`, `lasts`, `about` and `verb: cast` |
+
+Counting the spellbook's lines, comments left out:
+
+| | General words | `define` |
+|---|---|---|
+| The `[define]` passage | 0 | 9 |
+| The nineteen spells | 70 | 71 |
+| The book's Links | 20 | 0 |
+| **Total** | **90** | **80** |
+
+What each way costs:
+
+- **General words state every number twice.** "Lasts 4 turns" in the
+  description, `~ for 4 turns` in the effect; "Power 2" and `lower
+  here.heat 2`. Nothing ties them together, so a change to one leaves the
+  book lying. `tests/ex9_map.rs` now checks they agree. That check is the
+  price of the general words, and only typed fields remove it: the
+  description is built from `self.lasts` and the effect reads it.
+- **Nineteen hand-written Links** for the book, each with its label. With
+  `verb: cast` the platform offers every spell itself. But this is not
+  `define`'s alone: a general clause, `~ offered everywhere` on an act,
+  would do the same, with the act's name as the label.
+- **The word itself** (`spell kindle:` for `act kindle: ~ like spell`)
+  saves two words a line and reads better. It is the least of the three.
+
+**Recommendation.** Ex 9 earns step 2: typed fields on archetypes, read as
+`self.x` in descriptions and effects, so a number is written once. Step 1
+comes with it (an archetype is what carries the fields), including `~ verb
+cast`. `~ offered everywhere` is a general clause, worth building with
+the encounter milestone. Step 3, the word, stays optional: it is sugar
+for `~ like spell`, and Ex 2 showed that a defined word built on a kind
+splits what the fiction calls one thing. The first two steps are enough.

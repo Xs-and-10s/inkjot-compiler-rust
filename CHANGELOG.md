@@ -26,6 +26,28 @@
   Landlord, who takes someone in, and the Cult's is the One Who Left, who
   sits up with someone through the night.
 
+### Ex 9
+
+- *Saltmarrow*, drafted (`examples/drafts/ex9-saltmarrow.twee`): a
+  Zork-like `game` in general words, with nineteen spells paid for in
+  salt, fire that spreads through timber, shafts that fall after three
+  burnt crossings, the Gleaner, and the Brinewarden. Linted with the other
+  drafts. `tests/ex9_map.rs` plays it at random and checks there are no
+  dead ends, with the pick or without, and that the spellbook's numbers
+  agree with what the spells do.
+- Last bug pass: Thwaite must be beside you to count as brought out (a
+  lighten can wear off on the way; she waits where it did, and drags
+  herself clear of fire); a treasure scores once; the Gleaner's candle
+  never cools a blaze; the Warden's hall reads right when it has gone
+  after you, and a heap of salt cannot be fought or paid; the sluice wears
+  the Warden down only in its hall; the planks score whichever way they
+  go; text fixed for a dry stair, a dark drift, a fixed jack roll and a
+  shored shaft. New properties: every spell has its Link in the book, the
+  ranks cover every score once, and the best game scores exactly 100.
+- `define`, tested on its spellbook (`ex9-spellbook-define.twee`,
+  `docs/define.md`): typed fields earn their place; the word itself stays
+  optional.
+
 ### Ex 8
 
 - *The Inquest*, drafted (`examples/drafts/ex8-the-inquest.twee`): a
