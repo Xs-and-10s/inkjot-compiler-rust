@@ -139,8 +139,8 @@ table syndicate: shuffled ~ one per game
 ~ row outfit: "the Outfit", "a speakeasy behind a florist’s on the North Side of Chicago, 1928", "Made Man", "the Doc", "the Prohibition Agent", "Regular", "taken for a ride", none, outfit_deaths, "You sit at the end of the bar with your hat on. The bartender pours you one out of habit, and nobody drinks it."
 ~ row osaka: "the Kurosawa-gumi", "a pachinko parlour in Osaka, the summer of 1974", "Kumi-in", "the Bonesetter", "the Detective Sergeant", "Regular", "erased", none, osaka_deaths, "You stand among the machines, among the silver balls nobody ever picks up, and the lights go on blinking."
 ~ row doppelganger: "the Doppelgänger Clan", "a sanatorium in the Swiss Alps, 1907", "Doppelgänger", "the Physician", "the Alienist", "Patient", "replaced", doppelganger, doppelganger_deaths, "You watch someone wearing your face eat your breakfast, and take two sugars, which you never did."
-~ row collectors: "the Debt Collectors", "a seaside town out of season, Margate, 1936", "Collector", "the Pawnbroker", "the Bailiff", "Holidaymaker", "foreclosed", collectors, collector_deaths, "You walk the pier at low tide, owing nothing to anyone, at last."
-~ row cult: "the Cult of the Long Night", "a lighthouse community on a Hebridean island, 1952", "Acolyte", "the Lightkeeper", "the Minister", "Islander", "taken into the dark", cult, cult_deaths, "You stand inside the great lamp at the top of the lighthouse, and the light goes through you, and round, and round."
+~ row collectors: "the Debt Collectors", "a seaside town out of season, Margate, 1936", "Collector", "the Old Landlord", "the Bailiff", "Holidaymaker", "foreclosed", collectors, collector_deaths, "You walk the pier at low tide, owing nothing to anyone, at last."
+~ row cult: "the Cult of the Long Night", "a lighthouse community on a Hebridean island, 1952", "Acolyte", "the Ex-Cultist", "the Minister", "Islander", "taken into the dark", cult, cult_deaths, "You stand inside the great lamp at the top of the lighthouse, and the light goes through you, and round, and round."
 ~ row heist: "the Heist Crew", "a country-house weekend in Kent, 1923", "Crook", "the Butler", "the Inspector", "Guest", "robbed", heist, heist_deaths, "You sit in the library with the other guests nobody suspects any more, and a decanter, and very good views of everything."
 
 list vampire_deaths ~ pick shuffled
@@ -275,8 +275,14 @@ You are alone. Nobody at this table is with you.
 [if me.role == syndicate and members > 1]
 The others are {all(guest, where: it.team == me.team and it != me)}.
 
-[if me.role == doctor]
+[if me.role == doctor and syndicate.special != collectors and syndicate.special != cult]
 You are **{syndicate.doctor}**. Each night you may save someone; never the same one two nights running.
+
+[if me.role == doctor and syndicate.special == collectors]
+You are **{syndicate.doctor}**. Each night you may take someone in, and no Collector marks a name under your roof; never the same one two nights running.
+
+[if me.role == doctor and syndicate.special == cult]
+You are **{syndicate.doctor}**. You were in the dark once, and you got out. Each night you may sit up with someone and keep them turned from the light; never the same one two nights running.
 
 [if me.role == detective]
 You are **{syndicate.detective}**. Each night you may look into someone, and learn which side they are on.
@@ -292,10 +298,10 @@ In front of you lies your keepsake: **{top of my keepsake}**.
 
 :: night
 (((
-Debts fall due at nightfall: a name marked last night, and not paid
+Debts fall due at nightfall: a name marked this morning, and not paid
 today, dies now.
 )))
-let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now - 1)
+let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now)
 set due.alive: no when syndicate.special == collectors
 set foreclosed: due when syndicate.special == collectors
 (((
@@ -320,16 +326,18 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 > [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: no
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus
-> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set target.marked: yes ~ then set target.marked_since: clock.now
+> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: target
 
 > ~ for guest where: it.alive and it.team == cult ~ consensus
-> [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.voted_with(cult) ~ then set target.team: cult ~ then teach target cult_secret
+> [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.voted_with(cult) ~ then set victim: target
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus
 > [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target
 
 > ~ for guest where: it.alive and it.role == doctor
-> [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ then set saved: target ~ then set me.saved_last: target
+> [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special != collectors and syndicate.special != cult ~ then set saved: target ~ then set me.saved_last: target
+> [[Take {target} in->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special == collectors ~ then set saved: target ~ then set me.saved_last: target
+> [[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special == cult ~ then set saved: target ~ then set me.saved_last: target
 
 > ~ for guest where: it.alive and it.role == detective
 > [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town
@@ -368,14 +376,21 @@ You wait for the others.
 :: morning
 (((
 The morning report. What the night did is settled here, in order; then
-it is told, three ways. `report` holds the table's version; MonkeyPaw or
+it is told, three ways. Every special's night choice lands here, not on
+its Link, so the save can stop any of them: a death, a theft, a mark, a
+taking. `report` holds the table's version; MonkeyPaw or
 the Storyteller may tell it differently.
 )))
 let flourish: one syndicate.deaths
 let killer: one(guest, where: it.team == syndicate and it.alive and it.chose_target(victim))
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
-set victim: nobody when victim == saved
+let foiled: victim != nobody and victim == saved
+set victim: nobody when foiled
 set victim.alive: no when victim != nobody and syndicate.special in [none, doppelganger]
+set victim.marked: yes when victim != nobody and syndicate.special == collectors
+set victim.marked_since: clock.now when victim != nobody and syndicate.special == collectors
+set victim.team: cult when victim != nobody and syndicate.special == cult
+teach victim cult_secret when victim != nobody and syndicate.special == cult
 (((
 The Doppelgänger's swap happens before the report is written, so the
 report names the face on the body: the killer's old one.
@@ -383,8 +398,14 @@ report names the face on the body: the killer's old one.
 set killer.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
 set victim.shown_as: killer.name when syndicate.special == doppelganger and replacing and victim != nobody
 move top of victim.keepsake to haul when syndicate.special == heist and victim != nobody
-set report: "{victim} {flourish}." when victim != nobody
-set report: "Nobody died. Someone at this table will never know how close it came." when victim == nobody and saved != nobody and syndicate.special in [none, doppelganger]
+(((
+The taking is secret, and a mark is read from the slate, so only deaths
+and thefts make the report.
+)))
+set report: "{victim} {flourish}." when victim != nobody and syndicate.special in [none, doppelganger, heist]
+set report: "Nobody died. Someone at this table will never know how close it came." when foiled and syndicate.special in [none, doppelganger]
+set report: "The Collector knocked at a lodging house last night. {capital(syndicate.doctor)} said there was nobody of that name living there." when foiled and syndicate.special == collectors
+set report: "Somebody sat up all night with their back to the window, and somebody who used to love the lamp talked to them until dawn." when foiled and syndicate.special == cult
 --
 [if syndicate.special == doppelganger and replacing and victim != nobody; then play morning:replaced]
 [if syndicate.special == collectors; then play morning:debts]
@@ -565,6 +586,20 @@ expect no link: "Save {guest_2}"
 start: vote ~ cohort 6
 given: set guest_3.alive: no
 expect: not guest_3.in(accusation.voters)
+
+:: a_name_taken_in_is_not_marked [test]
+start: morning ~ cohort 5
+given: draw syndicate collectors
+given: set victim: guest_2
+given: set saved: guest_2
+expect: not guest_2.marked
+
+:: a_guest_sat_up_with_is_not_taken [test]
+start: morning ~ cohort 5
+given: draw syndicate cult
+given: set victim: guest_2
+given: set saved: guest_2
+expect: guest_2.team == town
 
 :: the_town_wins_when_none_are_left [test]
 start: counted ~ cohort 5

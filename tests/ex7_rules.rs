@@ -27,7 +27,10 @@ fn the_model_follows_the_draft() {
         "~ card townsfolk: rest",
         "get haul_needed: members + 2",
         "revote: 1, ties: draw}",
-        "it.marked_since < clock.now - 1",
+        "it.marked_since < clock.now)",
+        "set victim.marked_since: clock.now when victim != nobody",
+        "let foiled: victim != nobody and victim == saved",
+        "set victim.team: cult when victim != nobody",
         "it != me.saved_last",
         "it.voted_with(cult)",
         "finale when: syndicate_left >= town_left and syndicate.special in [none, doppelganger, collectors]",
@@ -161,7 +164,7 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             // Night. Debts fall due first.
             if special == Special::Collectors {
                 for x in g.iter_mut() {
-                    if x.alive && x.marked_since.is_some_and(|t| t + 1 < now) {
+                    if x.alive && x.marked_since.is_some_and(|t| t < now) {
                         x.alive = false;
                     }
                 }
@@ -193,17 +196,17 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
                 None
             };
             saved_last = saved;
-            if let Some(t) = target {
+            // The morning settles the night: a save stops every special's
+            // choice. A mark is made in the morning, `now + 1`.
+            if let Some(t) = target.filter(|t| saved != Some(*t)) {
                 match special {
-                    Special::None | Special::Doppelganger if saved != Some(t) => g[t].alive = false,
-                    Special::Collectors => g[t].marked_since = Some(now),
-                    // A conversion happens at once, as in the draft's Link.
+                    Special::None | Special::Doppelganger => g[t].alive = false,
+                    Special::Collectors => g[t].marked_since = Some(now + 1),
                     Special::Cult => g[t].team = Team::Cult,
-                    Special::Heist if saved != Some(t) => {
+                    Special::Heist => {
                         g[t].keepsake = false;
                         haul += 1;
                     }
-                    _ => {}
                 }
             }
         } else {

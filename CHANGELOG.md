@@ -21,6 +21,10 @@
   keepsake; a tied vote is drawn, so every game ends. `tests/ex7_rules.rs`
   plays the rules out for every syndicate at 5 to 12 players: every game
   ends, and both sides can win everywhere.
+- The save now stops every special's night choice, which lands in the
+  morning rather than on its Link: the Debt Collectors' Doctor is the Old
+  Landlord, who takes someone in, and the Cult's is the Ex-Cultist, who
+  sits up with someone through the night.
 
 ### Ex 8
 
