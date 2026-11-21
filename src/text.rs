@@ -3,7 +3,7 @@
 //! ```text
 //! The hall is quiet. {present} are here.                 prose: inserts
 //! say leo "Who's hungry? Is it you, {jojo.aka}?"          quoted text: the same braces
-//! "Corin kneels to {if lied then "a spirit" else "a monster"}."
+//! "Nell kneels to {if lied then "a spirit" else "a monster"}."
 //! A *thin*, **glassy** burn. Literal: \{ \} \* \" \\
 //! ```
 //!
