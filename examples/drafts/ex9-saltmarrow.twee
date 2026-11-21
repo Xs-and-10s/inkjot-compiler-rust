@@ -172,6 +172,9 @@ on move warden when warden.roused and warden.here and not warden.unmade
 on enter place when gleaner.here
 ~ then play gleaner:about
 
+on enter place when thwaite.here and thwaite.with_me and not way_free
+~ then play thwaite:waiting
+
 fuse lamp_oil: 90 ~ shown as "lamp oil" ~ lit
 ~ then set lamp.lit: no
 ~ then set safety_lamp.lit: no
@@ -185,21 +188,23 @@ act take
 act drop
 
 archetype tool ~ state broken: no
-archetype treasure
+archetype treasure ~ state counted: no
 
 item lamp: "Thwaite’s oil lamp" ~ held by apprentice ~ catches
 ~ state lit: yes
 item safety_lamp: "a gauzed safety lamp" ~ catches
 ~ state lit: yes
-item gauze: "a cylinder of fine iron gauze" ~ in drift
+item gauze: "a cylinder of fine iron gauze" ~ in drift ~ hidden until drift.searched
 item pick: "a short salt pick" ~ like tool ~ in timber_yard ~ breaks 1 in 6
 item hammer: "a lump hammer" ~ like tool ~ in timber_yard
 item hay: "fifty-year-dry hay" ~ in stables ~ fixed ~ catches ~ burns
+~ state lit: no
 item stop_planks: "the stop-planks" ~ in adit ~ fixed ~ catches
+~ state lit: no
 item spanner: "a long spanner" ~ like tool ~ in timber_yard
 item stave: "a pit prop" ~ plural "staves" ~ in timber_yard ~ count 4 ~ burns
 item sacking: "an old salt sack" ~ in timber_yard ~ burns
-item stretcher: "a stretcher of two staves and a sack"
+item stretcher: "a stretcher of two staves and a sack" ~ burns
 item horseshoe: "a pony’s horseshoe" ~ in stables
 item pawl: "an iron pawl, hammered from a horseshoe"
 item oil_can: "a can of lamp oil" ~ in stables ~ fixed
@@ -239,7 +244,7 @@ npc gleaner: "the Gleaner" ~ pronouns they ~ in stables
 ~ moves 1 per turn ~ where: it.salted and it.depth < 300 and it.heat == 0 and not it.like(shaft) and not (it == drift and gas > 0)
 
 objective find: "Find Agnes Thwaite" ~ done when thwaite.found
-objective bring: "Bring her up" ~ after find ~ done when thwaite.with_me and here.way_out
+objective bring: "Bring her up" ~ after find ~ done when thwaite.here and here.way_out
 
 (((
 Zork's ranks, in salt. A table read as a value.
@@ -371,7 +376,6 @@ state found: no
 state with_me: no
 state lightened: no
 --
-@thwaite (through her teeth) Salt first, then the word. Did nobody teach you anything?
 
 :: warden [npc]
 state salt: 3
@@ -393,6 +397,7 @@ threat grasp: at me ~ answered by cover
 ~ then set me.held: yes ~ for 1 turn
 threat douse: at me ~ answered by cover
 ~ then set lamp.lit: no
+~ then set safety_lamp.lit: no
 
 :: gleaner [npc]
 state candle_lit: yes
@@ -406,7 +411,7 @@ three turns later.
 )))
 on turn ends when not gleaner.here
 ~ then give one(item, in: gleaner.place, where: it.like(treasure) or it.like(tool)) to gleaner
-~ then roll candle when gleaner.candle_lit and gleaner.place.timbered and not gleaner.place.burnt
+~ then roll candle when gleaner.candle_lit and gleaner.place.timbered and not gleaner.place.burnt and gleaner.place.heat == 0
 ~ then set gleaner.candle_lit: yes ~ after 3 turns when not gleaner.candle_lit
 
 table candle: roll d6
@@ -433,18 +438,19 @@ Night. The headframe is a black shape against a blacker sky.
 The winding house of Saltmarrow pit: a tall timber headframe over the cage shaft, a cold engine, a coat on a peg that you know is Thwaite’s. A hatch in the floor opens on the ladderway. Beyond the door, the fen goes on for ever in the fog.
 
 [if not cage_fixed]
-The cage is somewhere at the bottom of its shaft. Its rope hangs slack.
+The cage is somewhere at the bottom of its shaft. Its rope hangs slack. You could climb down it. You could not climb up.
 
-[if thwaite.with_me]
+[if thwaite.here]
 Thwaite sits down on the step of the winding house and laughs, once, like a cough.
 
 [end]
-> [[Put {target} in the salt chest->pithead:chest]] ~ at item where: it.held_by(me) and it.like(treasure)
-> [[Go home with her->home]] ~ when thwaite.with_me
-> [[Go home without her->alone]] ~ when not thwaite.with_me
+> [[Put {target} in the salt chest->pithead:chest]] ~ at item where: it.held_by(me) and it.like(treasure) and not it.counted
+> [[Go home with her->home]] ~ when thwaite.here
+> [[Go home without her->alone]] ~ when not thwaite.here
 
 :: pithead:chest [act]
 move target to chest
+set target.counted: yes
 raise score 10
 --
 You lay {target} in the salt chest, where the next saltwright will find it.
@@ -470,6 +476,9 @@ Smoke curls up between the rungs from somewhere below.
 The warnings, one for each crossing left. The mice go first.
 )))
 --
+[if entered.crossings > 2]
+The shored timber creaks, and holds. The mice watch with interest.
+
 [if entered.crossings == 2]
 The burnt timber groans under you. {capital(plural(entered.crossings, "mouse"))} watch you from a crack, and do not like what they see.
 
@@ -608,9 +617,12 @@ CLEAR, it says, and under it, in a different hand: *a load at a time, and prop a
 The floor slopes. Something on rails creaks somewhere below.
 
 [else]
-The Incline: a haulage road sloping down into the second level, rails and a line of tubs, props every yard holding up a roof that clearly wants to come down. At the foot of the slope is the cage, in its shaft, with a hand winch bolted inside it for the deputies: a jack roll, for winding the cage up its own rope. The pawl that holds it is missing.
+The Incline: a haulage road sloping down into the second level, rails and a line of tubs, props every yard holding up a roof that clearly wants to come down. At the foot of the slope is the cage, in its shaft, with a hand winch bolted inside it for the deputies: a jack roll, for winding the cage up its own rope.
 
 East to the brine pans. West, the north drift, and a smell like a struck match.
+
+[if not cage_fixed]
+The jack roll’s pawl is missing. Without it the winch will not hold, and nobody is going up that way.
 
 [if cage_fixed]
 The new pawl clicks over the ratchet. The jack roll will hold.
@@ -631,15 +643,18 @@ Firedamp. An open flame here caps blue the first turn, a warning, and
 fires the second. Gust or the air door clears it.
 )))
 --
-[if gas > 0 and open_flame and not flame_warned]
+[if gas > 0 and open_flame]
 Your lamp flame stands up tall and turns blue. It has never done that before.
 
-[if gas == 0 or not open_flame]
+[if not seeing]
+A narrow place, and a smell like a struck match. Somewhere ahead, the air hisses.
+
+[if seeing and (gas == 0 or not open_flame)]
 The north drift: a narrow working that goes on north toward a square of timber cribs, the top of the winze. A deputy’s kit lies by the wall, as if dropped in a hurry.
 
 [end]
 > [[Put the lamp out->drift:lamp_out]] ~ when lamp.lit and me.holds.lamp
-> [[Open the deputy’s kit->drift:kit]] ~ once ~ when gas == 0 or not open_flame
+> [[Open the deputy’s kit->drift:kit]] ~ once ~ when seeing and (gas == 0 or not open_flame) ~ then set drift.searched: yes
 
 :: drift:lamp_out [act]
 set lamp.lit: no
@@ -677,7 +692,7 @@ The cribs are burnt black, and creak, and drop flakes of charcoal like snow.
 Water laps somewhere at your feet. It smells of the sea.
 
 [else]
-Brine pans: wide iron trays where brine was boiled down to salt, their fires long cold. The brine has dried in them to a white crust. Under one pan rim, a charm is scratched. To the south a stair goes down into black water, which stands {stair_water} steps deep.
+Brine pans: wide iron trays where brine was boiled down to salt, their fires long cold. The brine has dried in them to a white crust. Under one pan rim, a charm is scratched. To the south a stair goes down{if stair_water > 0 then " into black water, {plural(stair_water, "step")} deep" else ", wet and dripping, to the sump"}.
 
 [if here.crust > 0]
 Fresh crust has formed on the near pan, about {plural(here.crust, "crystal")} of it.
@@ -738,23 +753,30 @@ The wheel turns. Fresh water runs north along the channel, into the Warden’s h
 A vast dark. Something in it, very large, that does not breathe at all.
 
 [else]
-The Warden’s hall: salt columns going up into the dark, and between them, standing as it has stood for two hundred years, the Brinewarden. It is twice your height, a figure of grey salt bound with black pit timber and iron bands, and where a face should be it has a miner’s lamp, unlit.
+The Warden’s hall: salt columns going up into the dark, a door west to the sump, an arch north into the Marrow.
 
-[if sluice_open and not warden.unmade]
+[if warden.here and not warden.unmade]
+Between the columns, standing as it has stood for two hundred years, the Brinewarden. It is twice your height, a figure of grey salt bound with black pit timber and iron bands, and where a face should be it has a miner’s lamp{if warden.paid then ", lit" else ", unlit"}.
+
+[if not warden.here and not warden.unmade]
+The place between the columns where the Warden stood is empty. Its footprints go away across the salt.
+
+[if sluice_open and warden.here and not warden.unmade]
 Fresh water runs over the floor around its feet. The salt of its feet is beginning, very slowly, to go soft.
 
 [if warden.unmade]
 A heap of grey salt and old timber, and iron bands, and a lamp lying on its side.
 
-[if warden.paid]
-The Warden’s lamp is lit. It stands aside.
+[if warden.paid and warden.here]
+It stands aside.
 
-[if me.tongued and not warden.paid and not warden.unmade]
+[if me.tongued and warden.here and not warden.paid and not warden.unmade]
 @warden Down is free. Up is paid.
 
 [end]
-> [[Fight->warden:fight]] ~ when warden.roused and warden.here
-> [[Ask the Warden what it is owed->wardens_hall:ask]] ~ when me.tongued and not warden.paid and not warden.unmade
+> ~ when warden.here and not warden.unmade
+> [[Fight->warden:fight]] ~ when warden.roused
+> [[Ask the Warden what it is owed->wardens_hall:ask]] ~ when me.tongued and not warden.paid
 > [[Pay the Warden with the tally->wardens_hall:pay]] ~ when me.tongued and me.holds.tally and not warden.paid
 > [[Give the Warden back the shard->wardens_hall:return]] ~ when me.tongued and me.holds.shard and not warden.paid
 
@@ -792,7 +814,7 @@ The Marrow: a cave of salt so pure it is clear, so that the walls go down into t
 [if not thwaite.found]
 And sitting against the fall with her leg out in front of her at an angle legs should not have: Agnes Thwaite, with a shard of marrow salt beside her, the size of a loaf.
 
-[if thwaite.found and not thwaite.with_me]
+[if thwaite.found and thwaite.here and not thwaite.with_me]
 Thwaite, against the fall, waiting.
 
 [if rubble > 0 and propped]
@@ -803,7 +825,7 @@ Where the walls meet the floor, new salt has grown, like frost on a step.
 
 [end]
 > [[Thwaite!->marrow:found]] ~ when not thwaite.found
-> [[Take her with you->marrow:take_her]] ~ when thwaite.found and not thwaite.with_me and way_free
+> [[Take her with you->marrow:take_her]] ~ when thwaite.found and thwaite.here and not thwaite.with_me and way_free
 > [[Set staves under the fall->marrow:prop]] ~ when rubble > 0 and not propped and count(stave, held by: me) >= 2
 > [[Gather the new salt->scrape]] ~ when here.crust > 0
 > [[Dig at the fall->marrow:dig]] ~ uses pick ~ when rubble > 0 and propped and me.holds.pick and not pick.broken
@@ -826,6 +848,15 @@ She has been here three days. She cut the shard, and the Warden would not let he
 
 @thwaite One more thing. It was made to guard this place for a wage, and nobody ever paid it. Don’t fight it if you can help it. It’s only doing what it was made for.
 
+:: thwaite:waiting
+--
+Thwaite is here, sitting on the floor where your working ran out, with her leg out in front of her.
+
+@thwaite Well? I’m not walking.
+
+> [[Lighten {target}->spell:lighten]] ~ lighten
+> [[Roll her onto the stretcher->marrow:take_her]] ~ when me.holds.stretcher
+
 :: marrow:take_her [act]
 set thwaite.with_me: yes
 --
@@ -842,7 +873,7 @@ She rises off the floor like a leaf on a draught, and says, crossly, that she co
 set propped: yes
 lose stave 2
 --
-You set two staves under the roof of the fall, and hammer them tight. The roof stops whispering.
+You set two staves under the roof of the fall, and wedge them tight. The roof stops whispering.
 
 :: marrow:dig [act]
 lower rubble 1
@@ -889,6 +920,7 @@ Three blows each. The planks go, and the water of the whole mine goes with them,
 :: adit:burn [act]
 set planks_out: yes ~ after 2 turns
 set stair_water: 0 ~ after 2 turns
+raise score 5
 --
 The planks are tarred, and take the flame at once. In two turns there will be nothing but a black frame and daylight. Until then, a great deal of smoke.
 
@@ -896,8 +928,8 @@ The planks are tarred, and take the flame at once. In two turns there will be no
 --
 Reeds, fog, a heron that looks at you with deep disapproval. Saltmarrow’s eleven chimneys, a mile off. The adit mouth behind you pours water into the fen.
 
-> [[Go home with her->home]] ~ when thwaite.with_me
-> [[Go home without her->alone]] ~ when not thwaite.with_me
+> [[Go home with her->home]] ~ when thwaite.here
+> [[Go home without her->alone]] ~ when not thwaite.here
 
 :: fire:turn
 (((
@@ -905,7 +937,8 @@ Each turn's fire, in order. A blaze burns out. A smoulder or a fire grows.
 Each blaze, before it burns out, reaches the nearest timbered place next
 to it that has not burnt and is not burning. The brine pans and
 the Marrow crust over again too, one crystal every four turns, up to
-three.
+three. If Thwaite has been left where fire reaches, she drags herself out
+to the nearest place that is not timber.
 )))
 let ablaze: all(place, where: it.heat == 3)
 let growing: all(place, where: it.heat in 1..=2)
@@ -918,11 +951,18 @@ raise growing.heat 1
 let crusting: all(place, where: it.crusts and it.crust < 3)
 raise crusting.crust 1 when clock.now % 4 == 0
 lower gas 1 when air_door_open and gas > 0
+move thwaite to nearest(place, where: it.heat == 0 and not it.timbered) ~ along way when thwaite.place.heat > 0 and not thwaite.here
 set flame_warned: yes when here == drift and gas > 0 and open_flame
 set flame_warned: no when here != drift
 --
 [if count(burning_near) > 0]
 Smoke drifts in from {list burning_near}.
+
+[if here.heat == 1]
+The timbers here are smouldering.
+
+[if here.heat == 2]
+The timbers around you are burning. Get out.
 
 [if blows; then play drift:fires]
 [if here.heat == 3; then play burned]
@@ -941,6 +981,7 @@ it looked like, and do what only one place needs: hay, and the planks.
 set stables.heat: 1 when target == hay and not stables.burnt
 set planks_out: yes ~ after 2 turns when target == stop_planks
 set stair_water: 0 ~ after 2 turns when target == stop_planks
+raise score 5 when target == stop_planks
 --
 Salt on the tongue, then the word, and a flame stands up on your fingertip like a small polite guest.
 
@@ -994,8 +1035,11 @@ The burnt timber creaks, and stops creaking. It will hold three crossings more. 
 
 :: spell:draw [act]
 --
-[if here in [brine_pans, sump]]
+[if here in [brine_pans, sump] and stair_water > 0]
 The water in the stair draws back two steps, sulking, into the rock.
+
+[if here in [brine_pans, sump] and stair_water == 0]
+The last of the water in the stair drains away into the rock.
 
 [else]
 Water beads out of the bare rock and runs into your flask, salt as tears.
@@ -1045,12 +1089,12 @@ It opens its hand, wide, at the height of your waist.
 [if next == douse]
 Its chest swells. Something in it sloshes.
 
-[if sluice_open]
+[if sluice_open and warden.in(wardens_hall)]
 The fresh water round its feet eats at it. A little more of it is gone each round.
 
 [end]
 > ~ for apprentice
-> [[Freshet->warden:freshet]] ~ freshet
+> [[Freshet at {target}->warden:freshet]] ~ freshet
 > [[Throw the flask of spring water->warden:flask]] ~ when flask.water == fresh
 > [[Ward->warden:ward]] ~ ward
 > [[Kindle its bindings->warden:bindings]] ~ cost 1
@@ -1077,8 +1121,9 @@ lower warden.salt 1
 Kindle, at the black timber that binds it. The old pitch catches. The Warden stamps it out, but one band of iron falls ringing to the floor.
 
 :: warden:blow [resolve]
-lower warden.salt 1 when sluice_open
+lower warden.salt 1 when sluice_open and warden.in(wardens_hall)
 set warden.unmade: yes when warden.salt == 0
+set warden.roused: no when warden.salt == 0
 --
 [if threat.name == crush and threat.outcome == hit]
 A fist of salt the size of a bucket. You are on the floor, and do not remember getting there.
@@ -1128,7 +1173,13 @@ learn warden_feels
 
 :: crushed [ending]
 --
+[if here == drift]
+The drift lights up, all of it, and so, briefly, do you.
+
+[else]
 The salt comes down on you like a wave on a beach, and the beach is you.
+
+[end]
 
 > [[Undo->here]] ~ rewind
 

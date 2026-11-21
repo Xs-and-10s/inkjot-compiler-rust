@@ -864,3 +864,85 @@ fn the_book_says_what_the_spells_do() {
     }
     assert!(checked >= 10, "only {checked} numbers checked");
 }
+
+/// Every spell in the book has its Link, and every book Link names a spell.
+#[test]
+fn every_spell_is_in_the_book() {
+    let src = draft();
+    let map = parse(&src);
+    let start = src.find("> ~ for apprentice ~ everywhere").unwrap();
+    let group: Vec<&str> = src[start..]
+        .lines()
+        .skip(1)
+        .take_while(|l| l.starts_with("> [["))
+        .collect();
+    let named: HashSet<String> = group
+        .iter()
+        .map(|l| l.rsplit("~ ").next().unwrap().trim().to_string())
+        .collect();
+    let spells: HashSet<String> = map.spells.keys().cloned().collect();
+    assert_eq!(named, spells, "the book's Links and the spells differ");
+}
+
+/// Zork's ranks cover every score from 0 to 100 exactly once.
+#[test]
+fn the_ranks_cover_every_score() {
+    let src = draft();
+    let start = src.find("table rank: score").unwrap();
+    let mut covered = [0u8; 101];
+    for row in src[start..]
+        .lines()
+        .skip(1)
+        .take_while(|l| l.starts_with("~ "))
+    {
+        let range = row[2..].split(':').next().unwrap();
+        let (lo, hi) = match range.split_once("..=") {
+            Some((a, b)) => (a.parse::<usize>().unwrap(), b.parse::<usize>().unwrap()),
+            None => {
+                let n = range.parse::<usize>().unwrap();
+                (n, n)
+            }
+        };
+        for c in &mut covered[lo..=hi] {
+            *c += 1;
+        }
+    }
+    assert!(
+        covered.iter().all(|&c| c == 1),
+        "a score with no rank, or two"
+    );
+}
+
+/// The best game scores exactly 100: every award once, the planks by
+/// whichever way they go, and the three treasures in the chest.
+#[test]
+fn the_best_score_is_a_hundred() {
+    let src = draft();
+    let mut passage = "";
+    let mut awards: HashMap<&str, u32> = HashMap::new();
+    for line in src.lines() {
+        if let Some(h) = line.strip_prefix(":: ") {
+            passage = h.split(' ').next().unwrap();
+        } else if let Some(rest) = line.strip_prefix("raise score ") {
+            let n: u32 = rest.split(' ').next().unwrap().parse().unwrap();
+            *awards.entry(passage).or_default() += n;
+        }
+    }
+    // Ways to the same end score once.
+    let planks = ["adit:planks", "adit:burn", "spell:kindle"];
+    for p in planks {
+        assert_eq!(awards.get(p), Some(&5), "{p} scores the planks");
+    }
+    let mut best: u32 = awards
+        .iter()
+        .filter(|(p, _)| !planks.contains(p) && **p != "pithead:chest")
+        .map(|(_, n)| n)
+        .sum();
+    best += 5;
+    let treasures = src
+        .lines()
+        .filter(|l| l.starts_with("item ") && l.contains("~ like treasure"))
+        .count() as u32;
+    best += awards["pithead:chest"] * treasures;
+    assert_eq!(best, 100);
+}
