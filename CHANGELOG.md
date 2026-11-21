@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Ex 6
+
+- *Cloakroom*, the public cut of Ex 6: one evening, three names, the full
+  draft's machinery (`examples/drafts/ex6-cloakroom.twee`). The full Ex 6
+  lives in the Inklinks Library.
+- `src/period.rs`: periods' arithmetic (names to turns and back, `~ of`,
+  clocks written in period names), with property tests.
+- `tests/drafts.rs`: a lint for draft examples, with mutation properties;
+  `INKJOT_DRAFT=… cargo test --test drafts -- --ignored` lints any draft.
+
 ### Drafts
 
 - Ex 2's duel written four ways, to test the `define` proposal: in general
