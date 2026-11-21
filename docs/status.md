@@ -45,14 +45,70 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
 4. **Milestone 18, IR 3 and the first part of v0.6**, in three pull
    requests (see "Inkjot v0.6" below for what is in each): #26, #27, #28,
    and a fourth, #29, that takes the last Inklink words out of the engine.
-5. **Ex 6 to 9**, ideas first, then drafts:
-   - Ex 6, a spy-noir `story-game` that leans on Inklog: two knowledge
-     bases per character, and integrity constraints for facts that rule
-     each other out.
-   - Ex 7, Mafia, the card game.
-   - Ex 8, a `story` written for Inquests, in place of Ex 4.
-   - Ex 9, a modern Zork-like `game`.
+5. **Ex 6 to 9**, pitched and chosen on 20 Nov 2026 (below), drafted in
+   the order 6, 8, 7, 9. Ex 5 is brought up to the 20 Nov decisions on the
+   way.
 6. **The rest of v0.6** (below).
+
+## Ex 6 to 9
+
+| Ex | What | Lives | Tests most |
+|---|---|---|---|
+| 6 | *Seven Names*, spy-noir `story-game`, solo | Mark previews it: if it is very good, the Library, with a short public cut here; else here | knowledge bases, integrity constraints, redaction, blockquotes, pronouns and `possessive()`, `reveal` and `aka`, uneven periods, `expect events:` |
+| 7 | *Mafia*, `game`, 5 to 12 Linkers | here; the Library later, under a Creative Commons licence, if the themes come off | decks and private piles, night and day, `{present linker}`, per-Linker knowledge, `where:` (its showcase), `\|` in filters, quantifiers, `finale when:`, tables |
+| 8 | *The Inquest*, `story`, solo, short | here; a longer literary version may go to the Library | forks (written and pending), analysis tags, `theme`, `brief`, `[if …; then …]`, emphasis, `~ track`, presentation hints |
+| 9 | *Saltmarrow*, Zork-like `game`, solo | here | the encounter words, `spreads`, recipes, `~ breaks`, dice and tables, plural irregulars, and `define`'s next test (a spellbook) |
+
+**Ex 6, *Seven Names*.** A neutral port, 1952. A cipher clerk, a dead
+head of station, an agent with seven cover names. Suspense comes from the
+hunter becoming the hunted: the antagonist has a knowledge base of his
+own, fed by informants and by reading the clerk's notebook, and acts on
+it. Open questions are being settled with Mark before drafting.
+
+**Ex 7, *Mafia*.** The engine moderates by default. Each game draws a
+syndicate from a shuffled table: a type (historical, mythical, absurd or
+horror-tinged), a setting to match, its own titles for the roles, how it
+kills, and a table of flourishes for each death so the theme builds as
+bodies fall. Special syndicates change the rules: the Doppelgänger Clan
+(a killer may take the victim's form, so the morning reports the wrong
+death), and three more drafted with it. Three ways to moderate: the
+engine's tables alone; tables with generated flourishes (MonkeyPaw, the
+table's line as the fallback); or a human Storyteller who sees everything
+and may rewrite each morning's report. Whispers is an optional variant.
+Syndicates name no real living people or real present-day gangs, and use
+original names rather than those from films and songs.
+
+**Ex 8, *The Inquest*.** A fen village, 1893: the lock-keeper drowned the
+night the sluice was opened. The frame is in the second person, to the
+coroner's clerk; each testimony is in the first person, as the witness,
+some reliable and some not. Dialogue is screenplay-style speech cues.
+Possible v0.6 addition it may ask for: telling the engine a passage's
+person (`told: first person`), so `@you` and `{me}` read "I" in a
+testimony and "you" in the frame.
+
+**Ex 9, *Saltmarrow*.** Spells cost salt, carried as crystals. A dozen or
+more spells, with power, duration and range, some composing into greater
+ones. Fire needs a flame near dry timber (the lamp, a spell, the thief's
+candle, firedamp); about a quarter of the map is timbered. A burnt shaft
+can be crossed a few times, with warnings, then falls in. No dead ends:
+every collapse leaves another way, by magic or by engineering, checked by
+random playthroughs. The guardian can be fought, sneaked past, bargained
+with or outrun.
+
+**`where:`** is used heavily where the rules, not the Inker, pick which of
+many things: targets in a social game, an NPC choosing loot, a fire or a
+rumour choosing where to go next, counts for a win. Ex 7 is its showcase,
+then Ex 9 and Ex 6; Ex 8 hardly needs it.
+
+**Built in milestone 18 but in no example yet**, to be covered by Ex 6
+to 9: forks and Inquests (Ex 4 was the only one), `~ track`, `reveal`,
+`{all x.aka}` and `~ pick`, `plural`, `capital`, `if … then … else …` in
+braces, emphasis, `theme`, `brief`, analysis tags.
+
+**Ex 5** predates the 20 Nov decisions: its seasons are a clock setting
+(now `period season`), its relation names the gardener (now `you`), and
+`world only` / `almanac only` become `~ in world` / `~ in almanac` with
+`knowledge almanac`.
 
 ## Inkjot v0.6
 
