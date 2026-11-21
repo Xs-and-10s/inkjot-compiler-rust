@@ -65,6 +65,7 @@ character guest: "a guest" ~ selectable ~ custom ~ one per linker ~ pronouns cho
 ~ state team: town
 ~ state role: townsfolk
 ~ state voteless: no
+~ state wants_special: no
 ~ state marked: no
 ~ state marked_since: 0
 ~ state heard: no
@@ -112,6 +113,9 @@ state victim: nobody ~ of guest
 state saved: nobody ~ of guest
 state lynched: nobody ~ of guest
 state whispered: no
+state chosen_special: nothing ~ of special
+list specials: "the special syndicates" ~ holds doppelganger: "the Doppelgänger Clan", collectors: "the Debt Collectors", cult: "the Cult of the Long Night", heist: "the Heist Crew", surprise: "Surprise us"
+get special_wanted: count(guest, where: it.wants_special) * 2 > cohort.size
 state report: ""
 
 fact cult_secret: "The lamp turns. You see it now. You will vote as the lamp would have you vote." ~ secret
@@ -120,20 +124,20 @@ fact cult_secret: "The lamp turns. You see it now. You will vote as the lamp wou
 The syndicates. A table with named columns: `{syndicate.mafia}` reads the
 drawn row's title for the killers. `special` names the rule change, or
 `none`. Each row's `deaths` is a list of flourishes, picked shuffled, one
-per death.
+per death; `dead` is what the dead see at night.
 )))
 table syndicate: shuffled ~ one per game
-~ columns name, setting, mafia, doctor, detective, townsfolk, kills, special, deaths
-~ row vampires: "the Vampires", "a village in the Carpathians, the winter of 1891", "Vampire", "the Herbalist", "the Priest", "Villager", "drained", none, vampire_deaths
-~ row coven: "the Coven", "a fishing town on the Essex marshes, 1645", "Witch", "the Cunning Woman", "the Witchfinder", "Fisherfolk", "cursed", none, coven_deaths
-~ row illuminati: "Illuminati Anonymous", "a church hall in Swindon, Tuesday night, 1988", "Member", "the Group Leader", "the Investigative Journalist", "Attendee", "disappeared", none, illuminati_deaths
-~ row know_nothings: "the Know Nothings", "a lodge hall in Philadelphia, 1854", "Brother", "the Surgeon", "the Reporter", "Delegate", "silenced", none, know_nothing_deaths
-~ row outfit: "the Outfit", "a speakeasy behind a florist’s on the North Side of Chicago, 1928", "Made Man", "the Doc", "the Prohibition Agent", "Regular", "taken for a ride", none, outfit_deaths
-~ row osaka: "the Kurosawa-gumi", "a pachinko parlour in Osaka, the summer of 1974", "Kumi-in", "the Bonesetter", "the Detective Sergeant", "Regular", "erased", none, osaka_deaths
-~ row doppelganger: "the Doppelgänger Clan", "a sanatorium in the Swiss Alps, 1907", "Doppelgänger", "the Physician", "the Alienist", "Patient", "replaced", doppelganger, doppelganger_deaths
-~ row collectors: "the Debt Collectors", "a seaside town out of season, Margate, 1936", "Collector", "the Pawnbroker", "the Bailiff", "Holidaymaker", "foreclosed", collectors, collector_deaths
-~ row cult: "the Cult of the Long Night", "a lighthouse community on a Hebridean island, 1952", "Acolyte", "the Lightkeeper", "the Minister", "Islander", "taken into the dark", cult, cult_deaths
-~ row heist: "the Heist Crew", "a country-house weekend in Kent, 1923", "Crook", "the Butler", "the Inspector", "Guest", "robbed", heist, heist_deaths
+~ columns name, setting, mafia, doctor, detective, townsfolk, kills, special, deaths, dead
+~ row vampires: "the Vampires", "a village in the Carpathians, the winter of 1891", "Vampire", "the Herbalist", "the Priest", "Villager", "drained", none, vampire_deaths, "You drift over the village like chimney smoke. Below you a shutter bangs, and nobody goes to close it."
+~ row coven: "the Coven", "a fishing town on the Essex marshes, 1645", "Witch", "the Cunning Woman", "the Witchfinder", "Fisherfolk", "cursed", none, coven_deaths, "You stand in the salt marsh up to your ankles in cold water that does not touch you."
+~ row illuminati: "Illuminati Anonymous", "a church hall in Swindon, Tuesday night, 1988", "Member", "the Group Leader", "the Investigative Journalist", "Attendee", "disappeared", none, illuminati_deaths, "You have been given a lanyard that says OBSERVER, and a biscuit. You are not to speak."
+~ row know_nothings: "the Know Nothings", "a lodge hall in Philadelphia, 1854", "Brother", "the Surgeon", "the Reporter", "Delegate", "silenced", none, know_nothing_deaths, "You know nothing. You are, at last, a perfect member of the lodge."
+~ row outfit: "the Outfit", "a speakeasy behind a florist’s on the North Side of Chicago, 1928", "Made Man", "the Doc", "the Prohibition Agent", "Regular", "taken for a ride", none, outfit_deaths, "You sit at the end of the bar with your hat on. The bartender pours you one out of habit, and nobody drinks it."
+~ row osaka: "the Kurosawa-gumi", "a pachinko parlour in Osaka, the summer of 1974", "Kumi-in", "the Bonesetter", "the Detective Sergeant", "Regular", "erased", none, osaka_deaths, "You stand among the machines, among the silver balls nobody ever picks up, and the lights go on blinking."
+~ row doppelganger: "the Doppelgänger Clan", "a sanatorium in the Swiss Alps, 1907", "Doppelgänger", "the Physician", "the Alienist", "Patient", "replaced", doppelganger, doppelganger_deaths, "You watch someone wearing your face eat your breakfast, and take two sugars, which you never did."
+~ row collectors: "the Debt Collectors", "a seaside town out of season, Margate, 1936", "Collector", "the Pawnbroker", "the Bailiff", "Holidaymaker", "foreclosed", collectors, collector_deaths, "You walk the pier at low tide, owing nothing to anyone, at last."
+~ row cult: "the Cult of the Long Night", "a lighthouse community on a Hebridean island, 1952", "Acolyte", "the Lightkeeper", "the Minister", "Islander", "taken into the dark", cult, cult_deaths, "You stand inside the great lamp at the top of the lighthouse, and the light goes through you, and round, and round."
+~ row heist: "the Heist Crew", "a country-house weekend in Kent, 1923", "Crook", "the Butler", "the Inspector", "Guest", "robbed", heist, heist_deaths, "You sit in the library with the other guests nobody suspects any more, and a decanter, and very good views of everything."
 
 list vampire_deaths ~ pick shuffled
 ~ holds "found in the bell tower, pale as candle wax", "found in the snow with two neat marks and a look of surprise", "found sitting up in bed, very still, the window open on a windless night", "found in the churchyard, which was at least convenient"
@@ -148,7 +152,7 @@ list outfit_deaths ~ pick shuffled
 list osaka_deaths ~ pick shuffled
 ~ holds "was found under the pachinko machines at closing time, with one silver ball in their hand", "has gone home to their village, says the manager, who will not meet anyone’s eye"
 list doppelganger_deaths ~ pick shuffled
-~ holds "was found in the snow below the terrace, in their dressing gown", "was found at breakfast, at their usual table, and their usual table was empty"
+~ holds "was found in the snow below the terrace, and the snow, which fell all night, holds no footprints but the ones going out", "was found sitting at their usual table in the breakfast room, quite cold, with their tea poured and untouched"
 list collector_deaths ~ pick shuffled
 ~ holds "has had everything taken away, including, it appears, themselves", "was found under the pier with an itemised bill pinned to their lapel"
 list cult_deaths ~ pick shuffled
@@ -164,6 +168,12 @@ Cult) has been taken in since.
 get members: count(guest, where: it.role == syndicate)
 get town_left: count(guest, where: it.alive and it.team == town)
 get syndicate_left: count(guest, where: it.alive and it.team == syndicate)
+(((
+The Heist Crew needs more keepsakes the more of them there are: two more
+than their number. They take one a night, so the town gets that many days
+to find them.
+)))
+get haul_needed: members + 2
 get cult_left: count(guest, where: it.alive and it.team == cult)
 
 (((
@@ -176,8 +186,8 @@ objective syndicate: "Outnumber the town"
 ~ done when syndicate_left >= town_left
 objective cult: "Bring the island into the dark" ~ shown when syndicate.special == cult
 ~ done when cult_left > town_left
-objective haul: "Three keepsakes in the haul" ~ shown when syndicate.special == heist
-~ done when count(haul) >= 3
+objective haul: "{haul_needed} keepsakes in the haul" ~ shown when syndicate.special == heist
+~ done when count(haul) >= haul_needed
 
 on phase begins night
 ~ then play night
@@ -188,7 +198,8 @@ on phase begins day
 (((
 The lobby. Each Linker writes a name; the table chooses how the game is
 told; the syndicate is drawn and announced, and only then are the cards
-dealt.
+dealt. The draw is random among all ten, unless more than half the table
+asks for a special syndicate: then the table votes for one of the four.
 )))
 {name input for: me.name, max: 24}
 
@@ -196,7 +207,20 @@ dealt.
 
 The lamps are lit. Somebody passes round a bottle. Somebody else says *all right, all right, who’s telling it*, and nobody wants to, and so it is decided.
 
-> [[Draw the syndicate->drawn]] ~ when cohort.size >= 5 ~ for cohort ~ then roll syndicate
+> [[Ask for a special syndicate->gathering]] ~ when not me.wants_special ~ then set me.wants_special: yes ~ id want_special
+> [[Draw the syndicate->drawn]] ~ when cohort.size >= 5 and not special_wanted ~ for cohort ~ then roll syndicate
+> [[Choose the special syndicate->choosing]] ~ when cohort.size >= 5 and special_wanted ~ for cohort
+
+:: choosing
+(((
+More than half the table asked for a special syndicate, so the table
+chooses which, by simple majority. A tie is settled by drawing among the
+tied. "Surprise us" draws among all four.
+)))
+--
+{ballot for: chosen_special, from: specials, voters: cohort, ties: draw}
+
+> [[Draw it->drawn]] ~ for cohort ~ when ballot.done ~ then roll syndicate where: it.special == chosen_special or (chosen_special == surprise and it.special != none)
 
 :: drawn
 [quote poster]
@@ -216,7 +240,7 @@ The lamps are lit. Somebody passes round a bottle. Somebody else says *all right
 @lamplighter The Acolytes don’t kill. They take people into the dark, and only those who voted with them that day. The taken still speak with their old voices.
 
 [if syndicate.special == heist]
-@lamplighter Nobody dies this weekend. Something, every night, goes missing. Three keepsakes in the Crew’s bag and they’re off on the morning train.
+@lamplighter Nobody dies this weekend. Something, every night, goes missing. {haul_needed} keepsakes in the Crew’s bag and they’re off on the morning train.
 
 [end]
 > [[Deal the cards->dealt]] ~ for cohort ~ then shuffle roles ~ then deal 1 from roles to each role ~ then shuffle keepsakes ~ then deal 1 from keepsakes to each keepsake
@@ -267,7 +291,7 @@ those who may take it, and the most-chosen target is the one.
 Night in {syndicate.setting}. Eyes closed, if you please.
 
 [else]
-You watch from wherever the dead watch from.
+{syndicate.dead}
 
 [end]
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == none ~ consensus
@@ -283,23 +307,32 @@ You watch from wherever the dead watch from.
 > [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.voted_with(cult) ~ then set target.team: cult ~ then teach target cult_secret
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus
-> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and count(it.keepsake) > 0 ~ then set victim: target ~ then move top of target.keepsake to haul
+> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target ~ then move top of target.keepsake to haul
 
 > ~ for guest where: it.alive and it.role == doctor
 > [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ then set saved: target ~ then set me.saved_last: target
 
 > ~ for guest where: it.alive and it.role == detective
-> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target sides_with target.team }} in findings
+> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town
 
 > [[Sleep->night:done]] ~ for guest where: it.alive and it.role == townsfolk
 > [[Wait for morning->night:done]] ~ for guest where: not it.alive or it.is(storyteller)
 
 :: night:looked
-[if target.team == town]
-You learn, by ways of your own, that {target} is what {target.they} {if target.pronouns == they then "seem" else "seems"}: one of the town.
+(((
+The Detective asks one question, the classic one: *is this one of them?*
+Yes means one of them: the syndicate, or the Cult's taken. Findings are
+kept as `{{ x guilty }}` or `{{ x innocent }}` in the Detective's own
+knowledge.
+)))
+--
+Is {target} one of them? You find out, by ways of your own.
+
+[if target.team != town]
+**Yes.**
 
 [else]
-You learn, by ways of your own, that {target} is not what {target.they} {if target.pronouns == they then "seem" else "seems"}.
+**No.**
 
 [end]
 > [[Back to bed->night:done]] ~ id back_to_bed
@@ -369,7 +402,14 @@ let killer: one(guest, where: it.team == syndicate and it.alive and it.chose_tar
 set killer.shown_as: victim.name
 set victim.shown_as: killer.name
 --
-In the snow below the terrace they find someone in a dressing gown. It is {victim}. Everyone says so. Everyone is very sure.
+At first light, under a dusting of snow on the terrace: {victim}. The face is {possessive(victim)} face. Everyone says so. Everyone is very sure.
+
+(((
+Fiction for the swap: the clan member leaves their old face on the body
+and walks away in the victim's. So the town finds the killer's face on
+the dead, and reports the killer dead. No pronouns here: the body's
+pronouns would be the victim's, and would give the swap away.
+)))
 
 :: morning:debts
 let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now)
@@ -465,9 +505,9 @@ finale when: syndicate.special == cult and cult_left > town_left
 > [[The cards->reveal]] ~ for cohort
 
 :: heist_wins [finale]
-finale when: syndicate.special == heist and count(haul) >= 3
+finale when: syndicate.special == heist and count(haul) >= haul_needed
 --
-@lamplighter Monday. The morning train pulls out of the halt with three guests fewer than came, and three keepsakes: {all haul}. The Inspector writes it up as a misunderstanding.
+@lamplighter Monday. The morning train pulls out of the halt with {members} {plural(members, "guest")} fewer than came, and {haul_needed} keepsakes: {all haul}. The Inspector writes it up as a misunderstanding.
 
 > [[The cards->reveal]] ~ for cohort
 

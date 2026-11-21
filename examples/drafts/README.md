@@ -94,7 +94,10 @@ lists picked like `aka` (`{one syndicate.deaths}`); Link groups for whoever
 `where:` says, choosing together (`~ consensus`); a pending passage that
 is not a fork (a morning MonkeyPaw writes); a `shown_as` that can be set
 (the Doppelgänger's swap); `voters:` on the jury; a seat that exists only
-in one mode (the Storyteller).
+in one mode (the Storyteller); a general ballot (`{ballot for: chosen,
+from: specials, ties: draw}`, for the table choosing a special syndicate
+when more than half ask for one); and a draw limited by `where:` (`roll
+syndicate where: it.special == chosen_special`).
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 
