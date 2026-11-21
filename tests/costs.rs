@@ -14,7 +14,7 @@ Market
 kind: game
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 place stall: "the stall"
 resource coins: 5
 resource breath: 3

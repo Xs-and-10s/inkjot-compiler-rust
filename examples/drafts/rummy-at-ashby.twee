@@ -23,7 +23,7 @@ a few header effects. None of it is in v0.5.
 kind: story-game
 mode: solo
 pov: nell
-character nell: "Nell Ashdown" ~ playable
+character nell: "Nell Ashdown" ~ selectable
 npc tobin: "Old Tobin, the ferryman" ~ in yard
 npc gran: "Gran’s ghost" ~ in yard ~ unseen in sun
 place yard: "the yard of the Ferry Inn"

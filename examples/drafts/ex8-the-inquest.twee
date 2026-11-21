@@ -43,7 +43,7 @@ ages: 14..
 mode: solo
 pov: clerk, martha, tom, hesketh, fisk, garrard ~ switch never
 start: notice
-told: second person
+narration: second person
 resource inquests: 3
 
 theme truth: "What a record can hold"
@@ -53,7 +53,7 @@ theme mercy: "Who a verdict spares"
 brief grief: "The witness imagines the other night, and it is worse than the real one. Nothing new is learned about who did what."
 brief pride: "A gentleman imagines another night and tells it as if it flatters him. It doesn’t. He gives away one true thing without noticing."
 
-character clerk: "the coroner’s clerk" ~ playable ~ custom ~ pronouns chosen
+character clerk: "the coroner’s clerk" ~ selectable ~ custom ~ pronouns chosen
 character martha: "Martha Rudd" ~ pronouns she
 character tom: "Tom Rudd" ~ pronouns he
 ~ state count: 0
@@ -98,7 +98,7 @@ state record_closed: no
 state notes_passed: 0
 
 :: notice [prologue]
-told: second person
+narration: second person
 --
 [quote edict ~ by "J. Fenwick, Coroner for the Isle of Ely"]
 **NOTICE IS HEREBY GIVEN** that an Inquest will be held at the Plough Inn, Hythe Fen, on *Tuesday the 14th of November, 1893*, at ten o’clock in the forenoon, touching the death of **AMOS RUDD**, Lock-keeper, whose body was found in the Hythe Lock cut on the morning of the 10th instant.
@@ -115,7 +115,7 @@ You lay out the depositions book, three pens and a knife to mend them. Mr. Fenwi
 > [[Call the widow->martha]] ~ id call_martha ~ become martha ~ beat opening ~ tone dark
 
 :: martha
-told: first person
+narration: first person
 --
 @fenwick Mrs. Rudd. Tell the jury about the night of the ninth.
 
@@ -180,7 +180,7 @@ I stop.
 > [[Step down->after_martha]] ~ id martha_down3 ~ become clerk ~ pays off checking
 
 :: after_martha
-told: second person
+narration: second person
 --
 You blot the deposition and read it back to her. She signs it with a cross, very small, in the corner, as if she didn’t want to take up room.
 
@@ -191,7 +191,7 @@ You underline *a gig on the drove*. Then you underline it again.
 > [[Call the son->tom]] ~ id call_tom ~ become tom ~ beat turn
 
 :: tom
-told: first person
+narration: first person
 --
 @fenwick Thomas Rudd. You are seventeen? Then you’ll speak up.
 
@@ -291,7 +291,7 @@ I close my eyes. I can see it better with them closed. I always could.
 > [[Step down->after_tom]] ~ id tom_down3 ~ become clerk
 
 :: after_tom
-told: second person
+narration: second person
 --
 Tom signs his name in a careful hand, each letter separate, and then looks at it for a long time to be sure it is his.
 
@@ -310,7 +310,7 @@ You tear a strip from the foot of a page and write on it, *Ask the doctor about 
 > [[Call the surgeon->hesketh]] ~ id call_hesketh2 ~ become hesketh
 
 :: hesketh
-told: first person
+narration: first person
 --
 @fenwick Dr. Hesketh. You examined the body.
 
@@ -372,7 +372,7 @@ I look, without meaning to, at the back bench, where the men who are not on the 
 > [[Step down->after_hesketh]] ~ id hesketh_down3 ~ become clerk
 
 :: after_hesketh
-told: second person
+narration: second person
 --
 The doctor signs with a flourish and pockets his pen before you can offer him yours.
 
@@ -383,7 +383,7 @@ The doctor signs with a flourish and pockets his pen before you can offer him yo
 > [[Call Edward Fisk->fisk]] ~ id call_fisk ~ become fisk ~ beat crisis
 
 :: fisk
-told: first person
+narration: first person
 --
 @fenwick Edward Fisk. Eel-catcher, of Byall Fen. Where were you on the night of the ninth?
 
@@ -451,7 +451,7 @@ The room goes quiet in the way a room does when a man has said a name without me
 > [[Say you were at your traps on Byall Fen->fisk:traps]] ~ id fisk_lie2 ~ tone tense
 
 :: after_fisk
-told: second person
+narration: second person
 --
 Fisk makes his mark and goes back to the back bench, and the men there make room for him without looking at him.
 
@@ -463,7 +463,7 @@ On the front bench, in a good coat, {garrard}, whom the village calls {garrard.a
 > [[The coroner sums up->summing_up]] ~ id sum_up ~ become clerk
 
 :: garrard
-told: first person
+narration: first person
 reveal garrard
 --
 @fenwick Your name, sir, for the record.
@@ -527,7 +527,7 @@ I say it to the jury, as a joke. Two of them laugh. The foreman writes something
 > [[Step down->summing_up]] ~ id garrard_down3 ~ become clerk
 
 :: summing_up
-told: second person
+narration: second person
 --
 Mr. Fenwick turns his chair to the jury and puts the tips of his fingers together.
 
@@ -667,4 +667,4 @@ start: martha:tom_out
 expect fork: "Suppose she had taken him the lantern" ~ for "Say that you stayed by the fire"
 take fork: "Suppose she had taken him the lantern"
 expect: gig_heard
-expect: inquests == 2
+expect events: nib_shown

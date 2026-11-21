@@ -27,7 +27,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::json::Value;
 pub use inputs::Ask;
 pub use map::{Edge, Node, StoryMap};
-pub use prose::{Para, Pause, Span};
+pub use prose::{Para, Pause, Quote, Span, BAR};
 pub use value::V;
 
 /// An interpreter result. The error says what went wrong in plain words.
@@ -46,6 +46,8 @@ struct Decl {
 struct Passage {
     tags: Vec<String>,
     title: Option<String>,
+    /// `narration: first person` in this passage: `first`.
+    narration: Option<String>,
     header: Vec<Value>,
     body: Vec<Value>,
 }
@@ -75,6 +77,24 @@ pub struct Story {
     rewind: Option<Value>,
     /// Does any passage show `{ballots}`? Then the Inker frames the tally.
     shows_ballots: bool,
+    /// `narration: second person` in the config: `second`.
+    narration: Option<String>,
+    /// `cue names: …` and `cue directions: …`: `{"names": ["capital", "bold"]}`.
+    cue: Value,
+}
+
+/// `you`, `me`, `i`, `myself`, `yourself`: the pov.
+fn syntax_pov(name: &str) -> bool {
+    crate::syntax::POV_NAMES.contains(&name)
+}
+
+/// The text with its first letter a capital: `the foreman` → `The foreman`.
+fn capital_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 /// The field `key` of a JSON object, or `null`.
@@ -135,6 +155,8 @@ impl Story {
             checkpoints: Vec::new(),
             rewind: None,
             shows_ballots: false,
+            narration: None,
+            cue: Value::obj([("names", Value::Arr(vec![Value::str("capital")]))]),
         };
         let config = ir
             .get("config")
@@ -155,6 +177,7 @@ impl Story {
                 Passage {
                     tags: strs(f(p, "tags")),
                     title: f(p, "title").as_str().map(str::to_string),
+                    narration: f(f(p, "narration"), "person").as_str().map(str::to_string),
                     header,
                     body: f(p, "body").as_arr().unwrap_or(&[]).to_vec(),
                 },
@@ -214,6 +237,15 @@ impl Story {
                         .insert("clock_day".into(), f(s, "day").clone());
                 }
                 Some("rewind") => self.rewind = Some(s.clone()),
+                Some("narration") => {
+                    self.narration = f(f(s, "value"), "person").as_str().map(str::to_string)
+                }
+                Some("cue") => {
+                    if let (Value::Obj(pairs), Some(of)) = (&mut self.cue, f(s, "of").as_str()) {
+                        pairs.retain(|(k, _)| k != of);
+                        pairs.push((of.to_string(), f(s, "value").clone()));
+                    }
+                }
                 Some("default") => {
                     if let Some(of) = f(s, "of").as_str() {
                         self.defaults.insert(of.to_string(), f(s, "value").clone());
@@ -261,6 +293,18 @@ impl Story {
 
     /// A passage's tags: `[act]`, `[finale]`. None for a passage that is
     /// not there.
+    /// A passage's own `narration:`, or that of the passage it is a sub-Nib
+    /// of: `martha:tom_out` is told as `martha` is.
+    fn narration_of(&self, passage: &str) -> Option<String> {
+        let mut name = passage;
+        loop {
+            if let Some(n) = self.passages.get(name).and_then(|p| p.narration.clone()) {
+                return Some(n);
+            }
+            name = name.rsplit_once(':')?.0;
+        }
+    }
+
     pub fn passage_tags(&self, passage: &str) -> &[String] {
         self.passages.get(passage).map_or(&[], |p| &p.tags)
     }
@@ -293,11 +337,11 @@ impl Story {
             .any(|p| p.body.iter().any(|n| n.get("inquest").is_some()))
     }
 
-    /// The characters marked `~ playable`, whom a lobby lets a Linker pick.
-    pub fn playable(&self) -> Vec<String> {
+    /// The characters marked `~ selectable`, whom a lobby lets a Linker pick.
+    pub fn selectable(&self) -> Vec<String> {
         self.ids_of("character")
             .into_iter()
-            .filter(|c| self.has_tag(c, "playable"))
+            .filter(|c| self.has_tag(c, "selectable"))
             .collect()
     }
 }
@@ -419,6 +463,9 @@ pub struct Run {
     /// an event: `(type, data)`, in order. Not part of the world, so a
     /// rewind never takes it back.
     noted: Vec<(&'static str, Value)>,
+    /// Whose words the engine writes in the passage being shown:
+    /// `first`, `second` or `third` (`narration:`), or not said.
+    telling: Option<String>,
 }
 
 /// The most passages one action may enter. A `next:` that leads back to
@@ -497,6 +544,7 @@ impl Run {
             work: Work::default(),
             trail: Vec::new(),
             noted: Vec::new(),
+            telling: None,
         };
         run.init();
         run.place_npcs();
@@ -1630,9 +1678,45 @@ impl Run {
             .get(passage)
             .ok_or_else(|| format!("there is no passage `{passage}`"))?;
         let first_visit = self.visits.get(passage).copied().unwrap_or(0) <= 1;
+        // Whose words the engine writes here: the passage's own
+        // `narration:` (a sub-Nib's is its passage's), else the embedding
+        // passage's, else the config's.
+        let before = self.telling.clone();
+        self.telling = story
+            .narration_of(passage)
+            .or_else(|| before.clone())
+            .or_else(|| story.narration.clone());
+        let result = self.render_body(p, first_visit, quiet);
+        self.telling = before;
+        result
+    }
+
+    /// The body of a passage, block by block. An `[if]` chain is flat: a
+    /// second `[if]` in the same chain starts it over, and `[else]` is the
+    /// chain's. A `[quote]` or a `[redacted]` opens a block. `[end]` closes
+    /// whatever opened last, the chain or the block, so an `[if]` inside a
+    /// quote ends before the quote does, and a quote inside an `[if]`
+    /// before the `[if]` does. Nothing inside a block or chain not shown is
+    /// shown.
+    fn render_body(&mut self, p: &Passage, first_visit: bool, quiet: bool) -> R<Vec<Value>> {
+        /// What an open chain or block puts back when `[end]` closes it.
+        struct Outside {
+            chain: bool,
+            outer: bool,
+            show: bool,
+            last_if: bool,
+            quote: Option<prose::Quote>,
+            hidden: bool,
+        }
         let mut links = Vec::new();
+        // Is the innermost block shown at all, and within it, is this part?
+        let mut outer = true;
         let mut show = true;
         let mut last_if = true;
+        let mut blocks: Vec<Outside> = Vec::new();
+        // The quote being shown, and whether text is redacted here.
+        let mut quote: Option<prose::Quote> = None;
+        let mut hidden = false;
         let mut append = false;
         // `[after 2s]`, `[beat 2s]`: waits for the next paragraph shown. A
         // block that is not shown takes its pause with it.
@@ -1645,19 +1729,74 @@ impl Run {
                     verse = false;
                     for part in f(node, "parts").as_arr().unwrap_or(&[]) {
                         let when = f(part, "when");
-                        match f(part, "name").as_str().unwrap_or("") {
+                        let name = f(part, "name").as_str().unwrap_or("");
+                        // An `[if]` begins a chain, unless one is open here.
+                        let in_chain = blocks.last().is_some_and(|o| o.chain);
+                        if matches!(name, "if" | "ifalways" | "unless" | "ifnever") && !in_chain {
+                            blocks.push(Outside {
+                                chain: true,
+                                outer,
+                                show,
+                                last_if,
+                                quote: quote.clone(),
+                                hidden,
+                            });
+                            outer = show;
+                        }
+                        match name {
                             "if" | "ifalways" => {
                                 last_if = self.eval(when)?.truthy();
-                                show = last_if;
+                                show = outer && last_if;
                             }
                             "unless" | "ifnever" => {
                                 last_if = !self.eval(when)?.truthy();
-                                show = last_if;
+                                show = outer && last_if;
                             }
-                            "else" => show = !last_if,
-                            "end" | "continue" | "cont" => {
-                                show = true;
-                                last_if = true;
+                            "else" => show = outer && !last_if,
+                            "end" | "continue" | "cont" => match blocks.pop() {
+                                Some(o) => {
+                                    (outer, show, last_if) = (o.outer, o.show, o.last_if);
+                                    (quote, hidden) = (o.quote, o.hidden);
+                                }
+                                None => {
+                                    show = outer;
+                                    last_if = true;
+                                }
+                            },
+                            // `[if c; then e]`: e happens when the block is shown.
+                            "then" if show && !quiet => self.apply(f(part, "effect"), &[])?,
+                            "quote" => {
+                                blocks.push(Outside {
+                                    chain: false,
+                                    outer,
+                                    show,
+                                    last_if,
+                                    quote: quote.clone(),
+                                    hidden,
+                                });
+                                (outer, last_if) = (show, true);
+                                let by = match f(part, "by") {
+                                    Value::Null => None,
+                                    by => self.text_now(by),
+                                };
+                                quote = Some(prose::Quote {
+                                    kind: f(part, "kind").as_str().unwrap_or("").to_string(),
+                                    by,
+                                    first: true,
+                                });
+                            }
+                            "redacted" => {
+                                let revealed = self.eval(f(part, "until"))?.truthy();
+                                blocks.push(Outside {
+                                    chain: false,
+                                    outer,
+                                    show,
+                                    last_if,
+                                    quote: quote.clone(),
+                                    hidden,
+                                });
+                                (outer, last_if) = (show, true);
+                                hidden = hidden || !revealed;
                             }
                             "once" => show = show && first_visit,
                             "append" => append = true,
@@ -1677,14 +1816,8 @@ impl Run {
                 Some("link") if show => links.push(node.clone()),
                 Some("prose") | Some("speech") if show => {
                     let lead = match f(node, "who").as_str() {
-                        Some(who) => {
-                            let name = self.label(who);
-                            match f(node, "direction").as_str() {
-                                Some(d) => format!("{name} ({d}): "),
-                                None => format!("{name}: "),
-                            }
-                        }
-                        None => String::new(),
+                        Some(who) => self.cue(who, f(node, "direction").as_str())?,
+                        None => Para::default(),
                     };
                     for (i, para) in f(node, "paragraphs")
                         .as_arr()
@@ -1692,15 +1825,19 @@ impl Run {
                         .iter()
                         .enumerate()
                     {
-                        let (body, more) = self.paragraph(para, quiet)?;
-                        links.extend(more);
                         let mut text = Para::default();
                         if i == 0 {
-                            text.push(&lead, &[]);
+                            text.extend(lead.clone());
                         }
-                        text.extend(body);
+                        let kept = text.len();
+                        let mut more = Vec::new();
+                        self.parts(para, &[], quiet, &mut text, &mut more)?;
+                        links.extend(more);
                         if quiet || text.is_blank() {
                             continue;
+                        }
+                        if hidden {
+                            text.redact_from(kept);
                         }
                         text.pause = pause.take();
                         text.verse = verse;
@@ -1709,7 +1846,13 @@ impl Run {
                                 last.push(" ", &[]);
                                 last.extend(text);
                             }
-                            _ => self.output.push(text),
+                            _ => {
+                                text.quote = quote.clone();
+                                if let Some(q) = &mut quote {
+                                    q.first = false;
+                                }
+                                self.output.push(text)
+                            }
                         }
                     }
                     append = false;
@@ -1720,6 +1863,86 @@ impl Run {
             }
         }
         Ok(links)
+    }
+
+    /// A speech cue: `Fenwick (to you): `, styled as `cue names:` and `cue
+    /// directions:` say. A name is capitalised, being at the start of a
+    /// line, unless it is `~ keep case`.
+    fn cue(&mut self, who: &str, direction: Option<&str>) -> R<Para> {
+        let story = Arc::clone(&self.story);
+        let id = if syntax_pov(who) {
+            self.pov.clone()
+        } else {
+            who.to_string()
+        };
+        let styles = |of: &str| -> Vec<String> { strs(f(&story.cue, of)) };
+        let (names, directions) = (styles("names"), styles("directions"));
+        let marks = |list: &[String]| -> Vec<&'static str> {
+            list.iter()
+                .filter_map(|s| match s.as_str() {
+                    "bold" => Some("bold"),
+                    "italic" => Some("italic"),
+                    _ => None,
+                })
+                .collect()
+        };
+        let cased = |text: String, list: &[String]| -> String {
+            if list.iter().any(|s| s == "upper") {
+                text.to_uppercase()
+            } else if list.iter().any(|s| s == "capital") {
+                capital_first(&text)
+            } else {
+                text
+            }
+        };
+        let mut lead = Para::default();
+        if self.is_redacted(&id)? {
+            let n = self.label(&id).chars().count();
+            lead.push_bar(n, &marks(&names));
+        } else {
+            let name = match self.pov_word(&id, true) {
+                Some(word) => word,
+                None => self.label(&id),
+            };
+            let name = if self.keeps_case(&id) {
+                name
+            } else {
+                capital_first(&name)
+            };
+            lead.push(&cased(name, &names), &marks(&names));
+        }
+        if let Some(d) = direction {
+            lead.push(" ", &[]);
+            lead.push(&cased(format!("({d})"), &directions), &marks(&directions));
+        }
+        lead.push(": ", &[]);
+        Ok(lead)
+    }
+
+    /// Is this thing's name redacted now: `~ redacted until c`, and not c?
+    fn is_redacted(&mut self, id: &str) -> R<bool> {
+        let until = self.story.field(id, "redacted_until").clone();
+        Ok(until != Value::Null && !self.eval(&until)?.truthy())
+    }
+
+    /// `~ keep case`: never capitalised.
+    fn keeps_case(&self, id: &str) -> bool {
+        self.story.field(id, "keep_case") == &Value::Bool(true)
+    }
+
+    /// The pov, in the words `narration:` asks for: "you", or "I" at the
+    /// start of a sentence and "me" elsewhere. `None` in the third person,
+    /// or for anyone else: then the name.
+    fn pov_word(&self, id: &str, at_start: bool) -> Option<String> {
+        if id != self.pov {
+            return None;
+        }
+        match self.telling.as_deref() {
+            Some("second") => Some("you".into()),
+            Some("first") if at_start => Some("I".into()),
+            Some("first") => Some("me".into()),
+            _ => None,
+        }
     }
 
     /// One paragraph as text, and the Links of any passage it embeds.
@@ -1773,11 +1996,45 @@ impl Run {
                     }
                     _ => self.eval(v)?,
                 };
-                let shown = self.show(&v);
+                let at_start = text.at_sentence_start();
+                if let V::Id(id) = &v {
+                    if self.is_redacted(id)? {
+                        let n = self.label(id).chars().count();
+                        text.push_bar(n, style);
+                        continue;
+                    }
+                }
+                let (shown, keep) = match &v {
+                    V::Id(id) => (
+                        self.pov_word(id, at_start).unwrap_or_else(|| self.show(&v)),
+                        self.keeps_case(id),
+                    ),
+                    _ => (self.show(&v), false),
+                };
+                // A name at the start of a sentence is capitalised.
+                let named = matches!(v, V::Id(_) | V::List(_) | V::Str(_));
+                let shown = if at_start && named && !keep {
+                    capital_first(&shown)
+                } else {
+                    shown
+                };
                 text.push(&shown, style);
                 continue;
             }
             match f(part, "insert").as_str().unwrap_or("") {
+                // `{redacted "TEN" until telegram.dry}`: a bar until c.
+                "redacted" => {
+                    let revealed = self.eval(f(part, "until"))?.truthy();
+                    let mut inner = Para::default();
+                    let mut more = Vec::new();
+                    self.parts(f(part, "text"), style, quiet, &mut inner, &mut more)?;
+                    links.extend(more);
+                    if revealed {
+                        text.extend(inner);
+                    } else {
+                        text.push_bar(inner.len(), style);
+                    }
+                }
                 "embed" => {
                     let nib = f(part, "nib").as_str().unwrap_or("").to_string();
                     // An embedded passage brings its own `let`s with it.
@@ -1840,6 +2097,12 @@ impl Run {
                     for e in entries {
                         let mut label = match &e.label {
                             Some(text) => self.text_para(text)?,
+                            None if self.is_redacted(&e.id)? => {
+                                let mut bar = Para::default();
+                                bar.push_bar(self.label(&e.id).chars().count(), &[]);
+                                bar
+                            }
+                            // A list's entries are shown as written, not as sentences.
                             None => Para::plain_text(self.label(&e.id)),
                         };
                         if let Some(mark) = &e.mark {

@@ -1,11 +1,10 @@
-//! Ex 8, *The Inquest*, on today's engine.
+//! Ex 8, *The Inquest*, run as written: its own `[test]` passages through
+//! the interpreter, and its Inquests through the engine API.
 //!
-//! The draft uses a few v0.6 constructs not built yet (`told:`,
-//! `[if …; then …]`, blockquotes, redaction, `expect events:`). Everything
-//! else is built: forks, analysis tags, emphasis, `~ track`, names as the
-//! reader knows them. So these tests take the draft, rewrite the unbuilt
-//! parts into what they will mean, and run it: its own `[test]` passages
-//! through the interpreter, and its Inquests through the engine API.
+//! Until milestone 19 these tests rewrote the constructs not yet built
+//! (`narration:`, `[if …; then …]`, blockquotes, redaction, `expect
+//! events:`, tests that take forks) into what they would mean. Now the
+//! draft runs as it stands, which is what milestone 19 promised.
 
 use inkjot::engine::{Inklink, Start, State};
 use inkjot::json::{self, Value};
@@ -16,78 +15,14 @@ fn draft() -> String {
     std::fs::read_to_string(format!("{dir}/examples/drafts/ex8-the-inquest.twee")).unwrap()
 }
 
-/// The draft in what today's engine reads:
-///
-/// - `told: …` lines go (the engine does not need them to run);
-/// - `[quote …]` and `[redacted until …]` become `[if yes]`, so their text
-///   shows and their `[end]` still closes them;
-/// - `[if c; then e]` becomes `[if c]`, with `e when c` added to the
-///   passage's header, which is what it will do;
-/// - `expect events:` lines, and tests that take forks by label, go.
-fn built_subset(src: &str) -> String {
-    let mut passages: Vec<Vec<String>> = Vec::new();
-    for line in src.lines() {
-        if line.starts_with("::") || passages.is_empty() {
-            passages.push(Vec::new());
-        }
-        passages.last_mut().unwrap().push(line.to_string());
-    }
-    let mut out = Vec::new();
-    for p in passages {
-        if p.iter()
-            .any(|l| l.starts_with("take fork:") || l.starts_with("expect fork:"))
-        {
-            continue;
-        }
-        let mut header_adds = Vec::new();
-        let mut body = Vec::new();
-        for line in &p {
-            let t = line.trim();
-            if t.starts_with("told:") || t.starts_with("expect events:") {
-                continue;
-            }
-            if t.starts_with("[quote") || t.starts_with("[redacted") {
-                body.push("[if yes]".to_string());
-                continue;
-            }
-            if let Some(inner) = t.strip_prefix("[if ").and_then(|r| r.strip_suffix(']')) {
-                if let Some((cond, effect)) = inner.split_once("; then ") {
-                    header_adds.push(format!("{effect} when {cond}"));
-                    body.push(format!("[if {cond}]"));
-                    continue;
-                }
-            }
-            body.push(line.clone());
-        }
-        if !header_adds.is_empty() {
-            match body.iter().position(|l| l.trim() == "--") {
-                Some(i) => {
-                    for (k, add) in header_adds.into_iter().enumerate() {
-                        body.insert(i + k, add);
-                    }
-                }
-                None => {
-                    let mut with = vec![body[0].clone()];
-                    with.extend(header_adds);
-                    with.push("--".into());
-                    with.extend(body[1..].iter().cloned());
-                    body = with;
-                }
-            }
-        }
-        out.extend(body);
-    }
-    out.join("\n") + "\n"
-}
-
 fn inklink() -> Inklink {
-    let ir = inkjot::build(&built_subset(&draft())).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+    let ir = inkjot::build(&draft()).unwrap_or_else(|r| panic!("{:#?}", r.diags));
     Inklink::from_ir(&ir).unwrap()
 }
 
 #[test]
-fn the_built_subset_checks_clean() {
-    let src = built_subset(&draft());
+fn the_draft_checks_clean() {
+    let src = draft();
     let errors: Vec<_> = inkjot::check(&src)
         .diags
         .into_iter()
@@ -99,7 +34,7 @@ fn the_built_subset_checks_clean() {
 
 #[test]
 fn its_own_tests_pass() {
-    let src = built_subset(&draft());
+    let src = draft();
     let ir = inkjot::build(&src).unwrap_or_else(|r| panic!("{:#?}", r.diags));
     let outcomes = run_all(&src, &ir).unwrap();
     assert!(outcomes.len() >= 2);

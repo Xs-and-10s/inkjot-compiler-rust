@@ -14,6 +14,14 @@
 //! | a brace in quoted text: `"{"` | `"\{"` (v0.6 strings interpolate) |
 //! | `resource vults: 3` (costs spent vults) | `resource vults: 3` and `default cost: vults` |
 //!
+//! Two words were renamed within v0.6 (21 Nov 2026), so these are rewritten
+//! in a v0.6 file too:
+//!
+//! | Before | After |
+//! |---|---|
+//! | `told: second person` | `narration: second person` |
+//! | `~ playable` | `~ selectable` |
+//!
 //! Only statements are rewritten, found the way the checker finds them, so
 //! prose that happens to start with "fact" is left alone. What cannot be
 //! rewritten safely, such as an id that is now a reserved word, is reported
@@ -41,12 +49,20 @@ pub fn migrate(src: &str) -> Migrated {
             .any(|l| l.text.contains("\"format-version\"") && !l.text.contains("\"0.5"))
     });
     if already {
-        notes.push("this file is not Inkjot v0.5; nothing to migrate".to_string());
+        let renamed = renames(&mut lines, &passages);
+        if !renamed {
+            notes.push("this file is not Inkjot v0.5; nothing to migrate".to_string());
+            return Migrated {
+                source: src.to_string(),
+                notes,
+            };
+        }
         return Migrated {
-            source: src.to_string(),
+            source: joined(&lines, src),
             notes,
         };
     }
+    renames(&mut lines, &passages);
     for p in &passages {
         if p.name == "StoryData" {
             for l in &p.lines {
@@ -146,11 +162,44 @@ pub fn migrate(src: &str) -> Migrated {
             }
         }
     }
+    Migrated {
+        source: joined(&lines, src),
+        notes,
+    }
+}
+
+/// The lines as one source, ending as `src` did.
+fn joined(lines: &[String], src: &str) -> String {
     let mut source = lines.join("\n");
     if src.ends_with('\n') {
         source.push('\n');
     }
-    Migrated { source, notes }
+    source
+}
+
+/// The renames within v0.6: `told:` → `narration:`, `~ playable` → `~
+/// selectable`. Did anything change?
+fn renames(lines: &mut [String], passages: &[twee::Passage]) -> bool {
+    let mut changed = false;
+    for p in passages {
+        let (stmts, _) = gather(p, &mut Vec::new());
+        for s in &stmts {
+            let head = &s.clauses[0];
+            if s.kw == "told" {
+                let raw = &mut lines[head.line - 1];
+                *raw = replace_word_at(raw, head.col, "told", "narration");
+                changed = true;
+            }
+            for c in &s.clauses[1..] {
+                if c.text == "playable" {
+                    let raw = &mut lines[c.line - 1];
+                    *raw = replace_word_at(raw, c.col, "playable", "selectable");
+                    changed = true;
+                }
+            }
+        }
+    }
+    changed
 }
 
 /// Escape `{` and `}` inside v0.5 quoted strings, which end at the next
@@ -241,6 +290,7 @@ fact is, this line is prose.
         assert!(s.contains("state here_only: 1"), "{s}");
         assert!(s.contains("[fix] the fact of the matter"), "{s}");
         assert!(s.contains("fact is, this line is prose."), "{s}");
+        assert!(s.contains("~ selectable"), "{s}");
         assert!(m.notes.is_empty());
         let report = crate::check(s);
         assert!(report.ok(), "{:#?}", report.diags);
@@ -254,6 +304,29 @@ fact is, this line is prose.
             .notes
             .iter()
             .any(|n| n.contains("`you` is a reserved word")));
+    }
+
+    #[test]
+    fn a_v06_source_gets_the_renames() {
+        let src = V05
+            .replace("0.5.0", "0.6.0")
+            .replace(
+                "clue debts: \"He owed.\" ~ motive",
+                "fact debts: \"He owed.\" ~ clue",
+            )
+            .replace("fact cornered", "state cornered")
+            .replace("~ fact rusty", "~ state rusty")
+            .replace("learned from clue debts", "learned from debts")
+            .replace("{old}", "\\{old\\}")
+            .replace("[fixme]", "[fix]")
+            .replace("fact here_only", "state here_only")
+            .replace(":: hall\n", ":: hall\ntold: first person\n");
+        let m = migrate(&src);
+        assert!(m.source.contains("~ selectable"), "{}", m.source);
+        assert!(m.source.contains("narration: first person"), "{}", m.source);
+        assert!(m.notes.is_empty(), "{:?}", m.notes);
+        let report = crate::check(&m.source);
+        assert!(report.ok(), "{:#?}", report.diags);
     }
 
     #[test]

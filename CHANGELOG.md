@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Milestone 19: the page
+
+- `narration: first person | second person | third person` (`~ omniscient`
+  may follow) in the config or a passage, for the words the engine writes:
+  `@you` reads "You: …" or "I: …", `{me}` reads "you", or "I" and "me". A
+  sub-Nib is told as its passage is. `told:` is renamed `narration:`.
+- `~ playable` is now `~ selectable`; the engine's `Meta` and the NIF's
+  `meta/1` say `selectable`. `inkjot migrate` rewrites both renames, in a
+  v0.6 file too; Ex 1 to 3 and the drafts are migrated.
+- A name starting a sentence is capitalised, in prose and in speech cues;
+  `~ keep case` opts out. List entries are shown as written.
+- `cue names: capital, upper, bold, italic` and `cue directions: …` style
+  speech cues.
+- `[if c; then e]` and `[unless c; then e]`: the effect happens when the
+  block is shown, top to bottom, so one block may unlock the next.
+- `[end]` closes whatever opened last, an `[if]` chain or a block.
+- Blockquotes, `[quote sign | letter | poster | edict ~ by "…"]` … `[end]`:
+  each paragraph carries its `quote` (`kind`, `by`, `first`), in the view
+  and through the NIF.
+- Redaction: `[redacted until c]` … `[end]`, `{redacted "…" until c}` and
+  `~ redacted until c` on a name. The hidden words never reach the view: a
+  run of `█` as long as what it hides, styled `redacted`.
+- Tests: `expect events:`, `expect fork: "…" ~ for "…"`, `take fork: "…"`.
+- Ex 8 runs as written (`tests/ex8.rs` no longer rewrites it). Running it
+  found a wrong expectation in the draft: taking a fork does not spend an
+  Inquest in the engine; the platform spends it.
+- `tests/page.rs`: each of the above, and properties: redaction shows only
+  a length, capitalising changes only a first letter, and blocks nest as
+  written, against a model of the rules.
+
 ### Engine
 
 - Pacing reaches the view: each paragraph carries `pause` (`[after 2s]`,

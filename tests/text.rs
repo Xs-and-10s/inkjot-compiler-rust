@@ -15,7 +15,7 @@ Tobin's Table
 kind: story
 mode: solo
 pov: nell
-character nell: "Nell" ~ playable
+character nell: "Nell" ~ selectable
 npc tobin: "Old Tobin" ~ in yard
 place yard: "the yard"
 state cards: 3
@@ -184,7 +184,7 @@ Names
 kind: story
 mode: solo
 pov: skittles
-character skittles: "Skittles" ~ playable
+character skittles: "Skittles" ~ selectable
 npc widow: "Marge" ~ shown as "the Surviving Authority"
 npc leo: "Leo" ~ aka "Leo-Leo", "Lapkins", "Le Le" ~ pick cycle
 npc jojo: "Jojo" ~ aka "Jojo Bear", "Juju" ~ pick first
@@ -210,7 +210,8 @@ fn the_reader_sees_what_they_know_until_a_reveal() {
     let text: Vec<String> = room.view().text.iter().map(|p| p.plain()).collect();
     assert_eq!(
         text[0],
-        "the Surviving Authority is here. Her name is Marge; you call her the Surviving Authority."
+        // A name starting a sentence is capitalised (v0.6, 21 Nov 2026).
+        "The Surviving Authority is here. Her name is Marge; you call her the Surviving Authority."
     );
     assert_eq!(
         text[1],
@@ -220,7 +221,7 @@ fn the_reader_sees_what_they_know_until_a_reveal() {
         text[2],
         "Jojo is Jojo Bear, and Jojo Bear. Leo goes by Leo-Leo, Lapkins and Le Le."
     );
-    assert_eq!(text[3], "the Surviving Authority: Hello, Skittles.");
+    assert_eq!(text[3], "The Surviving Authority: Hello, Skittles.");
     let link = room.view().links[0].id.clone();
     let after = room.take_link(&link).unwrap();
     assert_eq!(after.view().text[0].plain(), "Marge says her own name.");
@@ -252,7 +253,7 @@ Quoted
 kind: story
 mode: solo
 pov: nell
-character nell: "Nell" ~ playable
+character nell: "Nell" ~ selectable
 npc tobin: "*Old* Tobin" ~ in deck
 place deck: "the deck"
 state motto: "*never* literal"

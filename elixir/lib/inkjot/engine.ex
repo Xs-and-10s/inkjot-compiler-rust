@@ -61,15 +61,29 @@ defmodule Inkjot.Engine do
   """
   @type pause :: %{ms: non_neg_integer(), kind: String.t()} | nil
   @typedoc """
-  A stretch of text in one style: `italic`, `bold`, `struck`. Its pause is
-  set only on a run appended after a wait (`[after 2s; append]`).
+  A stretch of text in one style: `italic`, `bold`, `struck`, `redacted`.
+  A `redacted` run's text is `█`, one for each character hidden: the words
+  never reach the page, only their length. Its pause is set only on a run
+  appended after a wait (`[after 2s; append]`).
   """
   @type run :: %{text: String.t(), style: [String.t()], pause: pause()}
   @typedoc """
-  A paragraph: its plain text, its styled runs, the wait before it, and
-  whether it is a line of verse (`[verse]`).
+  The blockquote a paragraph is part of (`[quote letter ~ by "A. K."]`): its
+  kind (`sign`, `letter`, `poster`, `edict`), its author if given, and
+  whether this paragraph begins it.
   """
-  @type paragraph :: %{plain: String.t(), runs: [run()], pause: pause(), verse: boolean()}
+  @type quote_block :: %{kind: String.t(), by: String.t() | nil, first: boolean()} | nil
+  @typedoc """
+  A paragraph: its plain text, its styled runs, the wait before it, whether
+  it is a line of verse (`[verse]`), and the blockquote it is part of.
+  """
+  @type paragraph :: %{
+          plain: String.t(),
+          runs: [run()],
+          pause: pause(),
+          verse: boolean(),
+          quote: quote_block()
+        }
   @type link :: %{id: String.t(), label: String.t(), runs: [run()]}
   @type ask :: %{
           kind: String.t(),
@@ -104,7 +118,7 @@ defmodule Inkjot.Engine do
   @spec load(binary()) :: {:ok, inklink()} | refused()
   defdelegate load(ir), to: Native
 
-  @doc "Title, kind, mode, start, povs, playable characters, tags, versions."
+  @doc "Title, kind, mode, start, povs, selectable characters, tags, versions."
   @spec meta(inklink()) :: map()
   defdelegate meta(inklink), to: Native
 

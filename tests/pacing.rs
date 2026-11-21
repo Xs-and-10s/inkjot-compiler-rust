@@ -14,7 +14,7 @@ Paced
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 npc leo: "Leo"
 state hidden: no
 

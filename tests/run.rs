@@ -203,7 +203,7 @@ Counting
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 state count: 0
 state pinned: 0
 
@@ -267,8 +267,8 @@ kind: story
 mode: solo
 pov: ann, bob
 start: hall for ann, study for bob
-character ann: "Ann" ~ playable
-character bob: "Bob" ~ playable
+character ann: "Ann" ~ selectable
+character bob: "Bob" ~ selectable
 place hall: "the hall"
 place study: "the study"
 way door: hall - study
@@ -469,7 +469,7 @@ rewind: echo
 ~ keeps knows
 act walk: cost 1 ~ steps 1 ~ ends turn
 act fiddle: cost 1 ~ private
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 state lamp: no
 fact lamp_works: "The lamp works." ~ clue
 
@@ -598,8 +598,8 @@ mode: solo
 pov: ann, bo
 clock: 0.. ~ shown as "turn" ~ day 2
 start: yard for ann, yard for bo
-character ann: "Ann" ~ playable
-character bo: "Bo" ~ playable
+character ann: "Ann" ~ selectable
+character bo: "Bo" ~ selectable
 place yard: "the yard"
 place shed: "the shed"
 resource vults: 10 ~ per character ~ refill each chronon

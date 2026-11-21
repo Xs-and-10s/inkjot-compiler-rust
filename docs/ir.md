@@ -45,7 +45,10 @@ version, and a runtime written for an earlier IR 3 keeps working.
 
 `title` is present when the passage says `title: "…"` in its header: a name
 for people, where the platform would otherwise show the passage's id. The
-statement itself is not repeated in `header`. `header` holds statements.
+statement itself is not repeated in `header`. Likewise `narration`, when
+the passage tells itself in another person: `"narration": {"person":
+"first", "omniscient": false}` (the config's `narration:` setting has the
+same value). `header` holds statements.
 `body` holds nodes. A margin passage (`[npc]`,
 `[character]`, `[place]`, `[archetype]`) is all header.
 
@@ -89,6 +92,7 @@ of the same length; one that pairs with nothing stays a literal `*`.
 | `{list the_list ~ one per line}` | `{"insert": "list", "list": "the_list", "options": ["one per line"]}` |
 | `{name input for: me.name, max: 24}` | `{"insert": "name input", "args": {"for": {"get": ["me", "name"]}, "max": 24}}` |
 | `{accuse who: suspect, how: scenario.methods, proof: proof_who and proof_how, revote: 1}` | `{"insert": "accuse", "args": {"who": "suspect", "how": {"get": […]}, "proof": {"and": ["proof_who", "proof_how"]}, "revote": 1}}` |
+| `{redacted "TEN" until telegram.dry}` | `{"insert": "redacted", "text": [parts], "until": {"get": ["telegram", "dry"]}}` |
 
 The jury's and the inputs' arguments are typed: a number is a number,
 `'quoted'` text is text, and anything else is an expression. Other inserts
@@ -102,7 +106,12 @@ for now.
 ```
 
 Modifiers stay in order, as in the source: each applies until the next one.
-`after` and `beat` carry `"time"`; `reveal` carries `"mode"`.
+`after` and `beat` carry `"time"`; `reveal` carries `"mode"`. `then`
+carries `"effect"`: `[if c; then e]` is `[{"name": "if", "when": c},
+{"name": "then", "effect": e}]`. `quote` carries `"kind"` and `"by"` (text,
+or null); `redacted` carries `"until"`. Each of those two opens a block
+that an `[end]` closes (`run.md`, Text: Blocks). A speech's `who` is `me`
+for the pov, whichever name the source used (`@you`).
 
 Author's notes (`[note]`, `[todo]`, `[fix]`) and the text under them are
 left out of the IR.
@@ -236,7 +245,7 @@ repeats, lists extend and objects merge.
 | Phrase | Field |
 |---|---|
 | `"…"` | `label`, or `description` if there is already a label. Quoted text is a plain string, or, when it has braces, `{"text": ["Keeper of ", {"value": "here"}]}`, worked out each time it is shown. Text that is read (a fact's text, a description, a list entry, a hint, a `say` line) also takes emphasis, so its parts may be styled runs; a name (`label`, `shown as`) and a value (`set x: "…"`) never do |
-| one word: `evidence`, `playable`, `loud`, `track` | added to `tags`. `track` marks a value whose changes the engine reports |
+| one word: `evidence`, `selectable`, `loud`, `track` | added to `tags`. `track` marks a value whose changes the engine reports |
 | `in X`, `at X` | `in`, `at` |
 | `held by X`, `belongs to X` | `held_by`, `belongs_to` |
 | `holds a, b: "label", c as mark` | `holds`: `[{"id", "label"?, "mark"?}]` |
@@ -246,7 +255,8 @@ repeats, lists extend and objects merge.
 | `aka "a", "b"` / `pick cycle` | `aka` (list) / `aka_pick`: `shuffled` (the default), `cycle`, `random` or `first` |
 | `else absent`, `weight heavy`, `of 6`, `survives death` | `else`, `weight`, `of`, `survives` |
 | `when E`, `open when E`, `done when E` | `when`, `open_when`, `done_when` |
-| `hidden until E`, `fixed until E`, `offstage until E` | `hidden_until`, `fixed_until`, `offstage_until` |
+| `hidden until E`, `fixed until E`, `offstage until E`, `redacted until E` | `hidden_until`, `fixed_until`, `offstage_until`, `redacted_until` |
+| `keep case` | `keep_case: true`: a name the engine never capitalises |
 | `watches here` / `watches here when E` | `watches: true` / `watches_when` |
 | `then EFFECT` | `then` (list of effects) |
 | `cost …`, `check E`, `min n`, `steps R`, `capacity n` | `cost` (list), `check`, `min`, `steps`, `capacity` |
@@ -339,6 +349,17 @@ phrase is left untyped.
 
 Insert arguments for inputs, `accuse`, `reveal` and sounds are still text in
 `args`, and v0.6 statements appear as `stretch` with their source.
+
+## Added within version 3
+
+Milestone 19, the page. Only fields were added, so version 3 stands:
+
+- `narration` on the config and on passages; the `cue` setting, `{"setting":
+  "cue", "of": "names", "value": ["capital", "bold"]}`.
+- Modifier parts `then`, `quote` and `redacted`; the `redacted` insert.
+- `redacted_until` and `keep_case` on declarations.
+- `playable` is now the tag `selectable` (a rename in the source, with
+  `inkjot migrate`).
 
 ## Changes from version 2
 

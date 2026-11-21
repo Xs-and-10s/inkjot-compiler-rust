@@ -63,13 +63,13 @@ one indexed story.
 
 **`Meta`**: `title`, `ifid`, `ir` (`"3"`), `inkjot` (the language version the source declared),
 `kind` (`story`, `story-game`, `game`), `mode` (`solo`, `cohort`), `start`,
-`povs` (the `pov:` setting, default first), `playable` (characters marked
-`~ playable`, for a lobby), `tags` (the Inker's), `engine`, `inquests` (the
+`povs` (the `pov:` setting, default first), `selectable` (characters marked
+`~ selectable`, for a lobby), `tags` (the Inker's), `engine`, `inquests` (the
 `inquests` resource when the Inklink declares it and hides a fork; else
 none).
 
 **`Start`**: `nib` (a Nib to start at), `pov` (a character from `povs` or
-`playable`), `hints` (offer hints; a Linker may turn them off).
+`selectable`), `hints` (offer hints; a Linker may turn them off).
 
 **`Action`**: `TakeLink(id)`, `Answer(words)`, `Vote { who, how, proof }`,
 `TakeFork { fork, from }`.
@@ -88,7 +88,7 @@ decides who sees them.
 | `tags` | Its tags: `finale`, `ending`, `epilogue`, `act`. |
 | `pov` | Who the Linker looks through. |
 | `now` | The clock's stop. |
-| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `struck`. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`) and `verse`; a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Pacing. |
+| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `struck`, `redacted`. A `redacted` span's text is `█`, one for each character hidden: redacted words never reach the view, only their length. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`), `verse`, and `quote` (a `Quote { kind, by, first }` for a paragraph in a `[quote …]` block, `first` on the one that begins it); a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Text. |
 | `links` | The Links offered: `{ id, label }`, the label a `Para`. |
 | `asks` | The open inputs: `{ kind, prompt, options, methods, length, voted }`. |
 | `over` | Nothing offered, nothing asked: the reading has ended. |
@@ -238,7 +238,8 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
 {:ok, state} = Inkjot.Engine.start(inklink, 42, %{})
 %{nib: nib, links: links, text: text} = Inkjot.Engine.view(state)
 # text: [%{plain: "…", runs: [%{text: "…", style: ["italic"], pause: nil}],
-#         pause: nil | %{ms: 2000, kind: "after"}, verse: false}]
+#         pause: nil | %{ms: 2000, kind: "after"}, verse: false,
+#         quote: nil | %{kind: "letter", by: "A. K." | nil, first: true}}]
 # links: [%{id: "…", label: "plain label", runs: [%{text, style}]}]
 {:ok, next} = Inkjot.Engine.take_link(state, hd(links).id)
 [%{"type" => "nib_shown", "origin" => "engine", "data" => data} | _] = Inkjot.Engine.events(next)

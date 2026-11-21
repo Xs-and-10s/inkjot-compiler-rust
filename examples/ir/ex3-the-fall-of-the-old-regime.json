@@ -40,7 +40,7 @@
       "declare": "character",
       "id": "skittles",
       "label": "Skittles",
-      "tags": ["playable", "kitten"],
+      "tags": ["selectable", "kitten"],
       "formally": "Skittles"
     },
     {

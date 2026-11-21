@@ -36,7 +36,7 @@ clock: 0..=8 ~ shown as "month"
 start: cottage
 default moves: walk
 
-character gardener: "the new gardener" ~ playable ~ custom
+character gardener: "the new gardener" ~ selectable ~ custom
 resource daylight: 6 ~ per character ~ refill each chronon ~ shown as "hours of daylight"
 resource hints: 3
 

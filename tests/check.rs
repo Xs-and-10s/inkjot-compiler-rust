@@ -16,7 +16,7 @@ place great_hall: "the hall"
 place cellar: "the cellar"
 way stair: great_hall - cellar ~ open when stair_clear
 state stair_clear: no
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 npc bob: "Bob" ~ in great_hall
 item key: "a key" ~ in great_hall
 fact secret: "A secret." ~ clue
@@ -469,7 +469,7 @@ Comments
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable ~ ((the only one))
+character ann: "Ann" ~ selectable ~ ((the only one))
 state lit: no ~ ((a line comment after a tilde))
 ((a whole-line comment, with an undeclared_name in it))
 

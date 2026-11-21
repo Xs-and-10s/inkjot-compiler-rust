@@ -55,7 +55,7 @@ period evening: new_years_eve ~ of hour
 clock: new_years_eve.eight ..= new_years_eve.midnight ~ shown as "turn"
 resource time: 4 ~ refill each turn ~ shown as "time left this turn"
 
-character attendant: "the cloakroom attendant" ~ playable ~ custom ~ pronouns chosen
+character attendant: "the cloakroom attendant" ~ selectable ~ custom ~ pronouns chosen
 ~ state leaving_early: no
 
 place cloakroom: "the cloakroom"

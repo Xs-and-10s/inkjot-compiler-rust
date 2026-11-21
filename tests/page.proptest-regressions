@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc bfa13538086827bda5d0bbbc2667a6769a94105fe5220fd4a237ba677543c3a4 # shrinks to nodes = [Redacted([If(false, [Line(0)]), Line(0)])]
+cc 97767b56d859e0efbee03a128cfd2dc0c30d02faabba08fa65f5d688f5c42fed # shrinks to nodes = [If(false, [If(false, [Line(0)]), Line(0)])]

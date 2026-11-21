@@ -32,6 +32,8 @@ here.
 | 18b | Text: styled runs in prose and labels, braces in every string with escapes, `if … then … else`, `plural`, `capital`; names as the reader knows them (`shown_as` until `reveal`); `aka` policies and `{all x.aka}`; the engine's view carries styled paragraphs | #27 |
 | 18c | Inquests: forks (`~ inquest`, `for`, `from`, `by role ~ rejoin`, `credit`) as the `inquest` field, checked; `theme`, `brief`; analysis tags; `~ track` and `changes` on `nib_shown`; the engine's `forks`, `any_forks`, `take_fork`, `asked_from` and `map()`, in the NIF too | #28 |
 | 18d | Costs name their resource: `default cost: vults`, `{"amount": …}` in the IR, `requires full x` for any resource; `hushed` is no longer built in (Ex 2 declares it); the reserved resource names documented | #29 |
+| — | Ex 6 to 9 drafted, reviewed and ready: *Seven Names* (the Library) with its public cut *Cloakroom*, *The Inquest*, *Mafia, by Lamplight*, *Saltmarrow*; pacing reaches the view | #30 to #38 |
+| 19 | The page: `narration:`, `~ selectable` (with `inkjot migrate`), names capitalised at the start of a sentence (`~ keep case`), `cue names:` and `cue directions:`, `[if c; then e]` and `[unless c; then e]`, blocks that `[end]` closes in order, blockquotes, redaction three ways (the hidden words never reach the view), `expect events:`, `expect fork:`, `take fork:`. Ex 8 runs as written | #39 |
 
 ## Next
 
@@ -46,9 +48,25 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
    requests (see "Inkjot v0.6" below for what is in each): #26, #27, #28,
    and a fourth, #29, that takes the last Inklink words out of the engine.
 5. **Ex 6 to 9**, pitched and chosen on 20 Nov 2026 (below), drafted in
-   the order 6, 8, 7, 9. Ex 5 is brought up to the 20 Nov decisions on the
-   way.
-6. **The rest of v0.6** (below).
+   the order 6, 8, 7, 9. Done: all four ready (21 Nov).
+6. **The rest of v0.6**, agreed 21 Nov 2026, the examples as acceptance
+   tests: a milestone is done when its example runs as written.
+   - 19, **the page**: done when Ex 8 runs with no rewrites. Done (#39).
+   - 20, **the world**: targets and `where:`, Link groups, Links offered
+     everywhere, handlers on a kind, `on move`, durations and delays, NPCs
+     that follow or pursue, `spreads`, threats and counters, recipes,
+     `~ breaks` and `~ uses`, counted items, `default takes`, dice, tables
+     read as values. Done when Ex 9 and the Ex 2 duel in general words run.
+   - 21, **the table**: decks and piles, periods and named clocks,
+     `{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating, settable
+     `shown_as`, `finale when:`, text tables. Done when Ex 7 runs.
+   - 22, **Inklog**: rules, `{{ }}`, knowledge bases, `assert` and
+     `retract`, quantifiers, facts at a time, `never`, `{note input}`. Done
+     when Ex 6's public cut runs and Ex 5 is brought up to date.
+   - 23, **close v0.6**: `define` step 2 if it still earns its place, the
+     IR frozen, release v0.6.0.
+   - To v0.7: engine timers for effect chains that wait on the clock;
+     `define` steps 1 and 3; facets and `~ conflict`.
 
 ## Ex 6 to 9
 
@@ -111,7 +129,7 @@ random playthroughs. The guardian can be fought, sneaked past, bargained
 with or outrun.
 
 **Ex 9, *Saltmarrow*.** Drafted 21 Nov
-(`examples/drafts/ex9-saltmarrow.twee`), in review. Fifteen places, four
+(`examples/drafts/ex9-saltmarrow.twee`); ready (#38). Fifteen places, four
 timbered; nineteen spells, five of them greater workings; the Gleaner; the
 Brinewarden, who can also be left the shard. `tests/ex9_map.rs` plays it
 at random and searches for a way out from wherever play stops: no dead

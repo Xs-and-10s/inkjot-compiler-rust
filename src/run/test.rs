@@ -24,6 +24,9 @@
 //! | `expect text: "…"` / `expect no text: "…"` | Text shown since the last `do` does / does not contain this |
 //! | `expect link: "…"` / `expect no link: "…"` | A Link with this label is / is not available |
 //! | `expect at: passage` | The pov is at this passage |
+//! | `expect events: ending_reached, died` | The engine reported these since the last action |
+//! | `expect fork: "Suppose …" ~ for "Say …"` | An Inquest here offers this fork (standing in for that Link) |
+//! | `take fork: "Suppose …"` | Take a fork, as an Inquest would |
 //!
 //! A failed `do` ends the test, since the rest of the script no longer
 //! describes what is on screen. A failed `expect` is recorded and the test
@@ -87,6 +90,8 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
     let mut started = false;
     // Text shown to each Linker since their last `do`.
     let mut shown: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    // The engine's events since the last action.
+    let mut events: Vec<String> = Vec::new();
 
     for (i, s) in stmts.iter().enumerate() {
         let head = &s.clauses[0];
@@ -110,10 +115,35 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                     .map(|w| w.split(',').map(str::trim).collect())
                     .unwrap_or_default();
                 started = true;
-                if who.len() > 1 {
+                events.clear();
+                let result = if who.len() > 1 {
                     run.start_cohort(Some(value), &who)
                 } else {
                     run.start(Some(value), who.first().copied())
+                };
+                note_events(&mut run, &mut events);
+                result
+            }
+            // `take fork: "Suppose …"`: take it, as an Inquest would.
+            "take" if how == "fork" => {
+                collect(&mut run, &mut shown);
+                let tag = seat_tag(&run);
+                let mine = shown.remove(&run.pov).unwrap_or_default();
+                out.transcript
+                    .extend(mine.into_iter().map(|l| format!("{tag}{l}")));
+                events.clear();
+                let taken = take_fork(&mut run, unquote(value));
+                note_events(&mut run, &mut events);
+                match taken {
+                    Ok(label) => {
+                        out.transcript.push(format!("{tag}> {label} (an Inquest)"));
+                        collect(&mut run, &mut shown);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        out.failures.push((at, e));
+                        break;
+                    }
                 }
             }
             "as" => {
@@ -142,7 +172,10 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                 let mine = shown.remove(&run.pov).unwrap_or_default();
                 out.transcript
                     .extend(mine.into_iter().map(|l| format!("{tag}{l}")));
-                match take(&mut run, value) {
+                events.clear();
+                let taken = take(&mut run, value);
+                note_events(&mut run, &mut events);
+                match taken {
                     Ok(label) => {
                         out.transcript.push(format!("{tag}> {label}"));
                         collect(&mut run, &mut shown);
@@ -161,7 +194,9 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                         Some(text) => vec![text.to_string()],
                         None => value.split(',').map(|w| w.trim().to_string()).collect(),
                     };
+                events.clear();
                 let result = run.answer(&words);
+                note_events(&mut run, &mut events);
                 collect(&mut run, &mut shown);
                 result
             }
@@ -179,9 +214,34 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                     .map(|p| p.trim().to_string())
                     .filter(|p| !p.is_empty())
                     .collect();
+                events.clear();
                 let result = run.vote(value, &clause("how "), &proof);
+                note_events(&mut run, &mut events);
                 collect(&mut run, &mut shown);
                 result
+            }
+            "expect" if how == "events" => {
+                let missing: Vec<&str> = value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|k| !events.iter().any(|e| e == k))
+                    .collect();
+                if missing.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "expected the events {}; the engine reported: {}",
+                        missing.join(", "),
+                        events.join(", ")
+                    ))
+                }
+            }
+            "expect" if how == "fork" => {
+                let stands_in_for = s.clauses[1..]
+                    .iter()
+                    .find_map(|c| c.text.strip_prefix("for "))
+                    .map(|l| unquote(l.trim()).to_string());
+                expect_fork(&mut run, unquote(value), stands_in_for.as_deref())
             }
             "expect" => {
                 collect(&mut run, &mut shown);
@@ -215,6 +275,79 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
     }
     let _ = run.sit(&served);
     out
+}
+
+/// What the engine reports for the action just taken, by type, as the
+/// engine works them out (`src/engine/events.rs`): what the interpreter
+/// noted, the Nib shown, an ending reached on arrival, the reading over.
+fn note_events(run: &mut Run, events: &mut Vec<String>) {
+    events.extend(run.take_noted().into_iter().map(|(k, _)| k.to_string()));
+    events.push("nib_shown".into());
+    let here = run.here().to_string();
+    let finale = run.story.passage_tags(&here).iter().any(|t| t == "finale");
+    if finale && run.trail().contains(&here) {
+        events.push("ending_reached".into());
+    }
+    let nothing_offered = run.choices().is_ok_and(|c| c.is_empty());
+    let nothing_asked = run.asks().is_ok_and(|a| a.is_empty());
+    if nothing_offered && nothing_asked && !run.waiting() {
+        events.push("reading_finished".into());
+    }
+}
+
+/// Every fork an Inquest could offer here: `(fork id, its label, the
+/// label of the Link it stands in for)`.
+fn forks_here(run: &mut Run) -> Result<Vec<(String, String, String)>, String> {
+    let mut out = Vec::new();
+    for (id, label) in run.offers()? {
+        for (fork, fork_label) in run.forks(&id, None)? {
+            out.push((fork, fork_label.plain(), label.plain()));
+        }
+    }
+    Ok(out)
+}
+
+fn take_fork(run: &mut Run, wanted: &str) -> Result<String, String> {
+    let forks = forks_here(run)?;
+    match forks.iter().find(|(_, label, _)| label == wanted) {
+        Some((id, label, _)) => {
+            let label = label.clone();
+            run.choose_fork(&id.clone(), None)?;
+            Ok(label)
+        }
+        None => Err(format!(
+            "no fork \"{wanted}\" can be taken at `{}`; the forks are: {}",
+            run.here(),
+            labels_of(&forks)
+        )),
+    }
+}
+
+fn expect_fork(run: &mut Run, wanted: &str, stands_in_for: Option<&str>) -> Result<(), String> {
+    let forks = forks_here(run)?;
+    let found = forks
+        .iter()
+        .any(|(_, label, offered)| label == wanted && stands_in_for.is_none_or(|s| s == offered));
+    if found {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected a fork \"{wanted}\"{}; the forks are: {}",
+            stands_in_for.map_or(String::new(), |s| format!(" for \"{s}\"")),
+            labels_of(&forks)
+        ))
+    }
+}
+
+fn labels_of(forks: &[(String, String, String)]) -> String {
+    if forks.is_empty() {
+        return "none".into();
+    }
+    forks
+        .iter()
+        .map(|(_, label, offered)| format!("\"{label}\" for \"{offered}\""))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Move what the served Linker has been shown into their pile.

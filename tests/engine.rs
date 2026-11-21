@@ -289,7 +289,7 @@ Round and Round
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 
 :: hall
 The hall.
@@ -469,7 +469,7 @@ The Pit
 kind: game
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 place hall: "the hall" ~ checkpoint
 place pit: "the pit"
 way ladder: hall - pit

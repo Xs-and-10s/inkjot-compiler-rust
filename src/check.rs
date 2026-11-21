@@ -123,6 +123,10 @@ struct Checker {
     /// Where the first cost is, and `default cost: vults` if the config has one.
     first_cost: Option<(usize, usize)>,
     default_cost: Option<(String, usize, usize)>,
+    /// What is open in the body being checked, innermost last: an `[if]`
+    /// chain, a `[quote …]` or a `[redacted until …]`, and where. `[end]`
+    /// closes the innermost.
+    blocks: Vec<(&'static str, usize, usize)>,
 }
 
 /// A Link seen in the passage being checked.
@@ -714,6 +718,25 @@ impl Checker {
         let rest = head.text[kw.len()..].trim_start();
         let rest_col = head.col + cols(&head.text[..head.text.len() - rest.len()]);
 
+        if kw == "told" {
+            return self.err(
+                head.line,
+                head.col,
+                "`told:` is now `narration:` (`narration: second person`); `inkjot migrate` rewrites it",
+            );
+        }
+        // A test takes a fork by its label: `take fork: "Suppose …"`.
+        if kw == "take" && rest.starts_with("fork:") {
+            let value = rest["fork:".len()..].trim();
+            if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
+                self.err(
+                    head.line,
+                    rest_col,
+                    "`take fork:` takes the fork's label in quotes",
+                );
+            }
+            return;
+        }
         if kw == "on" || kw == "upon" {
             self.on(rest, head.line, rest_col);
         } else if let Some(kind) = DECLS.iter().copied().find(|k| *k == kw) {
@@ -750,7 +773,12 @@ impl Checker {
         if let Some(i) = after_word(&c.text, "when") {
             self.expr(&c.text[i..], c.line, c.col + cols(&c.text[..i]));
         }
-        for lead in ["hidden until ", "fixed until ", "offstage until "] {
+        for lead in [
+            "hidden until ",
+            "fixed until ",
+            "offstage until ",
+            "redacted until ",
+        ] {
             if let Some(e) = c.text.strip_prefix(lead) {
                 self.expr(e, c.line, c.col + cols(lead));
             }
@@ -864,6 +892,13 @@ impl Checker {
         }
         for c in &s.clauses[1..] {
             let text = c.text.as_str();
+            if text == "playable" {
+                self.err(
+                    c.line,
+                    c.col,
+                    "`~ playable` is now `~ selectable`: every character can be played, and this one is offered at the start; `inkjot migrate` rewrites it",
+                );
+            }
             // `~ pick cycle`: how `{x.aka}` picks from the names.
             if let Some(how) = text.strip_prefix("pick ") {
                 if !AKA_PICKS.contains(&how.trim()) {
@@ -1084,6 +1119,46 @@ impl Checker {
                     );
                 }
             }
+            "narration" => {
+                if !NARRATIONS.contains(&value) {
+                    self.err(
+                        line,
+                        vcol,
+                        "`narration` is one of: first person, second person, third person",
+                    );
+                }
+                for c in &s.clauses[1..] {
+                    if c.text != "omniscient" {
+                        self.err(
+                            c.line,
+                            c.col,
+                            "after `narration:` only `~ omniscient` may follow",
+                        );
+                    }
+                }
+            }
+            "cue" => {
+                let of = rest.split(':').next().unwrap_or("").trim();
+                if !["names", "directions"].contains(&of) {
+                    self.err(
+                        line,
+                        rest_col,
+                        "`cue` is written `cue names: capital, bold` or `cue directions: italic`",
+                    );
+                }
+                for style in value.split(',').map(str::trim) {
+                    if !CUE_STYLES.contains(&style) {
+                        self.err(
+                            line,
+                            vcol,
+                            format!(
+                                "`{style}` is not a cue style; they are: {}",
+                                CUE_STYLES.join(", ")
+                            ),
+                        );
+                    }
+                }
+            }
             "kind" => {
                 if !["story", "game", "story-game"].contains(&value) {
                     self.err(line, vcol, "`kind` is one of: story, game, story-game");
@@ -1186,6 +1261,43 @@ impl Checker {
             "seed" => {
                 if value.parse::<u64>().is_err() {
                     self.err(line, vcol, "`seed:` takes a whole number");
+                }
+            }
+            // `expect events: ending_reached, died`: in a test, what the
+            // engine reported since the last action.
+            "expect" if rest.starts_with("events") => {
+                for kind in value.split(',').map(str::trim) {
+                    if !crate::engine::CATALOGUE.iter().any(|t| t.name == kind) {
+                        let names: Vec<&str> =
+                            crate::engine::CATALOGUE.iter().map(|t| t.name).collect();
+                        self.err(
+                            line,
+                            vcol,
+                            format!("`{kind}` is not an event; they are: {}", names.join(", ")),
+                        );
+                    }
+                }
+            }
+            // `expect fork: "Suppose …" ~ for "Say …"`.
+            "expect" if rest.starts_with("fork") => {
+                if value.len() < 2 || !value.starts_with('"') || !value.ends_with('"') {
+                    self.err(
+                        line,
+                        vcol,
+                        "`expect fork:` takes the fork's label in quotes",
+                    );
+                }
+                let for_ok = s.clauses[1..].iter().all(|c| {
+                    c.text
+                        .strip_prefix("for ")
+                        .is_some_and(|l| l.trim().starts_with('"') && l.trim().ends_with('"'))
+                });
+                if !for_ok || s.clauses.len() > 2 {
+                    self.err(
+                        line,
+                        vcol,
+                        "`expect fork:` may say which Link it stands in for: `~ for \"label\"`",
+                    );
                 }
             }
             "expect" => {
@@ -1319,6 +1431,7 @@ impl Checker {
         }
         let mut last = Last::Nothing;
         let mut if_seen = false;
+        self.blocks.clear();
         for l in lines {
             let t = l.text.trim();
             let col = 1 + cols(&l.text[..l.text.len() - l.text.trim_start().len()]);
@@ -1351,6 +1464,17 @@ impl Checker {
                 self.inserts(t, l.no, col);
                 last = Last::Speech;
             }
+        }
+        for (what, line, col) in std::mem::take(&mut self.blocks) {
+            // A flat `[if]` chain needs no `[end]`; a block does.
+            if what == "if" {
+                continue;
+            }
+            self.err(
+                line,
+                col,
+                format!("this `[{what}]` is never closed: end it with `[end]`"),
+            );
         }
     }
 
@@ -1535,13 +1659,15 @@ impl Checker {
         if who.is_empty() {
             return self.err(line, col, "`@` needs a speaker: `@leo Hello.`");
         }
-        self.need(
-            who,
-            &["character", "npc", "voice"],
-            "character, NPC or voice",
-            line,
-            col,
-        );
+        if !POV_NAMES.contains(&who) {
+            self.need(
+                who,
+                &["character", "npc", "voice"],
+                "character, NPC or voice",
+                line,
+                col,
+            );
+        }
         let mut rest = cue[who.len()..].trim_start();
         if rest.starts_with('(') {
             match rest.find(')') {
@@ -1636,6 +1762,32 @@ impl Checker {
             "sound" if second == "effect:" => {}
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
+            // `{redacted "TEN" until telegram.dry}`.
+            "redacted" => {
+                let text = c["redacted".len()..].trim_start();
+                let close = text
+                    .starts_with('"')
+                    .then(|| crate::text::string_end(text, 0))
+                    .flatten();
+                match close {
+                    Some(end) => {
+                        self.strings(&text[..=end], line, col);
+                        match text[end + 1..].trim().strip_prefix("until ") {
+                            Some(cond) => self.expr(cond.trim(), line, col),
+                            None => self.err(
+                                line,
+                                col,
+                                "`{redacted \"…\"}` says until when: `{redacted \"TEN\" until telegram.dry}`",
+                            ),
+                        }
+                    }
+                    None => self.err(
+                        line,
+                        col,
+                        "`{redacted …}` takes quoted text: `{redacted \"TEN\" until telegram.dry}`",
+                    ),
+                }
+            }
             "list" => self.need(second, &["list"], "list", line, col + 5),
             "all" if !second.is_empty() => {
                 let rest = &content[content.find("all").unwrap_or(0) + 3..];
@@ -1792,18 +1944,69 @@ impl Checker {
             match word {
                 "if" | "unless" | "ifalways" | "ifnever" => {
                     *if_seen = true;
+                    if self.blocks.last().is_none_or(|b| b.0 != "if") {
+                        self.blocks.push(("if", line, pcol));
+                    }
                     if rest.is_empty() {
                         self.err(line, pcol, format!("`[{word}]` needs a condition"));
                     } else {
                         self.expr(rest, line, pcol + cols(word) + 1);
                     }
                 }
+                // `[if c; then e]`: e happens when the block is shown.
+                "then" => {
+                    if rest.is_empty() {
+                        self.err(line, pcol, "`then` needs an effect: `[if c; then play x]`");
+                    } else {
+                        self.effect(rest, line, pcol + 5);
+                    }
+                }
+                // `[quote letter ~ by "A. K."]` … `[end]`.
+                "quote" => {
+                    let mut clauses = rest.splitn(2, '~');
+                    let kind = clauses.next().unwrap_or("").trim();
+                    if !QUOTES.contains(&kind) {
+                        self.err(
+                            line,
+                            pcol,
+                            format!("`[quote …]` is one of: {}", QUOTES.join(", ")),
+                        );
+                    }
+                    if let Some(by) = clauses.next().map(str::trim) {
+                        match by.strip_prefix("by ").map(str::trim) {
+                            Some(t) if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') => {
+                                self.strings(t, line, pcol)
+                            }
+                            _ => self.err(
+                                line,
+                                pcol,
+                                "a quote's author is quoted: `[quote letter ~ by \"A. K.\"]`",
+                            ),
+                        }
+                    }
+                    self.blocks.push(("quote", line, pcol));
+                }
+                // `[redacted until record_closed]` … `[end]`.
+                "redacted" => {
+                    match rest.strip_prefix("until ").map(str::trim) {
+                        Some(c) if !c.is_empty() => self.expr(c, line, pcol + 15),
+                        _ => self.err(
+                            line,
+                            pcol,
+                            "`[redacted]` says until when: `[redacted until record_closed]`",
+                        ),
+                    }
+                    self.blocks.push(("redacted", line, pcol));
+                }
                 "else" => {
                     if !*if_seen {
                         self.err(line, pcol, "`[else]` has no `[if …]` before it");
                     }
                 }
-                "end" | "continue" | "cont" => *if_seen = false,
+                "end" | "continue" | "cont" => {
+                    self.blocks.pop();
+                    *if_seen = self.blocks.iter().any(|b| b.0 == "if");
+                }
                 "append" | "once" | "note" | "todo" | "fix" | "verse" => {}
                 "after" => {
                     if !is_duration(rest) {

@@ -226,7 +226,7 @@ defmodule Inkjot.EngineTest do
   kind: story
   mode: solo
   pov: ann
-  character ann: "Ann" ~ playable
+  character ann: "Ann" ~ selectable
 
   :: hall
   The hall.
@@ -282,7 +282,7 @@ defmodule Inkjot.EngineTest do
   kind: story
   mode: solo
   pov: ann
-  character ann: "Ann" ~ playable
+  character ann: "Ann" ~ selectable
 
   :: lounge
   He winds it once, twice—
@@ -308,6 +308,39 @@ defmodule Inkjot.EngineTest do
     assert %{plain: "Flame for the fool,", verse: true} = verse
   end
 
+  @page """
+  :: StoryTitle
+  Page
+
+  :: StoryData
+  {"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "room"}
+
+  :: Inklink [config]
+  kind: story
+  mode: solo
+  pov: ann
+  character ann: "Ann" ~ selectable
+  state closed: no
+
+  :: room
+  [quote letter ~ by "A. K."]
+  Burn this.
+  [end]
+  Meet me at {redacted "TEN" until closed}.
+  """
+
+  test "quotes and redaction reach the view, and the hidden words do not" do
+    {:ok, ir} = Engine.build(@page)
+    {:ok, inklink} = Engine.load(ir)
+    {:ok, state} = Engine.start(inklink, 1)
+
+    assert [letter, meet] = Engine.view(state).text
+    assert %{plain: "Burn this.", quote: %{kind: "letter", by: "A. K.", first: true}} = letter
+    assert %{plain: "Meet me at ███.", quote: nil} = meet
+    assert %{text: "███", style: ["redacted"], pause: nil} in meet.runs
+    refute meet.plain =~ "TEN"
+  end
+
   @ford """
   :: StoryTitle
   The Ford
@@ -319,7 +352,7 @@ defmodule Inkjot.EngineTest do
   kind: story
   mode: solo
   pov: nell
-  character nell: "Nell" ~ playable
+  character nell: "Nell" ~ selectable
   resource inquests: 3
   state trust: 0 ~ track
 

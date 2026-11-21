@@ -75,11 +75,11 @@ state wound_watch: no ~ belongs to character
 fuse nerve: 3 ~ shown as "Miss Vell’s nerve" ~ hidden
 ~ then set vell.cornered: yes
 
-character ada: "Ada Thorne, financier" ~ investor ~ playable ~ else absent ~ knows debts
-character rook: "Captain Hal Rook, retired" ~ investor ~ playable ~ else absent ~ moves walk ~ knows saw_vell
-character wren: "Wren Hollis, investor" ~ investor ~ playable ~ else absent ~ moves walk, dash, slip
-character sallow: "Dr. Imogen Sallow, physician" ~ investor ~ playable ~ else absent ~ knows burn_pattern
-character guest: "a guest of your own" ~ investor ~ playable ~ custom ~ else absent
+character ada: "Ada Thorne, financier" ~ investor ~ selectable ~ else absent ~ knows debts
+character rook: "Captain Hal Rook, retired" ~ investor ~ selectable ~ else absent ~ moves walk ~ knows saw_vell
+character wren: "Wren Hollis, investor" ~ investor ~ selectable ~ else absent ~ moves walk, dash, slip
+character sallow: "Dr. Imogen Sallow, physician" ~ investor ~ selectable ~ else absent ~ knows burn_pattern
+character guest: "a guest of your own" ~ investor ~ selectable ~ custom ~ else absent
 
 npc vell: "Miss Edith Vell" ~ suspect ~ moves walk, dash
 npc crane: "Mr. Crane" ~ suspect ~ moves none
