@@ -93,12 +93,16 @@ pile role ~ per guest ~ private ~ face down ~ shown as "your card"
 
 (((
 The Heist Crew's game is played with keepsakes: everyone is dealt one,
-and it lies face up in front of them.
+and it lies face up in front of them. A stolen keepsake goes into the
+loot of the member who stole it (see `morning`); the haul is all the
+Crew's loot together, dead members' included, so a thief who is voted out
+still counts toward the train.
 )))
 deck keepsakes
 ~ card locket, pocket_watch, signet_ring, cameo, silver_flask, music_box, opera_glasses, tin_soldier, compass, hatpin, fountain_pen, harmonica
 pile keepsake ~ per guest ~ face up ~ shown as "keepsake"
-pile haul ~ shown as "the haul"
+pile loot ~ per guest ~ private ~ shown as "loot"
+get haul: all(guest, where: it.team == syndicate).loot
 
 (((
 What each player knows. The Detective's findings are the Detective's
@@ -308,7 +312,13 @@ set foreclosed: due when syndicate.special == collectors
 Night: each acts in private. Every target is `~ at guest` with a `where:`
 that says which guests may be picked. Links grouped by who may take them.
 The syndicate chooses together: `~ consensus` makes the Link a vote among
-those who may take it, and the most-chosen target is the one.
+those who may take it, and the most-chosen target is the one. A consensus
+remembers who chose each target, in the order they placed that vote
+(changing a vote places it again): `victim.chosen_by`, first to last.
+Where one member does the deed for all (the Doppelgänger who takes the
+face, the thief who carries the keepsake), it is the first who placed
+their vote on the target chosen: `first(victim.chosen_by)`. So it pays to
+decide quickly.
 )))
 --
 [if me.alive]
@@ -382,7 +392,12 @@ taking. `report` holds the table's version; MonkeyPaw or
 the Storyteller may tell it differently.
 )))
 let flourish: one syndicate.deaths
-let killer: one(guest, where: it.team == syndicate and it.alive and it.chose_target(victim))
+(((
+Who does the deed for the syndicate: the first member who placed their
+vote on the target chosen.
+)))
+let first_voter: first(victim.chosen_by)
+let taken: top of victim.keepsake
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
 let foiled: victim != nobody and victim == saved
 set victim: nobody when foiled
@@ -393,11 +408,12 @@ set victim.team: cult when victim != nobody and syndicate.special == cult
 teach victim cult_secret when victim != nobody and syndicate.special == cult
 (((
 The Doppelgänger's swap happens before the report is written, so the
-report names the face on the body: the killer's old one.
+report names the face on the body: the killer's old one. The killer is
+the first who voted for the victim.
 )))
-set killer.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
-set victim.shown_as: killer.name when syndicate.special == doppelganger and replacing and victim != nobody
-move top of victim.keepsake to haul when syndicate.special == heist and victim != nobody
+set first_voter.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
+set victim.shown_as: first_voter.name when syndicate.special == doppelganger and replacing and victim != nobody
+move taken to first_voter.loot when syndicate.special == heist and victim != nobody
 (((
 The taking is secret, and a mark is read from the slate, so only deaths
 and thefts make the report.
@@ -469,7 +485,7 @@ pronouns would be the victim's, and would give the swap away.
 
 :: morning:missing
 --
-@lamplighter In the night, from {victim}’s dressing table: one {top of haul}. The house is searched. Nothing is found. The house is very large.
+@lamplighter In the night, from {victim}’s dressing table: one {taken}. The house is searched. Nothing is found. The house is very large.
 
 :: day
 (((
@@ -564,6 +580,9 @@ The cards go face up, all at once:
 
 [if syndicate.special == doppelganger]
 And the faces: {all(guest, where: it.shown_as != it.name)} {if count(guest, where: it.shown_as != it.name) == 1 then "was" else "were"} not who they seemed.
+
+[if syndicate.special == heist and count(haul) > 0]
+And the luggage: {list loot of each guest where count(it.loot) > 0 ~ one per line}
 
 [end]
 

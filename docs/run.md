@@ -170,11 +170,12 @@ shown as written, being entries, not sentences.
 shown, in its parentheses: `@fenwick (to you)` reads "Mr. Fenwick (to
 you): …".
 
-**`narration:`** says whose words the engine writes for the pov: `@you`
-(and `@me`, `@i`, or the pov's own name in a cue) and `{me}`. `narration:
-second person` reads "You: …" and "you"; `first person` reads "I: …", and
-`{me}` as "I" at the start of a sentence and "me" elsewhere; `third person`,
-or nothing said, reads the pov's name. Prose is written by hand in whatever
+**`narration:`** says whose words the engine writes for the pov in prose:
+`{me}`. `narration: second person` reads "you"; `first person` reads "I"
+at the start of a sentence and "me" elsewhere; `third person`, or nothing
+said, reads the pov's name. A speech cue always names its speaker, the
+pov too: `@you` in a witness's first-person testimony reads "Martha Rudd:
+…", and "I" belongs to the prose (decided 21 Nov 2026). Prose is written by hand in whatever
 person it is. A passage may say its own (`narration: first person` in its
 header, for a witness's testimony), and its sub-Nibs (`martha:tom_out`) are
 told as it is. `~ omniscient` may follow, for analysis; play ignores it.

@@ -97,7 +97,11 @@ is not a fork (a morning MonkeyPaw writes); a `shown_as` that can be set
 in one mode (the Storyteller); a general ballot (`{ballot for: chosen,
 from: specials, ties: draw}`, for the table choosing a special syndicate
 when more than half ask for one); and a draw limited by `where:` (`roll
-syndicate where: it.special == chosen_special`).
+syndicate where: it.special == chosen_special`); a consensus that
+remembers who chose each target, in order (`victim.chosen_by`), with
+`first(…)`, so the first to vote for the chosen target does the deed for
+the group (decided 21 Nov); a pile on a set of players (`all(guest,
+where: …).loot`).
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 

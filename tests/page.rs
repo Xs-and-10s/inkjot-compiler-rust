@@ -63,7 +63,8 @@ fn the_pov_is_told_as_narration_says() {
     assert_eq!(
         plain(&second),
         [
-            "You: I came by the drove.",
+            // A cue names the speaker; narration is for the prose.
+            "Ann: I came by the drove.",
             "You stopped. Mr. Fenwick looked at you."
         ]
     );
@@ -71,7 +72,7 @@ fn the_pov_is_told_as_narration_says() {
     assert_eq!(
         plain(&first),
         [
-            "I: I came by the drove.",
+            "Ann: I came by the drove.",
             "I stopped. Mr. Fenwick looked at me."
         ]
     );
@@ -100,11 +101,11 @@ fn a_passage_may_tell_itself_differently() {
 fn a_sub_nib_is_told_as_its_passage_is() {
     let src = story(
         "narration: second person",
-        "narration: first person\n--\n{me} went.\n> [[On->room:on]]\n\n:: room:on\n@you I did.",
+        "narration: first person\n--\n{me} went.\n> [[On->room:on]]\n\n:: room:on\n@you {me} did.",
     );
     let state = start(&src);
     let id = state.view().links[0].id.clone();
-    assert_eq!(plain(&state.take_link(&id).unwrap()), ["I: I did."]);
+    assert_eq!(plain(&state.take_link(&id).unwrap()), ["Ann: I did."]);
 }
 
 // ------------------------------------------------------------ names and cues

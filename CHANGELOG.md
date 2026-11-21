@@ -5,9 +5,11 @@
 ### Milestone 19: the page
 
 - `narration: first person | second person | third person` (`~ omniscient`
-  may follow) in the config or a passage, for the words the engine writes:
-  `@you` reads "You: …" or "I: …", `{me}` reads "you", or "I" and "me". A
-  sub-Nib is told as its passage is. `told:` is renamed `narration:`.
+  may follow) in the config or a passage, for the words the engine writes
+  in prose: `{me}` reads "you", or "I" and "me". A speech cue always names
+  its speaker, the pov too (changed after review, 21 Nov 2026: "Martha
+  Rudd: …", not "I: …"). A sub-Nib is told as its passage is. `told:` is
+  renamed `narration:`.
 - `~ playable` is now `~ selectable`; the engine's `Meta` and the NIF's
   `meta/1` say `selectable`. `inkjot migrate` rewrites both renames, in a
   v0.6 file too; Ex 1 to 3 and the drafts are migrated.
@@ -44,6 +46,12 @@
 - *Mafia, by Lamplight*, drafted (`examples/drafts/ex7-mafia.twee`): ten
   syndicates, four that change the rules, three ways to moderate, and
   `where:` in nearly every Link. Linted with the other drafts.
+- Who does the deed for the syndicate: the first member who placed their
+  vote on the target chosen (`first(victim.chosen_by)`), so the
+  Doppelgänger who takes the face and the thief who carries the keepsake
+  are decided by the vote, and it pays to vote quickly. A stolen keepsake
+  goes into its thief's own loot; the haul is all the Crew's loot, so the
+  win count is unchanged, and the epilogue shows whose luggage held what.
 - Last bug pass: the Doppelgänger's swap now happens before the morning
   report; debts fall due at nightfall, a full day after marking; the
   syndicate's size counts players only, after the deal; teammates are

@@ -1866,8 +1866,11 @@ impl Run {
     }
 
     /// A speech cue: `Fenwick (to you): `, styled as `cue names:` and `cue
-    /// directions:` say. A name is capitalised, being at the start of a
-    /// line, unless it is `~ keep case`.
+    /// directions:` say. A cue always names the speaker, the pov too: a
+    /// witness's line reads "Martha Rudd: …" in a testimony told in the
+    /// first person (decided 21 Nov 2026); `narration:` changes the words
+    /// in prose only. A name is capitalised, being at the start of a line,
+    /// unless it is `~ keep case`.
     fn cue(&mut self, who: &str, direction: Option<&str>) -> R<Para> {
         let story = Arc::clone(&self.story);
         let id = if syntax_pov(who) {
@@ -1900,10 +1903,7 @@ impl Run {
             let n = self.label(&id).chars().count();
             lead.push_bar(n, &marks(&names));
         } else {
-            let name = match self.pov_word(&id, true) {
-                Some(word) => word,
-                None => self.label(&id),
-            };
+            let name = self.label(&id);
             let name = if self.keeps_case(&id) {
                 name
             } else {
