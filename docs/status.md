@@ -85,8 +85,8 @@ in review. Runs on today's engine bar five unbuilt constructs
 (`tests/ex8.rs`). Found while writing it: an `[act]` passage cannot offer
 Links of its own (the testimony's steps are plain Nibs); speech labels
 keep a lowercase name at the start of a line ("the foreman: …"), which
-the platform may want to capitalise; `[if c; then e]` is read here as
-"shown when c, and does e when shown", to be confirmed. A fen village, 1893: the lock-keeper drowned the
+the engine should capitalise (proposed below); `[if c; then e]` confirmed.
+A fen village, 1893: the lock-keeper drowned the
 night the sluice was opened. The frame is in the second person, to the
 coroner's clerk; each testimony is in the first person, as the witness,
 some reliable and some not. Dialogue is screenplay-style speech cues.
@@ -281,6 +281,39 @@ Inklog and time, from Ex 6 (21 Nov 2026):
   inserts (`{note …}`, `{contradictions}`); per-Linker knowledge surviving
   a fall-back; a checkpoint that shows a passage first; `finale when:` in a
   passage header; pronouns the Linker chooses.
+
+From Ex 8's review (21 Nov 2026):
+
+- **Decided.** `[if c; then e]`: the block shows when `c` holds, and `e`
+  happens when it is shown. Its mirror, `[unless c; then e]` (Mark
+  proposed `do`; `then` is recommended, since `then` introduces effects
+  everywhere else). Effects in a passage happen top to bottom when it is
+  shown, so a block may unlock the next ("effect chains"). `[after 2s]`
+  only paces the showing; a chain that waits on the clock needs engine
+  timers, a v0.7 question.
+- **Proposed.** `told:` becomes `narration: first person | second person |
+  third person`, the craft term; `person:` would clash with the built-in
+  kind. It decides only the words the engine writes (`@you`, `{me}`,
+  pronoun inserts, retellings) and the person a generated fork must be
+  written in; prose is written by hand in whatever person it is. Close,
+  distant and omniscient are stances, not grammar: an optional clause
+  (`~ omniscient`) for analysis and briefs, ignored by play.
+- **Proposed.** `~ playable` becomes `~ selectable`: every `character` can
+  be played (that is what makes it not an `npc`); the clause means "offered
+  to choose at the start". Ex 8's witnesses are characters reached by
+  `become`, so only the clerk is selectable. Renamed with `inkjot migrate`.
+- **Proposed.** Names at the start of a line or sentence are capitalised
+  by the engine, everywhere, not only in speech labels ("The foreman: …");
+  `~ keep case` on a name opts out. Styling the parts of a cue with a list
+  of transforms applied in order: `cue names: capital, bold`, `cue
+  directions: italic`. (Mark's pipeline, `~ capitalized(_) ~> bold(_)`,
+  written as a plain list; the full pipeline waits for a second use.)
+- **Found.** `[after 2s]`, `beat` and `verse` reach the IR but not the
+  engine's view, so the platform, which reads the view, cannot pace text.
+  Each paragraph of the view should carry its delay after the one before.
+- **As designed.** A speech direction, `@fenwick (to you)`, is shown to
+  the reader, as in a play script; an author's note in a cue is written
+  `((…))` and never shown.
 
 Text, decided 20 Nov 2026:
 

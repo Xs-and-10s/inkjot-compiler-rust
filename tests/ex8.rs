@@ -403,3 +403,34 @@ fn a_reading() {
         show(&s);
     }
 }
+
+/// Every passage can be reached from the notice, along Links and forks,
+/// and every passage but the last leads somewhere: no dead ends but the
+/// record.
+#[test]
+fn every_passage_is_reached_and_only_the_record_ends() {
+    let map = inklink().map();
+    let mut reached = std::collections::BTreeSet::from(["notice".to_string()]);
+    loop {
+        let before = reached.len();
+        for e in &map.edges {
+            if reached.contains(&e.from) {
+                reached.insert(e.to.clone());
+            }
+        }
+        if reached.len() == before {
+            break;
+        }
+    }
+    let nodes: Vec<&str> = map.nodes.iter().map(|n| n.id.as_str()).collect();
+    let unreached: Vec<&&str> = nodes
+        .iter()
+        .filter(|n| !reached.contains(**n) && **n != "Inklink")
+        .collect();
+    assert!(unreached.is_empty(), "never reached: {unreached:?}");
+    let dead_ends: Vec<&&str> = nodes
+        .iter()
+        .filter(|n| **n != "the_record" && !map.edges.iter().any(|e| e.from == **n))
+        .collect();
+    assert!(dead_ends.is_empty(), "dead ends: {dead_ends:?}");
+}

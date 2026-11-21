@@ -407,6 +407,45 @@ fn lint(src: &str) -> Vec<String> {
         }
     }
 
+    // Every declared state is read somewhere: a condition, an insert, an
+    // effect. One nothing reads is a thread the Inker dropped.
+    let text = lines.join("\n");
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim().trim_start_matches("~ ");
+        let Some(rest) = t.strip_prefix("state ") else {
+            continue;
+        };
+        let name: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        // A read is any mention that is not the declaration or a write
+        // (`set x:`, `raise x`, `lower x`, with or without an owner).
+        let reads = text
+            .match_indices(name.as_str())
+            .filter(|(k, _)| {
+                let b = text.as_bytes();
+                let before = *k == 0 || !(b[k - 1].is_ascii_alphanumeric() || b[k - 1] == b'_');
+                let end = k + name.len();
+                let after = end >= b.len() || !(b[end].is_ascii_alphanumeric() || b[end] == b'_');
+                let line_start = text[..*k].rfind('\n').map_or(0, |n| n + 1);
+                let lead = text[line_start..*k].trim_start().trim_start_matches("~ ");
+                let lead = lead.trim_start_matches("then ");
+                let owner = lead.rsplit(' ').next().unwrap_or("");
+                let verb = lead.trim_end_matches(owner).trim_end();
+                let write = ["set", "raise", "lower", "state"].contains(&verb)
+                    && (owner.is_empty() || owner.ends_with('.'));
+                before && after && !write
+            })
+            .count();
+        if reads == 0 {
+            out.push(format!(
+                "line {}: `state {name}` is declared and never read",
+                i + 1
+            ));
+        }
+    }
+
     // A comment just above a header belongs to the passage before it.
     for (i, w) in raw.windows(2).enumerate() {
         if w[0].trim() == ")))" && w[1].starts_with("::") {
@@ -538,4 +577,23 @@ fn a_comment_above_a_header_is_caught() {
         "(((\nHis rules, in the order he finds you.\n)))\n:: dossier_rules [rules]",
     );
     assert!(lint(&src).iter().any(|p| p.contains("under the header")));
+}
+
+#[test]
+fn a_state_nothing_reads_is_caught() {
+    let src = draft("ex8-the-inquest.twee").replace(
+        "state struck: no",
+        "state struck: no\nstate dropped_thread: no",
+    );
+    let src = src.replace(
+        ":: garrard:dined\nset struck: yes",
+        ":: garrard:dined\nset struck: yes\nset dropped_thread: yes",
+    );
+    let problems = lint(&src);
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("`state dropped_thread` is declared and never read")),
+        "{problems:?}"
+    );
 }

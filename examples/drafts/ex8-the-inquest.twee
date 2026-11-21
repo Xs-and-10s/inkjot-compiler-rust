@@ -54,12 +54,12 @@ brief grief: "The witness imagines the other night, and it is worse than the rea
 brief pride: "A gentleman imagines another night and tells it as if it flatters him. It doesn’t. He gives away one true thing without noticing."
 
 character clerk: "the coroner’s clerk" ~ playable ~ custom ~ pronouns chosen
-character martha: "Martha Rudd" ~ playable ~ pronouns she
-character tom: "Tom Rudd" ~ playable ~ pronouns he
+character martha: "Martha Rudd" ~ pronouns she
+character tom: "Tom Rudd" ~ pronouns he
 ~ state count: 0
-character hesketh: "Dr. Hesketh" ~ playable ~ pronouns he
-character fisk: "Ned Fisk" ~ playable ~ pronouns he
-character garrard: "Edmund Garrard" ~ playable ~ pronouns he
+character hesketh: "Dr. Hesketh" ~ pronouns he
+character fisk: "Ned Fisk" ~ pronouns he
+character garrard: "Edmund Garrard" ~ pronouns he
 ~ shown as "the gentleman from the Grange" ~ aka "the Squire", "Mr. Garrard" ~ pick cycle
 
 npc fenwick: "Mr. Fenwick, the coroner" ~ pronouns he
@@ -387,10 +387,13 @@ told: first person
 --
 @fenwick Edward Fisk. Eel-catcher, of Byall Fen. Where were you on the night of the ninth?
 
-[if man_at_frame and fisk_there]
+[if fisk_there]
 They’ve all heard the boy. *Eel-trap.* *Nearly there, sir.* Half the room has bought eels off me. The other half owes me for them.
 
-[if not fisk_there]
+[if man_at_frame and not fisk_there]
+The boy smelled eel-trap at the frame. Nobody has said my name yet. Half the room is looking at my hands.
+
+[if not man_at_frame]
 Nobody has said my name. Nobody needs to. I can feel the back bench looking at my hands.
 
 [end]
@@ -528,7 +531,7 @@ told: second person
 --
 Mr. Fenwick turns his chair to the jury and puts the tips of his fingers together.
 
-@fenwick Gentlemen. You have heard that the pins were {if pins_out then "drawn before ten" else "home at nine, and we do not know after"}. You have heard {if fisk_there then "that a man was at the sluice" else "of no one at the sluice but the deceased"}{if light_on_bank then ", and of a lamp on the bank" else ""}. You have heard the doctor.
+@fenwick Gentlemen. You have heard that the pins were {if pins_out then "drawn before ten" else "home at nine, and we do not know after"}. You have heard {if fisk_there then "that a man was at the sluice" else "of no one at the sluice but the deceased"}{if light_on_bank then ", and of a lamp on the bank" else ""}. You have heard the doctor{if a_fall then " say he struck the beam" else if a_blow then " speak of a blow" else ""}.
 
 @fenwick Your verdict must rest on what has been said in this room. Not on what you have heard in the Plough these five nights. On what has been said in this room.
 
