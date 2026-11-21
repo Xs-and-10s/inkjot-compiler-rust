@@ -9,6 +9,23 @@
   appended after a wait carries its own; the same through the NIF. Times
   may be decimal (`1.5s`) (#36).
 
+### Ex 7
+
+- *Mafia, by Lamplight*, drafted (`examples/drafts/ex7-mafia.twee`): ten
+  syndicates, four that change the rules, three ways to moderate, and
+  `where:` in nearly every Link. Linted with the other drafts.
+- Last bug pass: the Doppelgänger's swap now happens before the morning
+  report; debts fall due at nightfall, a full day after marking; the
+  syndicate's size counts players only, after the deal; teammates are
+  found by team (so the cult sees the cult); a saved guest keeps their
+  keepsake; a tied vote is drawn, so every game ends. `tests/ex7_rules.rs`
+  plays the rules out for every syndicate at 5 to 12 players: every game
+  ends, and both sides can win everywhere.
+- The save now stops every special's night choice, which lands in the
+  morning rather than on its Link: the Debt Collectors' Doctor is the Old
+  Landlord, who takes someone in, and the Cult's is the One Who Left, who
+  sits up with someone through the night.
+
 ### Ex 8
 
 - *The Inquest*, drafted (`examples/drafts/ex8-the-inquest.twee`): a

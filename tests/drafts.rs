@@ -465,6 +465,11 @@ fn the_public_cut_of_ex6_lints_clean() {
 }
 
 #[test]
+fn ex7_lints_clean() {
+    assert_eq!(lint(&draft("ex7-mafia.twee")), Vec::<String>::new());
+}
+
+#[test]
 fn ex8_lints_clean() {
     assert_eq!(lint(&draft("ex8-the-inquest.twee")), Vec::<String>::new());
 }
