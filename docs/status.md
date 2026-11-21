@@ -81,8 +81,11 @@ Syndicates name no real living people or real present-day gangs, and use
 original names rather than those from films and songs.
 
 **Ex 7, *Mafia, by Lamplight*.** Drafted 21 Nov
-(`examples/drafts/ex7-mafia.twee`), in review. What it asks of v0.6 beyond
-the plan is in the drafts README.
+(`examples/drafts/ex7-mafia.twee`); ready (#37). The save stops every
+special's night choice; the Debt Collectors' Doctor is the Old Landlord
+and the Cult's is the One Who Left. `tests/ex7_rules.rs` plays its rules:
+every game ends, and both sides can win with every syndicate at 5 to 12
+players. What it asks of v0.6 beyond the plan is in the drafts README.
 
 **Ex 8, *The Inquest*.** Drafted 21 Nov (`examples/drafts/ex8-the-inquest.twee`),
 in review. Runs on today's engine bar five unbuilt constructs
@@ -106,6 +109,15 @@ can be crossed a few times, with warnings, then falls in. No dead ends:
 every collapse leaves another way, by magic or by engineering, checked by
 random playthroughs. The guardian can be fought, sneaked past, bargained
 with or outrun.
+
+**Ex 9, *Saltmarrow*.** Drafted 21 Nov
+(`examples/drafts/ex9-saltmarrow.twee`), in review. Fifteen places, four
+timbered; nineteen spells, five of them greater workings; the Gleaner; the
+Brinewarden, who can also be left the shard. `tests/ex9_map.rs` plays it
+at random and searches for a way out from wherever play stops: no dead
+ends, with the pick or without. `define`'s second test is in
+`docs/define.md`: step 2 (typed fields on archetypes) earns its place;
+step 3 stays optional.
 
 **`where:`** is used heavily where the rules, not the Inker, pick which of
 many things: targets in a social game, an NPC choosing loot, a fire or a

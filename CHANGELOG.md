@@ -26,6 +26,19 @@
   Landlord, who takes someone in, and the Cult's is the One Who Left, who
   sits up with someone through the night.
 
+### Ex 9
+
+- *Saltmarrow*, drafted (`examples/drafts/ex9-saltmarrow.twee`): a
+  Zork-like `game` in general words, with nineteen spells paid for in
+  salt, fire that spreads through timber, shafts that fall after three
+  burnt crossings, the Gleaner, and the Brinewarden. Linted with the other
+  drafts. `tests/ex9_map.rs` plays it at random and checks there are no
+  dead ends, with the pick or without, and that the spellbook's numbers
+  agree with what the spells do.
+- `define`, tested on its spellbook (`ex9-spellbook-define.twee`,
+  `docs/define.md`): typed fields earn their place; the word itself stays
+  optional.
+
 ### Ex 8
 
 - *The Inquest*, drafted (`examples/drafts/ex8-the-inquest.twee`): a

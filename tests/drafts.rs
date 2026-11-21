@@ -475,6 +475,11 @@ fn ex8_lints_clean() {
 }
 
 #[test]
+fn ex9_lints_clean() {
+    assert_eq!(lint(&draft("ex9-saltmarrow.twee")), Vec::<String>::new());
+}
+
+#[test]
 #[ignore = "lints the draft named by INKJOT_DRAFT"]
 fn a_draft_from_elsewhere() {
     let path = std::env::var("INKJOT_DRAFT").expect("INKJOT_DRAFT names a .twee file");

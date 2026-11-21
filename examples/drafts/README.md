@@ -135,6 +135,69 @@ few into what they will mean and runs the rest on today's engine: its own
 that every reading, whatever is said and supposed, reaches exactly one
 verdict and ends on the record.
 
+## Ex 9: Saltmarrow (`ex9-saltmarrow.twee`)
+
+A Zork-like solo `game`, in general words only. Saltmarrow is an old salt
+mine under a fen town, and its salt holds spells: a working is paid for
+with a crystal on the tongue. Agnes Thwaite, the last saltwright, went down
+three days ago; you go after her, with her lamp, her primer and four
+crystals.
+
+Fifteen places on three levels, four of them timbered; nineteen spells,
+fourteen of them learned from carvings, notes and charms across the mine,
+five of them greater workings made of two; the Gleaner, who wanders the
+upper workings with a candle and steals tools; firedamp in the north
+drift; and the Brinewarden, who lets anyone down and nobody up with
+marrow salt. It can be fought (fresh water unmakes salt), sneaked past (it
+feels warmth and hears footsteps), bargained with (it was never paid), or
+outrun (it walks only on salt). Or the shard can be left behind.
+
+Fire is the game's weather. A flame near dry timber (the lamp, a spell,
+the Gleaner's candle, the firedamp) starts a fire that smoulders, burns,
+blazes, reaches the next timbered place, and burns out. A burnt shaft can
+be crossed three more times, the mice leaving one by one, and then falls
+in behind you. No dead ends: every way that can fall has another beside
+it, by magic or by engineering.
+
+**Checked by playing it.** `tests/ex9_map.rs` reads the map, the ways, the
+items, the spells' costs and where each is learned from the draft, plays
+at random with fires, thefts and falling shafts, then searches for a way
+to bring Thwaite out, once with the pick and once without (it can break,
+and must never be the only way). It found three dead ends while the draft
+was written: stranded on the surface with the ladderway down (now: the
+cage rope always goes down); stranded in the deep with no spell to drain
+the stair (now: Thwaite teaches *draw* when you find her); out of salt in
+the deep (now: salt regrows in the Marrow). Undo any of the three and it
+fails.
+
+What it asks of v0.6, beyond the plan and the encounter milestone:
+
+| Construct | Example |
+|---|---|
+| A duration on an effect | `set me.hushed: yes ~ for 4 turns`, `cover me ~ for 3 turns` |
+| A delay on an effect | `set planks_out: yes ~ after 2 turns` |
+| Spreading from a set, one way only | `spreads 1 from ablaze to nearest(place, where: …) ~ along way ~ within 1` |
+| Handlers on a kind, naming the thing | `on enter shaft when entered.burnt`, `on leave shaft when left.crossings == 0` |
+| Handlers on an NPC's move | `on move warden when warden.roused and warden.here` |
+| Taking and dropping, offered like moves | `default takes: take, drop` |
+| Links offered everywhere | `> ~ for apprentice ~ everywhere`, the spellbook's Links |
+| Items that come in a number | `item stave: … ~ count 4`, `count(stave, held by: me)`, `lose stave 2` |
+| A recipe with a part twice | `recipe stretcher: stave, stave, sacking` |
+| A tool used by a Link, so it may break | `[[Dig at the fall->…]] ~ uses pick` with `item pick: … ~ breaks 1 in 6` |
+| A resource counted in a noun | `resource salt: 4 ~ counted as "crystal"` |
+| A table read as a value | `table rank: score ~ 0..=19: "a lamp carrier"`, then `{rank}` |
+| A place's way toward another | `here.toward(out)`, for Dowse |
+| NPCs that follow and pursue | `~ follows me when …`, `~ moves toward me 1 every 2 turns … ~ where: it.salted` |
+| Kinds of item, for `where:` | `~ catches` (a flame takes), `~ burns` (a fire destroys) |
+
+**`define`, tested again.** `ex9-spellbook-define.twee` writes the
+spellbook with typed fields and the word `spell`. Leaving comments out, 90
+lines in general words against 80. The difference that matters is not
+length: in general words each spell says its numbers twice, once in the
+book ("Lasts 4 turns", "Power 2") and once in its effect, and the two can
+drift. `tests/ex9_map.rs` checks they agree, which is the cost of the
+general words. Verdict in `docs/define.md`.
+
 ## Ex 6, the public cut: Cloakroom (`ex6-cloakroom.twee`)
 
 The full Ex 6, *Seven Names*, lives in the Inklinks Library. This is a
