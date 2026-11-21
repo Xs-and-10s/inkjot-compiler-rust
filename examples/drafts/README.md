@@ -59,6 +59,43 @@ quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
 margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.
 v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
 
+## Ex 7: Mafia, by Lamplight (`ex7-mafia.twee`)
+
+The party game for 5 to 12 Linkers, with the engine as the moderator. Each
+game draws a syndicate from a shuffled table of ten. The syndicate sets
+the place and year, the roles' titles, how people die, and a list of
+flourishes for each death, so the theme builds as the bodies fall. Four
+special syndicates change the rules:
+
+- **the Doppelgänger Clan**: a killer takes the victim's face, so the
+  morning reports the wrong death;
+- **the Debt Collectors**: they mark instead of killing, and a marked
+  name dies at the next nightfall unless someone pays with their vote;
+- **the Cult of the Long Night**: they convert instead of killing, and
+  only someone who voted with them that day;
+- **the Heist Crew**: no deaths; three keepsakes stolen from the players'
+  piles and they win.
+
+Three ways to moderate: the engine's tables; MonkeyPaw, writing each
+morning fresh with the table's line as the fallback; or a Storyteller who
+plays no role, sees everything, and may rewrite each morning's report.
+Whispers, a rumour that spreads one seat a day, is always on offer once a
+game.
+
+**`where:` is the heart of it.** Nearly every choice is "one of the
+players who…", so nearly every Link is `~ at guest where: …`. The config's
+opening note teaches the difference: *which* is `where:`, *whether* is
+`when`.
+
+What it asks of v0.6, beyond the plan: one character per Linker
+(`~ one per linker`); a seating ring to spread along; decks sized by
+expressions; tables of text with named columns (`{syndicate.mafia}`);
+lists picked like `aka` (`{one syndicate.deaths}`); Link groups for whoever
+`where:` says, choosing together (`~ consensus`); a pending passage that
+is not a fork (a morning MonkeyPaw writes); a `shown_as` that can be set
+(the Doppelgänger's swap); `voters:` on the jury; a seat that exists only
+in one mode (the Storyteller).
+
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 
 A short solo `story` written for Inquests, in place of the withdrawn Ex 4.

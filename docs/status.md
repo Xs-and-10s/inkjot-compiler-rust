@@ -80,6 +80,10 @@ and may rewrite each morning's report. Whispers is an optional variant.
 Syndicates name no real living people or real present-day gangs, and use
 original names rather than those from films and songs.
 
+**Ex 7, *Mafia, by Lamplight*.** Drafted 21 Nov
+(`examples/drafts/ex7-mafia.twee`), in review. What it asks of v0.6 beyond
+the plan is in the drafts README.
+
 **Ex 8, *The Inquest*.** Drafted 21 Nov (`examples/drafts/ex8-the-inquest.twee`),
 in review. Runs on today's engine bar five unbuilt constructs
 (`tests/ex8.rs`). Found while writing it: an `[act]` passage cannot offer

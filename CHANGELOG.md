@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Ex 7
+
+- *Mafia, by Lamplight*, drafted (`examples/drafts/ex7-mafia.twee`): ten
+  syndicates, four that change the rules, three ways to moderate, and
+  `where:` in nearly every Link. Linted with the other drafts.
+
 ### Ex 8
 
 - *The Inquest*, drafted (`examples/drafts/ex8-the-inquest.twee`): a
