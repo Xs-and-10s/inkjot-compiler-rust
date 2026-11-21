@@ -59,6 +59,29 @@ quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
 margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.
 v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
 
+## Ex 6, the public cut: Cloakroom (`ex6-cloakroom.twee`)
+
+The full Ex 6, *Seven Names*, lives in the Inklinks Library. This is a
+small story of its own with the same machinery, so the public tests can
+cover it: New Year's Eve, 1961, a lakeside hotel, the cloakroom
+attendant, one evening and three names.
+
+What it exercises: two knowledge bases racing (your notebook, `~ per
+linker ~ manual ~ reads knows`; the assistant manager's dossier, fed by
+the doorman and the cigarette girl); integrity constraints that refuse
+or flag notes; facts with a time (`{{ orme at bar @ new_years_eve.ten }}`);
+uneven periods made of periods (`period evening: new_years_eve ~ of
+hour`) and a clock written in their names; all three forms of redaction;
+blockquotes; pronouns and `possessive()`; `person`, `where:` and
+quantifiers ending in a dot; `~ at` and Link groups; a death that falls
+back to the start of the hour, keeping the notebook; `finale when:`;
+`expect events:`.
+
+`tests/drafts.rs` lints it on every run (fact shapes, times, how a base
+is asked, quantifiers, speech cues, Link targets, tested labels, comment
+placement), with mutation properties that check the lint catches each
+kind of slip anywhere in the file.
+
 ## Ex 2's duel, four ways (`ex2-duel-*.twee`)
 
 The duel of Ex 2 rewritten for the encounter milestone: once in general

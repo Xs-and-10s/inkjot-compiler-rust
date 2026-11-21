@@ -54,7 +54,7 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
 
 | Ex | What | Lives | Tests most |
 |---|---|---|---|
-| 6 | *Seven Names*, spy-noir `story-game`, solo | Mark previews it: if it is very good, the Library, with a short public cut here; else here | knowledge bases, integrity constraints, redaction, blockquotes, pronouns and `possessive()`, `reveal` and `aka`, uneven periods, `expect events:` |
+| 6 | *Seven Names*, spy-noir `story-game`, solo | the Library (decided 21 Nov); its public cut, *Cloakroom* (`examples/drafts/ex6-cloakroom.twee`), here | knowledge bases, integrity constraints, redaction, blockquotes, pronouns and `possessive()`, `reveal` and `aka`, uneven periods, `expect events:` |
 | 7 | *Mafia*, `game`, 5 to 12 Linkers | here; the Library later, under a Creative Commons licence, if the themes come off | decks and private piles, night and day, `{present linker}`, per-Linker knowledge, `where:` (its showcase), `\|` in filters, quantifiers, `finale when:`, tables |
 | 8 | *The Inquest*, `story`, solo, short | here; a longer literary version may go to the Library | forks (written and pending), analysis tags, `theme`, `brief`, `[if …; then …]`, emphasis, `~ track`, presentation hints |
 | 9 | *Saltmarrow*, Zork-like `game`, solo | here | the encounter words, `spreads`, recipes, `~ breaks`, dice and tables, plural irregulars, and `define`'s next test (a spellbook) |
@@ -246,7 +246,17 @@ Inklog and time, from Ex 6 (21 Nov 2026):
   P }}`; several of one kind with commas, kinds in a row with dots: `some
   P, Q. all R. …`. The dot must be followed by a space, which tells it from
   `P.name`.
-- **Proposed.** A period made of another names it: `period day: monday, …
+- **Decided** (21 Nov). Periods made of periods: `period day: monday, …
+  saturday ~ of watch`; the clock's range in their names; inline
+  redaction with braces. (Arithmetic in `src/period.rs`, with property
+  tests; the checker and interpreter use it when periods are built.)
+- **Found** (21 Nov, reviewing Ex 6). A base is asked with `in`, no tilde:
+  `{{ you must_go }} in dossier`, `assert {{ … }} in dossier`, `{{ ? is
+  ashe }} in notebook`. Written `~ in dossier`, the tilde starts a new
+  clause and cuts the condition in two. `~ in dossier` stays right where
+  it is a clause: on a `rule` or a `never`. `you.notebook {{ … }}` is
+  dropped for the same form. `tests/drafts.rs` enforces it in drafts.
+- **Was proposed** (now decided above). A period made of another names it: `period day: monday, …
   saturday ~ of watch` (one round of watches each), so nothing is counted
   or pluralised; a number still means turns (`~ 3 each`). The clock's range
   in those names: `clock: monday.morning ..= saturday.night`. Reading:

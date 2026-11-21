@@ -11,6 +11,7 @@ pub mod expr;
 pub mod ir;
 pub mod json;
 pub mod migrate;
+pub mod period;
 pub mod resolve;
 pub mod run;
 mod syntax;
