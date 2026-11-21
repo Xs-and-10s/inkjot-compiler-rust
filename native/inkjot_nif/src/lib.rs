@@ -17,7 +17,9 @@
 //!   (`:not_offered`), `at` the index of the refused action in a replay,
 //!   else `nil`. A term of the wrong shape raises `ArgumentError`.
 
-use inkjot::engine::{Action, Event, Inklink, Para, Refused, Start, State, View, ENGINE_VERSION};
+use inkjot::engine::{
+    Action, Event, Inklink, Para, Pause, Refused, Start, State, View, ENGINE_VERSION,
+};
 use inkjot::json::Value;
 use rustler::{Atom, Binary, Encoder, Env, NifResult, ResourceArc, Term};
 
@@ -101,8 +103,21 @@ fn para_term<'a>(env: Env<'a>, p: &Para) -> Term<'a> {
         &[
             ("plain", p.plain().encode(env)),
             ("runs", runs_term(env, p)),
+            ("pause", pause_term(env, p.pause)),
+            ("verse", p.verse.encode(env)),
         ],
     )
+}
+
+/// A wait before a paragraph or run: `nil`, or `%{ms: 2000, kind: "after"}`.
+fn pause_term<'a>(env: Env<'a>, pause: Option<Pause>) -> Term<'a> {
+    match pause {
+        Some(p) => atom_map(
+            env,
+            &[("ms", p.ms.encode(env)), ("kind", p.kind.encode(env))],
+        ),
+        None => rustler::types::atom::nil().encode(env),
+    }
 }
 
 /// A paragraph's runs: `[%{text: "…", style: ["italic"]}]`.
@@ -113,7 +128,11 @@ fn runs_term<'a>(env: Env<'a>, p: &Para) -> Term<'a> {
         .map(|r| {
             atom_map(
                 env,
-                &[("text", r.text.encode(env)), ("style", r.style.encode(env))],
+                &[
+                    ("text", r.text.encode(env)),
+                    ("style", r.style.encode(env)),
+                    ("pause", pause_term(env, r.pause)),
+                ],
             )
         })
         .collect();

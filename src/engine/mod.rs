@@ -42,7 +42,7 @@ use std::sync::Arc;
 
 use crate::json::{self, Value};
 use crate::run::{Ask, Run, Story};
-pub use crate::run::{Edge, Node, Para, Span, StoryMap};
+pub use crate::run::{Edge, Node, Para, Pause, Span, StoryMap};
 
 /// The engine's version. Logs recorded under one version replay the same
 /// way under it; the platform records it with every reading.

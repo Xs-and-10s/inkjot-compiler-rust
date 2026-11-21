@@ -7,6 +7,13 @@
 //!
 //! `plain()` flattens a paragraph for the terminal and for `expect text:`:
 //! styles drop away, except that struck text is written `~~like this~~`.
+//!
+//! Pacing rides along, so a runtime that reads only the view can pace the
+//! text: `[after 2s]` and `[beat 2s]` become a `Pause` on the next
+//! paragraph (a wait after the one before it is shown), or on a run when
+//! the text is appended to the paragraph before (`[after 2s; append]`:
+//! "He winds it once, twice— *(two seconds)* The lights die."). `[verse]`
+//! marks its paragraphs as lines of verse.
 
 /// A stretch of text in one style.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -14,12 +21,45 @@ pub struct Span {
     pub text: String,
     /// `italic`, `bold`, `struck`, in that order; empty for plain text.
     pub style: Vec<&'static str>,
+    /// A wait before this run is shown, within its paragraph. Only a run
+    /// appended after a pause has one; a paragraph's own wait is its
+    /// `pause`.
+    pub pause: Option<Pause>,
+}
+
+/// A wait in the text: `[after 2s]` or `[beat 2s]`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pause {
+    /// How long, after what came before is shown.
+    pub ms: u32,
+    /// `after` (the text simply waits) or `beat` (a dramatic pause, which a
+    /// runtime that reveals on tap may let the reader skip).
+    pub kind: &'static str,
+}
+
+impl Pause {
+    /// `2s`, `1.5s`, `400ms`: a wait in milliseconds.
+    pub fn parse(time: &str, kind: &'static str) -> Option<Pause> {
+        let t = time.trim();
+        let ms = match t.strip_suffix("ms") {
+            Some(n) => n.trim().parse::<f64>().ok()?,
+            None => t.strip_suffix('s')?.trim().parse::<f64>().ok()? * 1000.0,
+        };
+        (ms.is_finite() && (0.0..=3_600_000.0).contains(&ms)).then(|| Pause {
+            ms: ms.round() as u32,
+            kind,
+        })
+    }
 }
 
 /// One paragraph.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Para {
     pub runs: Vec<Span>,
+    /// A wait before this paragraph is shown, after the one before it.
+    pub pause: Option<Pause>,
+    /// A line of verse (`[verse]`): kept as a line, set close to the next.
+    pub verse: bool,
 }
 
 impl Para {
@@ -44,14 +84,24 @@ impl Para {
             _ => self.runs.push(Span {
                 text: text.to_string(),
                 style,
+                pause: None,
             }),
         }
     }
 
-    /// Add another paragraph's runs after this one's.
+    /// Add another paragraph's runs after this one's. Its pause, if any,
+    /// goes on its first run, so the wait still happens mid-paragraph.
     pub fn extend(&mut self, other: Para) {
+        let mut pause = other.pause;
         for run in other.runs {
-            self.push(&run.text, &run.style);
+            match pause.take() {
+                Some(p) if !run.text.is_empty() => self.runs.push(Span {
+                    pause: Some(p),
+                    ..run
+                }),
+                Some(p) => pause = Some(p),
+                None => self.push(&run.text, &run.style),
+            }
         }
     }
 
@@ -100,6 +150,31 @@ mod tests {
         assert_eq!(p.runs[1].text, "bc");
         assert_eq!(p.runs[1].style, ["italic", "bold"]);
         assert_eq!(p.plain(), "a bc d");
+    }
+
+    #[test]
+    fn times_read_as_milliseconds() {
+        let ms = |t| Pause::parse(t, "after").map(|p| p.ms);
+        assert_eq!(ms("2s"), Some(2000));
+        assert_eq!(ms("1.5s"), Some(1500));
+        assert_eq!(ms("400ms"), Some(400));
+        assert_eq!(ms("0s"), Some(0));
+        assert_eq!(ms("2"), None);
+        assert_eq!(ms("soon"), None);
+        assert_eq!(ms("-1s"), None);
+    }
+
+    #[test]
+    fn an_appended_paragraph_keeps_its_pause_on_its_first_run() {
+        let mut p = Para::plain_text("He winds it once, twice—");
+        let mut more = Para::plain_text("The lights die.");
+        more.pause = Pause::parse("2s", "after");
+        p.push(" ", &[]);
+        p.extend(more);
+        assert_eq!(p.runs.len(), 2);
+        assert_eq!(p.runs[0].pause, None);
+        assert_eq!(p.runs[1].pause.map(|x| x.ms), Some(2000));
+        assert_eq!(p.plain(), "He winds it once, twice— The lights die.");
     }
 
     #[test]

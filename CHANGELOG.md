@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Engine
+
+- Pacing reaches the view: each paragraph carries `pause` (`[after 2s]`,
+  `[beat 2s]`, a wait after the paragraph before) and `verse`, and a run
+  appended after a wait carries its own; the same through the NIF. Times
+  may be decimal (`1.5s`) (#36).
+
 ### Ex 7
 
 - *Mafia, by Lamplight*, drafted (`examples/drafts/ex7-mafia.twee`): ten
