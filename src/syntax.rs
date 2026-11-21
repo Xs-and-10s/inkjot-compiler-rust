@@ -176,6 +176,7 @@ pub(crate) const BUILTIN_ACTS: &[&str] = &["walk", "dash", "slip", "observe", "t
 
 /// Tags the engine gives things itself.
 pub(crate) const BUILTIN_TAGS: &[&str] = &[
+    "person",
     "linker",
     "living",
     "character",

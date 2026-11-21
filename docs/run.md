@@ -197,6 +197,8 @@ The words agendas lean on:
   play, the character you are not looking through is unwatched.
 - `nearest(living)`: the nearest living thing the NPC can reach (by its
   goal's `via`), other than itself and its own kind.
+- `person`: any character or NPC, living or not. Built in, like `linker`
+  and `living`; an Inklink does not declare it.
 - `living`: characters and NPCs not dead and not tagged `lifeless`. A tag on
   an archetype counts for everything like it: `archetype statue: ~ lifeless`.
 - `alone_with(a, b)`: the two share a place, and no other Linker or awake
