@@ -292,7 +292,7 @@ The Ford
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 state crossed: no
 state coins: 3
 state toll: 1.5

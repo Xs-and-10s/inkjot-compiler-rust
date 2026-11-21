@@ -6,7 +6,7 @@
 //! has to know that the phrase was "held by".
 //!
 //! The vocabulary is one table, [`PATTERNS`]. A phrase that matches nothing
-//! becomes a tag if it is one word (`evidence`, `playable`), and otherwise
+//! becomes a tag if it is one word (`evidence`, `selectable`), and otherwise
 //! goes to `other`, so nothing is ever silently dropped.
 
 use std::collections::HashSet;
@@ -90,6 +90,9 @@ const PATTERNS: &[Pattern] = &[
     // Conditions.
     p(&["when"], "when", Shape::Expr),
     p(&["hidden", "until"], "hidden_until", Shape::Expr),
+    p(&["redacted", "until"], "redacted_until", Shape::Expr),
+    // `~ keep case`: a name the engine never capitalises (`e. e. cummings`).
+    p(&["keep", "case"], "keep_case", Shape::Flag),
     p(&["fixed", "until"], "fixed_until", Shape::Expr),
     p(&["offstage", "until"], "offstage_until", Shape::Expr),
     p(&["open", "when"], "open_when", Shape::Expr),

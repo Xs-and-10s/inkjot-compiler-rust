@@ -26,7 +26,7 @@ spot under_table: "under the buffet table"
 spot chair: "the armchair by the window"
 spot mantel: "the mantel"
 
-character skittles: "Skittles" ~ playable ~ kitten ~ formally "Skittles"
+character skittles: "Skittles" ~ selectable ~ kitten ~ formally "Skittles"
 npc leo: "Leo" ~ formally "Leon" ~ aka "Leo-Leo Beans", "Lapkins", "Leonardo DiCattrio", "Le Le Le Leo"
 npc jojo: "Jojo" ~ formally "Joseph" ~ aka "Jojo Bear", "Juju", "The Joker", "Uncle Joe"
 npc lenny: "Lenny" ~ formally "Vladimir" ~ aka "that awful stray" ~ offstage until testament

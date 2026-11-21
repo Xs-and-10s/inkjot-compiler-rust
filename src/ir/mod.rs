@@ -463,6 +463,11 @@ impl Builder {
                 .trim();
             Value::str(quoted(text).unwrap_or(text))
         });
+        // `narration: first person` in a passage tells that passage only.
+        let narration = stmts
+            .iter()
+            .position(|s| s.kw == "narration")
+            .map(|i| narration(&stmts.remove(i)));
         let mut pairs = vec![
             ("name".to_string(), Value::str(&p.name)),
             (
@@ -482,6 +487,10 @@ impl Builder {
         }
         if let Some(title) = title {
             pairs.insert(1, ("title".to_string(), title));
+        }
+        if let Some(narration) = narration {
+            let at = pairs.iter().position(|(k, _)| k == "margin").unwrap_or(1);
+            pairs.insert(at, ("narration".to_string(), narration));
         }
         Value::Obj(pairs)
     }
@@ -631,6 +640,22 @@ impl Builder {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
             "hint" => f.add("hint", quoted_styled(value).unwrap_or(Value::str(value))),
+            "narration" => {
+                f.add("setting", Value::str("narration"));
+                f.add("value", narration(s));
+                return Value::Obj(f.into_pairs());
+            }
+            // `cue names: capital, bold` → `{"setting": "cue", "of": "names", "value": […]}`.
+            "cue" => {
+                let (of, list) = rest.split_once(':').unwrap_or((rest, ""));
+                f.add("setting", Value::str("cue"));
+                f.add("of", Value::str(of.trim()));
+                f.add(
+                    "value",
+                    strings(list.split(',').map(str::trim).filter(|w| !w.is_empty())),
+                );
+                return Value::Obj(f.into_pairs());
+            }
             "tags" => {
                 let all =
                     std::iter::once(value).chain(s.clauses[1..].iter().map(|c| c.text.as_str()));
@@ -743,6 +768,8 @@ impl Builder {
                                 text = after.trim_start();
                             }
                         }
+                        // `@you`, `@i`: the pov, which the IR always calls `me`.
+                        let who = if POV_NAMES.contains(&who) { "me" } else { who };
                         out.push(Value::obj([
                             ("type", Value::str("speech")),
                             ("who", Value::str(who)),
@@ -1195,6 +1222,21 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
     ])
 }
 
+/// `narration: second person ~ omniscient` → `{"person": "second", "omniscient": true}`.
+fn narration(s: &Stmt) -> Value {
+    let head = s.clauses[0].text["narration".len()..]
+        .trim_start_matches(':')
+        .trim();
+    let person = head.split_whitespace().next().unwrap_or("");
+    Value::obj([
+        ("person", Value::str(person)),
+        (
+            "omniscient",
+            Value::Bool(s.clauses[1..].iter().any(|c| c.text == "omniscient")),
+        ),
+    ])
+}
+
 /// A `[modifier]` line: `{"type": "modifier", "parts": [{"name": "if", "when": …}, …]}`.
 fn modifier(text: &str) -> Value {
     // Strip exactly one bracket from each end: `[if x == [a, b]]` ends in two.
@@ -1214,6 +1256,23 @@ fn modifier(text: &str) -> Value {
             }
             "after" | "beat" if !rest.is_empty() => pairs.push(("time".into(), Value::str(rest))),
             "reveal" => pairs.push(("mode".into(), Value::str(rest))),
+            // `[if c; then e]`: the effect, done when the block is shown.
+            "then" => pairs.push(("effect".into(), effect(rest))),
+            // `[quote letter ~ by "A. K."]`.
+            "quote" => {
+                let (kind, by) = rest.split_once('~').unwrap_or((rest, ""));
+                pairs.push(("kind".into(), Value::str(kind.trim())));
+                let by = by.trim().strip_prefix("by ").map(str::trim);
+                pairs.push((
+                    "by".into(),
+                    by.and_then(quoted_styled).unwrap_or(Value::Null),
+                ));
+            }
+            // `[redacted until c]`: hidden as a bar while c does not hold.
+            "redacted" => pairs.push((
+                "until".into(),
+                expression(rest.strip_prefix("until").unwrap_or(rest).trim()),
+            )),
             _ => {}
         }
         Value::Obj(pairs)
@@ -1277,6 +1336,18 @@ fn insert(content: &str) -> Value {
             ),
             ("args", insert_args(&c[first.len()..])),
         ]),
+        // `{redacted "TEN" until telegram.dry}`: text shown as a bar until c.
+        "redacted" => {
+            let text = c["redacted".len()..].trim_start();
+            let end = crate::text::string_end(text, 0).unwrap_or(text.len().saturating_sub(1));
+            let inner = text.get(1..end).unwrap_or("");
+            let until = text[end + 1..].trim().trim_start_matches("until").trim();
+            Value::obj([
+                ("insert", Value::str("redacted")),
+                ("text", parts(inner)),
+                ("until", expression(until)),
+            ])
+        }
         // The jury and the inputs take typed arguments.
         "accuse" => Value::obj([
             ("insert", Value::str("accuse")),

@@ -49,6 +49,9 @@ expect text: "I told you it was good."
 | `answer: "Mara"` | Answer the first open input with text |
 | `answer: gust, spark, hush` | …or with the things chosen |
 | `vote: vell ~ how device ~ proof cufflink` | Cast a ballot for the jury, citing proof |
+| `expect events: ending_reached, died` | The engine reported these since the last action (`docs/engine.md`, Events) |
+| `expect fork: "Suppose …" ~ for "Say …"` | An Inquest here would offer this fork, standing in for that Link |
+| `take fork: "Suppose …"` | Take a fork, as an Inquest would. The Inquest itself is the platform's to spend |
 
 `inkjot check` checks tests like any other passage, so a misspelled label's
 passage, an undeclared name or a malformed effect is caught before anything
@@ -153,6 +156,69 @@ not past a block that is not shown, which takes its pause with it. `[verse]`
 marks its paragraphs as lines of verse. The runtime does the waiting, lets
 a reader skip ahead, and shows everything at once for a reader who asks for
 reduced motion.
+
+**Names at the start of a sentence** are capitalised: "{foreman} stands"
+reads "The foreman stands", and so does a speech cue, `@foreman`. A
+sentence starts at the start of a paragraph, or after `.`, `!`, `?` or `:`
+and a space, with any opening quote marks between. `~ keep case` on a name
+opts out (`npc poet: "ee cummings" ~ keep case`). A list's entries are
+shown as written, being entries, not sentences.
+
+**Speech cues** are styled by the config: `cue names: capital, bold` and
+`cue directions: italic`, each a list of `capital`, `upper`, `bold` and
+`italic`. Names are capitalised whatever the list says. A direction is
+shown, in its parentheses: `@fenwick (to you)` reads "Mr. Fenwick (to
+you): …".
+
+**`narration:`** says whose words the engine writes for the pov: `@you`
+(and `@me`, `@i`, or the pov's own name in a cue) and `{me}`. `narration:
+second person` reads "You: …" and "you"; `first person` reads "I: …", and
+`{me}` as "I" at the start of a sentence and "me" elsewhere; `third person`,
+or nothing said, reads the pov's name. Prose is written by hand in whatever
+person it is. A passage may say its own (`narration: first person` in its
+header, for a witness's testimony), and its sub-Nibs (`martha:tom_out`) are
+told as it is. `~ omniscient` may follow, for analysis; play ignores it.
+
+**`[if c; then e]`** shows its block when c holds, and does e when the
+block is shown; `[unless c; then e]` is its mirror. Effects in a passage
+happen top to bottom as it is shown, so one block may unlock the next:
+
+```
+[if not rang; then set rang: yes]
+The bell rings.
+[if rang; then raise counted 1]
+Someone counts.
+```
+
+Nothing is done while the interpreter only works out which Links are on
+offer.
+
+**Blocks.** An `[if]` chain is flat: another `[if]` in the same chain starts
+it over, and `[else]` is the chain's. `[quote …]` and `[redacted until …]`
+open blocks. `[end]` closes whatever opened last, the chain or the block,
+so an `[if]` inside a quote ends before the quote does, and a quote inside
+an `[if]` before the `[if]` does (Ex 8's struck letter). Nothing inside a
+chain or block that is not shown is shown. A block left open is an error.
+
+**Blockquotes:** `[quote letter ~ by "E. Garrard"]` … `[end]`, of kind
+`sign`, `letter`, `poster` or `edict`. Each paragraph inside carries its
+quote (`kind`, `by`, and `first` on the one that begins it), so a runtime
+draws the letter or the edict as one block.
+
+**Redaction**, three ways:
+
+- `[redacted until record_closed]` … `[end]`: the paragraphs inside, while
+  `record_closed` does not hold. A speaker's name is kept; what they said
+  is not.
+- `{redacted "TEN" until telegram.dry}`: a few words in a line.
+- `npc organist: "the Organist" ~ redacted until telegram.dry`: the name,
+  wherever it is shown (`{organist}`, `@organist`, a list entry).
+  `{organist.name}` is still the name: asking for it is asking.
+
+Redacted text never reaches the page. In its place is a run of `█`, one
+for each character hidden, styled `redacted`, which a runtime draws as a
+bar. Only the length is given away. When the condition holds, the text is
+shown as written.
 
 **`aka`.** `{leo.aka}` picks one of his names by his `~ pick` policy:
 `shuffled` (the default: each name once, in a seeded order, then again),
@@ -481,7 +547,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - Talking between Linkers, and the `turn limit` timeout: both belong to the
   platform, which runs in real time.
 - `span` and `quiet` on handlers (reserved).
-- Inquests: hidden forks a Linker can ask for (`~ inquest`).
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.

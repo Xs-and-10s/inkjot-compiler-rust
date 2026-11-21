@@ -13,7 +13,7 @@ Kinds
 kind: story
 mode: solo
 pov: ann
-character ann: "Ann" ~ playable
+character ann: "Ann" ~ selectable
 npc bo: "Bo" ~ in hall
 npc cy: "Cy" ~ in hall ~ lifeless
 npc di: "Di" ~ in yard

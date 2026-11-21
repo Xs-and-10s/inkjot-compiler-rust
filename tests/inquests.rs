@@ -15,7 +15,7 @@ The Ford
 kind: story
 mode: solo
 pov: nell
-character nell: "Nell" ~ playable
+character nell: "Nell" ~ selectable
 resource inquests: 3
 theme mercy: "Who deserves saving"
 state trust: 0 ~ track

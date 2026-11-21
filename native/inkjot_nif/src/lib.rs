@@ -18,7 +18,7 @@
 //!   else `nil`. A term of the wrong shape raises `ArgumentError`.
 
 use inkjot::engine::{
-    Action, Event, Inklink, Para, Pause, Refused, Start, State, View, ENGINE_VERSION,
+    Action, Event, Inklink, Para, Pause, Quote, Refused, Start, State, View, ENGINE_VERSION,
 };
 use inkjot::json::Value;
 use rustler::{Atom, Binary, Encoder, Env, NifResult, ResourceArc, Term};
@@ -105,8 +105,25 @@ fn para_term<'a>(env: Env<'a>, p: &Para) -> Term<'a> {
             ("runs", runs_term(env, p)),
             ("pause", pause_term(env, p.pause)),
             ("verse", p.verse.encode(env)),
+            ("quote", quote_term(env, p.quote.as_ref())),
         ],
     )
+}
+
+/// The blockquote a paragraph is part of: `nil`, or `%{kind: "letter", by:
+/// "A. K.", first: true}`.
+fn quote_term<'a>(env: Env<'a>, quote: Option<&Quote>) -> Term<'a> {
+    match quote {
+        Some(q) => atom_map(
+            env,
+            &[
+                ("kind", q.kind.encode(env)),
+                ("by", q.by.encode(env)),
+                ("first", q.first.encode(env)),
+            ],
+        ),
+        None => rustler::types::atom::nil().encode(env),
+    }
 }
 
 /// A wait before a paragraph or run: `nil`, or `%{ms: 2000, kind: "after"}`.
@@ -313,7 +330,7 @@ fn meta<'a>(env: Env<'a>, inklink: InklinkRef) -> Term<'a> {
             ("mode", m.mode.encode(env)),
             ("start", m.start.encode(env)),
             ("povs", m.povs.encode(env)),
-            ("playable", m.playable.encode(env)),
+            ("selectable", m.selectable.encode(env)),
             ("tags", m.tags.encode(env)),
             ("engine", m.engine.encode(env)),
             ("inquests", m.inquests.encode(env)),

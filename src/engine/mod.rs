@@ -42,7 +42,7 @@ use std::sync::Arc;
 
 use crate::json::{self, Value};
 use crate::run::{Ask, Run, Story};
-pub use crate::run::{Edge, Node, Para, Pause, Span, StoryMap};
+pub use crate::run::{Edge, Node, Para, Pause, Quote, Span, StoryMap, BAR};
 
 /// The engine's version. Logs recorded under one version replay the same
 /// way under it; the platform records it with every reading.
@@ -152,8 +152,8 @@ pub struct Meta {
     pub start: String,
     /// The `pov:` setting: who a Linker looks through, the default first.
     pub povs: Vec<String>,
-    /// The characters marked `~ playable`, for a lobby to offer.
-    pub playable: Vec<String>,
+    /// The characters marked `~ selectable`, for a lobby to offer.
+    pub selectable: Vec<String>,
     /// The Inker's tags: `comedy`, `cozy`.
     pub tags: Vec<String>,
     /// The engine that read it: [`ENGINE_VERSION`].
@@ -201,7 +201,7 @@ impl Inklink {
                 mode: setting(ir, "mode").unwrap_or("solo").to_string(),
                 start: text("start").to_string(),
                 povs: story.povs().to_vec(),
-                playable: story.playable(),
+                selectable: story.selectable(),
                 tags: config_tags(ir),
                 engine: ENGINE_VERSION,
                 inquests: inquests(ir).filter(|_| story.has_forks()),
@@ -237,7 +237,7 @@ impl Inklink {
                 run.turn_off_hints();
             }
             if let Some(pov) = &start.pov {
-                if !self.story.povs().contains(pov) && !self.meta.playable.contains(pov) {
+                if !self.story.povs().contains(pov) && !self.meta.selectable.contains(pov) {
                     return Err(refused(
                         RefusedKind::StoryError,
                         format!("`{pov}` is not someone a Linker may play"),

@@ -531,7 +531,7 @@ mod tests {
     /// A story that is nothing but `n` places and the given ways.
     fn map(n: usize, ways: &[(usize, usize, bool)]) -> String {
         let mut src = String::from(
-            ":: StoryTitle\nMap\n\n:: StoryData\n{\"ifid\": \"x\", \"format\": \"Inkjot\", \"format-version\": \"0.6.0\", \"start\": \"p0\"}\n\n:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ playable\n",
+            ":: StoryTitle\nMap\n\n:: StoryData\n{\"ifid\": \"x\", \"format\": \"Inkjot\", \"format-version\": \"0.6.0\", \"start\": \"p0\"}\n\n:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ selectable\n",
         );
         for i in 0..n {
             src.push_str(&format!("place p{i}: \"p{i}\"\n"));

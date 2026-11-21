@@ -14,12 +14,25 @@
 //! the text is appended to the paragraph before (`[after 2s; append]`:
 //! "He winds it once, twice— *(two seconds)* The lights die."). `[verse]`
 //! marks its paragraphs as lines of verse.
+//!
+//! Two things the page shows that are not words:
+//!
+//! - **Blockquotes.** `[quote letter ~ by "A. K."]` … `[end]`: each
+//!   paragraph inside carries its `Quote` (kind and author), and the first
+//!   says it begins one, so a runtime draws the letter, the poster or the
+//!   edict as one block.
+//! - **Redaction.** Text redacted and not yet revealed never reaches the
+//!   page: in its place is a run of `█`, one for each character hidden,
+//!   styled `redacted`. A runtime draws it as a bar; only its length is
+//!   given away.
 
 /// A stretch of text in one style.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     pub text: String,
-    /// `italic`, `bold`, `struck`, in that order; empty for plain text.
+    /// `italic`, `bold`, `struck`, `redacted`, in that order; empty for
+    /// plain text. A `redacted` run's text is `█`, one for each character
+    /// hidden.
     pub style: Vec<&'static str>,
     /// A wait before this run is shown, within its paragraph. Only a run
     /// appended after a pause has one; a paragraph's own wait is its
@@ -52,6 +65,20 @@ impl Pause {
     }
 }
 
+/// The bar redacted text is shown as: one of these for each character.
+pub const BAR: char = '█';
+
+/// A blockquote that a paragraph belongs to: `[quote letter ~ by "A. K."]`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Quote {
+    /// `sign`, `letter`, `poster` or `edict`.
+    pub kind: String,
+    /// Who wrote it, if the quote says: `~ by "A. K."`.
+    pub by: Option<String>,
+    /// This paragraph begins the quote.
+    pub first: bool,
+}
+
 /// One paragraph.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Para {
@@ -60,6 +87,8 @@ pub struct Para {
     pub pause: Option<Pause>,
     /// A line of verse (`[verse]`): kept as a line, set close to the next.
     pub verse: bool,
+    /// The blockquote this paragraph is part of, if any.
+    pub quote: Option<Quote>,
 }
 
 impl Para {
@@ -77,7 +106,11 @@ impl Para {
             return;
         }
         let mut style: Vec<&'static str> = style.to_vec();
-        style.sort_by_key(|s| ["italic", "bold", "struck"].iter().position(|k| k == s));
+        style.sort_by_key(|s| {
+            ["italic", "bold", "struck", "redacted"]
+                .iter()
+                .position(|k| k == s)
+        });
         style.dedup();
         match self.runs.last_mut() {
             Some(last) if last.style == style => last.text.push_str(text),
@@ -103,6 +136,61 @@ impl Para {
                 None => self.push(&run.text, &run.style),
             }
         }
+    }
+
+    /// The paragraph's text from character `from` on, hidden: one run of
+    /// `█`, a bar as long as what it hides. What came before (a speaker's
+    /// name, say) is kept.
+    pub fn redact_from(&mut self, from: usize) {
+        let mut kept = Para {
+            pause: self.pause,
+            verse: self.verse,
+            quote: self.quote.clone(),
+            ..Para::default()
+        };
+        let mut seen = 0;
+        let mut hidden = 0;
+        for run in &self.runs {
+            for ch in run.text.chars() {
+                if seen < from {
+                    kept.push(&ch.to_string(), &run.style);
+                } else {
+                    hidden += 1;
+                }
+                seen += 1;
+            }
+        }
+        kept.push_bar(hidden, &[]);
+        *self = kept;
+    }
+
+    /// A bar of `n` characters, in `style` and `redacted`.
+    pub fn push_bar(&mut self, n: usize, style: &[&'static str]) {
+        let mut style = style.to_vec();
+        style.push("redacted");
+        self.push(&BAR.to_string().repeat(n), &style);
+    }
+
+    /// How many characters the paragraph holds.
+    pub fn len(&self) -> usize {
+        self.runs.iter().map(|r| r.text.chars().count()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Does the text so far end where a sentence starts? At the start of a
+    /// paragraph, or after `.`, `!`, `?` or `:` and a space, with any
+    /// opening quote marks between.
+    pub fn at_sentence_start(&self) -> bool {
+        let text: String = self.runs.iter().map(|r| r.text.as_str()).collect();
+        let t = text.trim_end_matches(['“', '‘', '"', '(', '[']);
+        if t.trim().is_empty() {
+            return true;
+        }
+        let spaced = t.len() > t.trim_end().len();
+        spaced && t.trim_end().ends_with(['.', '!', '?', ':'])
     }
 
     pub fn is_blank(&self) -> bool {

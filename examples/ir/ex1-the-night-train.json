@@ -327,7 +327,7 @@
       "declare": "character",
       "id": "ada",
       "label": "Ada Thorne, financier",
-      "tags": ["investor", "playable"],
+      "tags": ["investor", "selectable"],
       "else": "absent",
       "knows": ["debts"]
     },
@@ -335,7 +335,7 @@
       "declare": "character",
       "id": "rook",
       "label": "Captain Hal Rook, retired",
-      "tags": ["investor", "playable"],
+      "tags": ["investor", "selectable"],
       "else": "absent",
       "moves": ["walk"],
       "knows": ["saw_vell"]
@@ -344,7 +344,7 @@
       "declare": "character",
       "id": "wren",
       "label": "Wren Hollis, investor",
-      "tags": ["investor", "playable"],
+      "tags": ["investor", "selectable"],
       "else": "absent",
       "moves": ["walk", "dash", "slip"]
     },
@@ -352,7 +352,7 @@
       "declare": "character",
       "id": "sallow",
       "label": "Dr. Imogen Sallow, physician",
-      "tags": ["investor", "playable"],
+      "tags": ["investor", "selectable"],
       "else": "absent",
       "knows": ["burn_pattern"]
     },
@@ -360,7 +360,7 @@
       "declare": "character",
       "id": "guest",
       "label": "a guest of your own",
-      "tags": ["investor", "playable", "custom"],
+      "tags": ["investor", "selectable", "custom"],
       "else": "absent"
     },
     {

@@ -769,14 +769,14 @@
       "declare": "character",
       "id": "roland",
       "label": "Roland Vey, scholar and thief",
-      "tags": ["playable"],
+      "tags": ["selectable"],
       "stats": {"wits": 4, "might": 1, "hp": 1}
     },
     {
       "declare": "character",
       "id": "eldric",
       "label": "Ser Eldric of the Long Watch",
-      "tags": ["playable"],
+      "tags": ["selectable"],
       "stats": {"wits": 2, "might": 5, "hp": 2}
     },
     {

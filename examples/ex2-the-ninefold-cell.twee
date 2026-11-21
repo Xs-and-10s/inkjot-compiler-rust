@@ -156,8 +156,8 @@ fuse flood: 2 ~ shown as "the water" ~ unlit
 fuse collapse: 8 ~ shown as "the ceiling" ~ unlit
 ~ then kill pov.all when pov.any.in(prison)
 
-character roland: "Roland Vey, scholar and thief" ~ playable ~ wits 4 ~ might 1 ~ hp 1
-character eldric: "Ser Eldric of the Long Watch" ~ playable ~ wits 2 ~ might 5 ~ hp 2
+character roland: "Roland Vey, scholar and thief" ~ selectable ~ wits 4 ~ might 1 ~ hp 1
+character eldric: "Ser Eldric of the Long Watch" ~ selectable ~ wits 2 ~ might 5 ~ hp 2
 
 npc hask: "the Hollow Host" ~ villain ~ moves none ~ in sanctum
 npc knight: "the Knight" ~ like statue ~ weight heavy ~ in gallery

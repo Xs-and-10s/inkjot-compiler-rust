@@ -403,7 +403,7 @@ proptest! {
 fn room_story(header: &str, body: &str, act: &str) -> String {
     format!(
         ":: StoryTitle\nRoom\n\n:: StoryData\n{{\"ifid\": \"x\", \"format\": \"Inkjot\", \"format-version\": \"0.6.0\", \"start\": \"room\"}}\n\n\
-:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ playable\nstate a: 0\nstate b: 0\nstate c: 0\n\n\
+:: Inklink [config]\nkind: story\nmode: solo\npov: ann\ncharacter ann: \"Ann\" ~ selectable\nstate a: 0\nstate b: 0\nstate c: 0\n\n\
 :: room\n{header}--\n{body}\n> [[Bump->room:bump]]\n\n:: room:bump [act]\nraise a 1\n--\n{act}\n"
     )
 }

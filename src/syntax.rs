@@ -84,6 +84,10 @@ pub(crate) const SETTINGS: &[&str] = &[
     "timeout",
     "param",
     "title",
+    // Whose words the engine writes: `narration: second person`.
+    "narration",
+    // How a speech cue is styled: `cue names: capital, bold`.
+    "cue",
     // A slot a generated fork fills: `pending: tragic ~ by monkeypaw`.
     "pending",
     // `[test]` passages.
@@ -221,6 +225,15 @@ pub(crate) const RESERVED: &[&str] = &[
     "recipe",
     "between",
 ];
+
+/// How `narration:` may be told.
+pub(crate) const NARRATIONS: &[&str] = &["first person", "second person", "third person"];
+
+/// What `cue names:` and `cue directions:` may do to a cue, in order.
+pub(crate) const CUE_STYLES: &[&str] = &["capital", "upper", "bold", "italic"];
+
+/// The kinds of blockquote: `[quote letter]`.
+pub(crate) const QUOTES: &[&str] = &["sign", "letter", "poster", "edict"];
 
 /// Link targets that are not passages.
 pub(crate) const BUILTIN_TARGETS: &[&str] = &["here", "rewind"];
