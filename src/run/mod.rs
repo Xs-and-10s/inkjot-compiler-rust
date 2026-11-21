@@ -2843,6 +2843,7 @@ impl Run {
             .iter()
             .filter(|(id, d)| {
                 let tagged = match tag {
+                    "person" => matches!(d.kind.as_str(), "character" | "npc"),
                     "linker" => self.story.povs.contains(id) || self.at.contains_key(*id),
                     "living" => {
                         matches!(d.kind.as_str(), "character" | "npc")

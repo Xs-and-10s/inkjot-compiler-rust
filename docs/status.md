@@ -63,7 +63,9 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
 head of station, an agent with seven cover names. Suspense comes from the
 hunter becoming the hunted: the antagonist has a knowledge base of his
 own, fed by informants and by reading the clerk's notebook, and acts on
-it. Open questions are being settled with Mark before drafting.
+it. Drafted 20 Nov, in review (private for now; where it lives is Mark's
+call). Later, a Library version with the antagonist chosen at random each
+reading, for replays.
 
 **Ex 7, *Mafia*.** The engine moderates by default. Each game draws a
 syndicate from a shuffled table: a type (historical, mythical, absurd or
@@ -230,6 +232,39 @@ breaking change.
   entries, paragraphs, Link labels and documents (below). Redacted text is
   shown as a bar and never reaches the page; the IR carries its length
   only.
+
+Inklog and time, from Ex 6 (21 Nov 2026):
+
+- **Decided.** A fact is two terms (`{{ you curious }}`) or three (`{{ hale
+  is ashe }}`); a verb is one word (`asked_about`). A fact may carry a
+  time after `@`: `{{ hale at miramar @ monday.evening }}`. The time is
+  when it was true (valid time), in the periods' names; when a fact
+  reached a knowledge base is kept by the engine on its own (`{known
+  about: x ~ in dossier ~ with times}`). `@` already means "at a time" in
+  cells (`dining@2`).
+- **Decided.** Quantifiers end with a dot: `some P. you.notebook {{ it is
+  P }}`; several of one kind with commas, kinds in a row with dots: `some
+  P, Q. all R. …`. The dot must be followed by a space, which tells it from
+  `P.name`.
+- **Proposed.** A period made of another names it: `period day: monday, …
+  saturday ~ of watch` (one round of watches each), so nothing is counted
+  or pluralised; a number still means turns (`~ 3 each`). The clock's range
+  in those names: `clock: monday.morning ..= saturday.night`. Reading:
+  `clock.day`, `clock.watch`, and the turn within each.
+- **Proposed.** Inline redaction as an insert, `{redacted "the Dentist"
+  until you.clearance >= 2}`; `[redacted until …]` stays for paragraphs;
+  `~ redacted until …` on a declared thing hides its name everywhere.
+- **Proposed.** A state that holds an id may say of what kind: `state
+  named: nobody ~ of suspect`.
+- **Fixed** (#33): `person`, built in as a character or an NPC, now counts
+  in `count`, `one` and `all`, as it already did in goals; documented.
+- From the draft's README, still to place: a manual base that reads
+  another (`~ reads knows`); a base owned by an NPC (`~ for ashe ~ starts
+  with …`); asking a base by name (`{{ … }} ~ in dossier`,
+  `you.notebook {{ … }}`); `for each P in …: effect`; the notebook's
+  inserts (`{note …}`, `{contradictions}`); per-Linker knowledge surviving
+  a fall-back; a checkpoint that shows a passage first; `finale when:` in a
+  passage header; pronouns the Linker chooses.
 
 Text, decided 20 Nov 2026:
 
