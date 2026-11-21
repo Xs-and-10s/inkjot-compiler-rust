@@ -59,6 +59,42 @@ quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
 margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.
 v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
 
+## Ex 8: The Inquest (`ex8-the-inquest.twee`)
+
+A short solo `story` written for Inquests, in place of the withdrawn Ex 4.
+Hythe Fen, November 1893: the lock-keeper drowned the night the sluice
+was opened, and the inquest sits in the long room of the Plough. The frame
+is in the second person, to the coroner's clerk; each testimony is in the
+first person, as the witness, and the Linker chooses what the witness did
+and what they say about it, which is not always the same thing.
+
+An Inquest is the coroner's *suppose*: "Suppose you had gone back for the
+lantern." The witness imagines the other night and, imagining it,
+remembers something. Two of the five Supposes are written; two are
+pending, for MonkeyPaw, each with one home (`pending:` in the placeholder
+passage, whose body is the fallback). The verdict reads only what the
+record holds: accident, misadventure, an open verdict, or unlawful
+killing, with a rider on the Squire if the shilling came out.
+
+The lock-keeper's son checks the gates in a fixed order, and on a bad
+night five times. `{list checks ~ rotate 2s}` lets the reader live his
+counting; the story takes it seriously, and his precision is what the
+verdict turns on.
+
+What it exercises: forks written and pending, `~ inquest for`, `~ credit`,
+`theme`, `brief`, analysis tags on most Links, `~ track` on everything the
+record holds, emphasis, names as the reader knows them (`shown as` until
+`reveal`, `{x.aka}`), inline `if … then … else`, `[if …; then …]`,
+`told:`, blockquotes, and a struck remark redacted until the record
+closes.
+
+**It runs.** Everything in it but `told:`, `[if …; then …]`, blockquotes,
+redaction and `expect events:` is built, so `tests/ex8.rs` rewrites those
+few into what they will mean and runs the rest on today's engine: its own
+`[test]` passages, each Inquest through the engine API, and a property
+that every reading, whatever is said and supposed, reaches exactly one
+verdict and ends on the record.
+
 ## Ex 6, the public cut: Cloakroom (`ex6-cloakroom.twee`)
 
 The full Ex 6, *Seven Names*, lives in the Inklinks Library. This is a

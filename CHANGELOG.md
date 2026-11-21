@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Ex 8
+
+- *The Inquest*, drafted (`examples/drafts/ex8-the-inquest.twee`): a
+  short `story` for Inquests. `tests/ex8.rs` runs it on today's engine,
+  with a property that every reading reaches one verdict.
+
 ### Ex 6
 
 - *Cloakroom*, the public cut of Ex 6: one evening, three names, the full
