@@ -124,6 +124,7 @@ The catalogue (`engine::CATALOGUE`; a test fails if this table differs):
 |---|---|---|
 | `nib_shown` | `nib`, `passed`, `links`, `visit`, `changes` | After every action, and at the start: the Nib in front of the Linker, the passages the action went through on the way, the ids of the Links offered, how many times the Nib has been arrived at, and how the action changed the values marked `~ track` (`{"leo.trust": [2, 3]}`; empty when nothing tracked changed). |
 | `ending_reached` | `ending` | The action arrived at a `[finale]` Nib. Its name is the ending's id. |
+| `measured` | `ending`, `values` | With `ending_reached`, when the Inklink declares a `measure`: each measure's value, worked out at the ending (`{"players": 8, "special": "heist"}`), for tuning from real readings. |
 | `reading_finished` | `ending` | Nothing is offered and nothing asked. `ending` is the last finale reached, or null. |
 | `checkpoint_reached` | `checkpoint` | A passage says `checkpoint name`: the world is saved there. |
 | `died` | `who`, `at` | A character died during the action, at that place. |
@@ -133,10 +134,18 @@ The catalogue (`engine::CATALOGUE`; a test fails if this table differs):
 
 **Order.** An action's events come in the order things happened: what the
 interpreter met while playing it (a death, the fall back that caught it, a
-checkpoint, a turn's end), then `nib_shown`, then `ending_reached`, then
+checkpoint, a turn's end), then `nib_shown`, then `ending_reached` and `measured`, then
 `reading_finished`. The platform puts the Linker's `link_taken` before
 them, and its own `rating_asked` between `ending_reached` and
 `reading_finished`.
+
+**`measured`** is the Inker's own report of a game, for tuning it from
+real readings: `measure players: players` in the config, worked out when
+an ending is reached. The engine knows nothing of what the names mean; the
+platform keeps the event like any other and can group readings by any of
+the values (Ex 7: town wins by `special` and `players`, set beside the
+rates its rules model predicts). Values are JSON: numbers, text, ids,
+`true`/`false`, lists; one that cannot be worked out is `null`.
 
 **`nib_shown`** comes once per action, answers included: a new view is a
 Nib put in front of the Linker again. `passed` lists the passages the

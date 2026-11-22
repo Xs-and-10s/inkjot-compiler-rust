@@ -66,6 +66,11 @@ pub const CATALOGUE: &[EventType] = &[
         when: "The action arrived at a `[finale]` Nib. Its name is the ending's id.",
     },
     EventType {
+        name: "measured",
+        keys: &["ending", "values"],
+        when: "With `ending_reached`, when the Inklink declares a `measure`: each measure's value, worked out at the ending (`{\"players\": 8, \"special\": \"heist\"}`), for tuning from real readings.",
+    },
+    EventType {
         name: "reading_finished",
         keys: &["ending"],
         when: "Nothing is offered and nothing asked. `ending` is the last finale reached, or null.",
@@ -153,6 +158,20 @@ pub(super) fn events(
             kind: "ending_reached",
             data: Value::obj([("ending", Value::str(&view.nib))]),
         });
+        if run.story().has_measures() {
+            let values = run
+                .measures()
+                .into_iter()
+                .map(|(name, v)| (name, super::json_of(&v)))
+                .collect();
+            out.push(Event {
+                kind: "measured",
+                data: Value::obj([
+                    ("ending", Value::str(&view.nib)),
+                    ("values", Value::Obj(values)),
+                ]),
+            });
+        }
     }
     if view.over {
         let last = ending.as_deref().map_or(Value::Null, Value::str);

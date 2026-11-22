@@ -170,11 +170,12 @@ shown as written, being entries, not sentences.
 shown, in its parentheses: `@fenwick (to you)` reads "Mr. Fenwick (to
 you): …".
 
-**`narration:`** says whose words the engine writes for the pov: `@you`
-(and `@me`, `@i`, or the pov's own name in a cue) and `{me}`. `narration:
-second person` reads "You: …" and "you"; `first person` reads "I: …", and
-`{me}` as "I" at the start of a sentence and "me" elsewhere; `third person`,
-or nothing said, reads the pov's name. Prose is written by hand in whatever
+**`narration:`** says whose words the engine writes for the pov in prose:
+`{me}`. `narration: second person` reads "you"; `first person` reads "I"
+at the start of a sentence and "me" elsewhere; `third person`, or nothing
+said, reads the pov's name. A speech cue always names its speaker, the
+pov too: `@you` in a witness's first-person testimony reads "Martha Rudd:
+…", and "I" belongs to the prose (decided 21 Nov 2026). Prose is written by hand in whatever
 person it is. A passage may say its own (`narration: first person` in its
 header, for a witness's testimony), and its sub-Nibs (`martha:tom_out`) are
 told as it is. `~ omniscient` may follow, for analysis; play ignores it.
@@ -224,6 +225,24 @@ shown as written.
 `shuffled` (the default: each name once, in a seeded order, then again),
 `cycle` (in the order written), `random` (any, each time) or `first`.
 `{all leo.aka}` shows every name.
+
+## Measures
+
+`measure name: expression` in the config is a value the Inklink reports
+when a reading reaches an ending, in the engine's `measured` event, so its
+Inker can tune it from real readings:
+
+```
+measure players: players
+measure special: syndicate.special
+measure nights: nights
+measure saves: saves
+```
+
+A measure is about the whole reading, so it cannot say `me` or `you`.
+Measures are worked out in the order written, at the ending; counters an
+Inklink wants reported are ordinary `state`s it raises as it goes. A test
+can check the event: `expect events: ending_reached, measured`.
 
 ## `on` handlers
 

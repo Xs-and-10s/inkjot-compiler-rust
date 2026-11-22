@@ -25,11 +25,20 @@ fn the_model_follows_the_draft() {
         "~ card doctor: 1",
         "~ card detective: 1",
         "~ card townsfolk: rest",
-        "get haul_needed: members + 2",
+        "get haul_needed: players / 3 + 1",
+        "move each found to it.owner.keepsake when syndicate.special == heist",
+        "get haul: all(guest, where: it.team == syndicate).loot",
+        "let first_voter: first(victim.chosen_by)",
+        "~ consensus ~ when cult_left < 2 or nights % 2 == 1",
+        "it.team != cult and it.role != doctor and it.voted_with(cult)",
+        "[[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me and it != me.saved_last",
+        "syndicate.special == collectors ~ consensus 2",
+        "~ then set victim: first(targets) ~ then set second: last(targets)",
+        "set second.marked: yes when second != nobody and syndicate.special == collectors",
         "revote: 1, ties: draw}",
         "it.marked_since < clock.now)",
         "set victim.marked_since: clock.now when victim != nobody",
-        "let foiled: victim != nobody and victim == saved",
+        "let foiled: (victim != nobody and victim == saved) or foiled_second",
         "set victim.team: cult when victim != nobody",
         "it != me.saved_last",
         "it.voted_with(cult)",
@@ -71,8 +80,11 @@ struct Guest {
     team: Team,
     role: Role,
     marked_since: Option<u32>,
-    voteless: bool,
+    /// Days left without a vote, after paying a debt.
+    voteless: u8,
     keepsake: bool,
+    /// The Heist: whose keepsakes this member stole, owners by seat.
+    loot: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -120,8 +132,9 @@ fn deal(players: usize, special: Special, dice: &mut Dice) -> Vec<Guest> {
             },
             role,
             marked_since: None,
-            voteless: false,
+            voteless: 0,
             keepsake: true,
+            loot: Vec::new(),
         })
         .collect()
 }
@@ -132,11 +145,121 @@ fn alive(g: &[Guest], f: impl Fn(&Guest) -> bool) -> Vec<usize> {
 
 /// One game, to the end. `None` if it is still going after `limit` phases.
 fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winner> {
+    play_with(players, special, seed, limit, true)
+}
+
+/// One game; with `returned`, a thief voted out gives back their loot,
+/// as the draft says.
+fn play_with(
+    players: usize,
+    special: Special,
+    seed: u64,
+    limit: u32,
+    returned: bool,
+) -> Option<Winner> {
+    play_need(
+        players,
+        special,
+        seed,
+        limit,
+        returned,
+        haul_needed(players),
+    )
+}
+
+/// `get haul_needed: players / 3 + 1`.
+fn haul_needed(players: usize) -> usize {
+    players / 3 + 1
+}
+
+fn play_need(
+    players: usize,
+    special: Special,
+    seed: u64,
+    limit: u32,
+    returned: bool,
+    need: usize,
+) -> Option<Winner> {
+    let r = Rules {
+        returned,
+        need,
+        ..Rules::draft(players)
+    };
+    play_rules(players, special, seed, limit, &r)
+}
+
+/// The rules that can be tuned, as the draft has them and as they might be.
+#[derive(Clone, Copy, Debug, Default)]
+struct Rules {
+    /// The Heist: a thief voted out gives back their loot.
+    returned: bool,
+    /// The Heist: keepsakes the Crew needs.
+    need: usize,
+    /// The Cult: the One Who Left cannot be taken (and so saves others).
+    immune: bool,
+    /// The Cult: a taking needs every Acolyte's vote, cast once. Each
+    /// follows the first with this chance in a hundred.
+    unanimous: Option<usize>,
+    /// The Cult: takings only every other night.
+    alternate: bool,
+    /// The Cult: takings only every other night, once it has this many
+    /// Acolytes or more.
+    alternate_from: Option<usize>,
+    /// The Cult: rests the night after a taking (tried or done), once it
+    /// has this many Acolytes or more.
+    rest_from: Option<usize>,
+    /// The Cult: wins when it is as many as the town, not more.
+    cult_ties: bool,
+    /// The Cult: a lone Acolyte may take anyone, not only those who voted
+    /// with them.
+    lone_takes_any: bool,
+    /// The Collectors: the Old Landlord cannot take himself in.
+    no_self_save: bool,
+    /// The Collectors: two marks a night, with two or more of them.
+    two_marks: bool,
+    /// The Collectors: two marks a night, however many they are.
+    two_marks_always: bool,
+    /// The Collectors: paying a debt costs your vote for two days.
+    pay_two_days: bool,
+}
+
+impl Rules {
+    /// The rules as the draft has them (tuned 21 Nov 2026; see
+    /// `tune_the_cult_and_collectors`).
+    fn draft(players: usize) -> Rules {
+        Rules {
+            returned: true,
+            need: haul_needed(players),
+            immune: true,
+            alternate_from: Some(2),
+            two_marks_always: true,
+            ..Rules::default()
+        }
+    }
+
+    /// The rules before the tuning, for comparison.
+    fn before(players: usize) -> Rules {
+        Rules {
+            returned: true,
+            need: haul_needed(players),
+            ..Rules::default()
+        }
+    }
+}
+
+fn play_rules(
+    players: usize,
+    special: Special,
+    seed: u64,
+    limit: u32,
+    r: &Rules,
+) -> Option<Winner> {
+    let (returned, need) = (r.returned, r.need);
     let mut dice = Dice(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     let mut g = deal(players, special, &mut dice);
-    let need = members(players) + 2;
-    let mut haul = 0;
     let mut saved_last: Option<usize> = None;
+    // The Cult took (or tried to) last night.
+    let mut took_last_night = false;
     // Who voted with a cultist yesterday.
     let mut voted_with_cult: Vec<usize> = Vec::new();
     for now in 0..limit {
@@ -154,9 +277,15 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
         {
             return Some(Winner::Syndicate);
         }
-        if special == Special::Cult && cult > town {
+        if special == Special::Cult && (cult > town || (r.cult_ties && cult >= town)) {
             return Some(Winner::Cult);
         }
+        // The haul: all the Crew's loot, dead members' included.
+        let haul: usize = g
+            .iter()
+            .filter(|x| x.team == Team::Syndicate)
+            .map(|x| x.loot.len())
+            .sum();
         if special == Special::Heist && haul >= need {
             return Some(Winner::Heist);
         }
@@ -171,13 +300,35 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             }
             let not_ours = |x: &Guest| x.team == Team::Town;
             let target = match special {
+                Special::Cult if r.alternate && (now / 2) % 2 == 1 => None,
+                Special::Cult
+                    if took_last_night
+                        && r.rest_from
+                            .is_some_and(|k| alive(&g, |x| x.team == Team::Cult).len() >= k) =>
+                {
+                    None
+                }
+                Special::Cult
+                    if (now / 2) % 2 == 1
+                        && r.alternate_from
+                            .is_some_and(|k| alive(&g, |x| x.team == Team::Cult).len() >= k) =>
+                {
+                    None
+                }
                 Special::Cult => {
-                    let can = alive(&g, not_ours);
-                    dice.one(
+                    let can = alive(&g, |x| not_ours(x) && !(r.immune && x.role == Role::Doctor));
+                    let lone = alive(&g, |x| x.team == Team::Cult).len() == 1;
+                    let chosen = dice.one(
                         &can.into_iter()
-                            .filter(|i| voted_with_cult.contains(i))
+                            .filter(|i| (r.lone_takes_any && lone) || voted_with_cult.contains(i))
                             .collect::<Vec<_>>(),
-                    )
+                    );
+                    // Unanimous: each other Acolyte must follow the first.
+                    let others = alive(&g, |x| x.team == Team::Cult).len().saturating_sub(1);
+                    match r.unanimous {
+                        Some(follow) if (0..others).any(|_| dice.pick(100) >= follow) => None,
+                        _ => chosen,
+                    }
                 }
                 Special::Collectors => {
                     dice.one(&alive(&g, |x| not_ours(x) && x.marked_since.is_none()))
@@ -185,11 +336,16 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
                 Special::Heist => dice.one(&alive(&g, |x| not_ours(x) && x.keepsake)),
                 _ => dice.one(&alive(&g, not_ours)),
             };
+            took_last_night = special == Special::Cult && target.is_some();
             let doctor_alive = !alive(&g, |x| x.role == Role::Doctor).is_empty();
+            // Saving yourself: pointless for an immune One Who Left, and
+            // not allowed for the Old Landlord under `no_self_save`.
+            let not_self = (special == Special::Cult && r.immune)
+                || (special == Special::Collectors && r.no_self_save);
             let saved = if doctor_alive {
                 let can: Vec<usize> = alive(&g, |_| true)
                     .into_iter()
-                    .filter(|i| Some(*i) != saved_last)
+                    .filter(|i| Some(*i) != saved_last && !(not_self && g[*i].role == Role::Doctor))
                     .collect();
                 dice.one(&can)
             } else {
@@ -198,14 +354,27 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             saved_last = saved;
             // The morning settles the night: a save stops every special's
             // choice. A mark is made in the morning, `now + 1`.
+            // Two marks a night, with two Collectors or more.
+            if special == Special::Collectors
+                && (r.two_marks_always || (r.two_marks && members(players) >= 2))
+            {
+                let second = dice.one(&alive(&g, |x| not_ours(x) && x.marked_since.is_none()));
+                if let Some(t) = second.filter(|t| saved != Some(*t) && target != Some(*t)) {
+                    g[t].marked_since = Some(now + 1);
+                }
+            }
             if let Some(t) = target.filter(|t| saved != Some(*t)) {
                 match special {
                     Special::None | Special::Doppelganger => g[t].alive = false,
                     Special::Collectors => g[t].marked_since = Some(now + 1),
                     Special::Cult => g[t].team = Team::Cult,
+                    // The first to vote for the target carries it; any of
+                    // the Crew, as far as the model knows.
                     Special::Heist => {
-                        g[t].keepsake = false;
-                        haul += 1;
+                        if let Some(thief) = dice.one(&alive(&g, |x| x.team == Team::Syndicate)) {
+                            g[t].keepsake = false;
+                            g[thief].loot.push(t);
+                        }
                     }
                 }
             }
@@ -213,13 +382,13 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             // Day. Someone may pay a debt, and loses their vote.
             if special == Special::Collectors && dice.pick(2) == 0 {
                 let marked = alive(&g, |x| x.marked_since.is_some());
-                let payers = alive(&g, |x| !x.voteless);
+                let payers = alive(&g, |x| x.voteless == 0);
                 if let (Some(m), Some(p)) = (dice.one(&marked), dice.one(&payers)) {
                     g[m].marked_since = None;
-                    g[p].voteless = true;
+                    g[p].voteless = if r.pay_two_days { 2 } else { 1 };
                 }
             }
-            let voters = alive(&g, |x| !x.voteless);
+            let voters = alive(&g, |x| x.voteless == 0);
             let candidates = alive(&g, |_| true);
             let mut votes = vec![0usize; g.len()];
             let mut ballots = Vec::new();
@@ -235,6 +404,12 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             // A tie votes once more; modelled as straight to the draw.
             if let Some(out) = dice.one(&tied) {
                 g[out].alive = false;
+                // Found in the luggage, and given back.
+                if returned {
+                    for owner in std::mem::take(&mut g[out].loot) {
+                        g[owner].keepsake = true;
+                    }
+                }
             }
             let cult_choices: Vec<usize> = ballots
                 .iter()
@@ -247,7 +422,7 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
                 .map(|(v, _)| *v)
                 .collect();
             for x in g.iter_mut() {
-                x.voteless = false;
+                x.voteless = x.voteless.saturating_sub(1);
             }
         }
     }
@@ -305,5 +480,193 @@ proptest! {
         let special = SPECIALS[which];
         let limit = 2 * players as u32 + 2;
         prop_assert!(play(players, special, seed, limit).is_some(), "{:?} at {} did not end", special, players);
+    }
+}
+
+/// The town's chance against each special syndicate is about its chance
+/// against a plain one, at every table size: within 15 points, in random
+/// play. Random play is a crude player, but the same crude player on both
+/// sides of the comparison, so it shows when a rule tips a special too far.
+///
+/// One known exception: the Cult at five players, a lone Acolyte among
+/// four, leans to the town (about 57% against 34%). Every lever tried for
+/// it tipped the larger tables the other way (`tune_the_cult_and_collectors`).
+#[test]
+fn every_special_is_about_as_fair_as_a_plain_syndicate() {
+    let rate = |players, special| {
+        let n = 2000u64;
+        let town = (1..=n)
+            .filter(|&seed| play(players, special, seed, 200) == Some(Winner::Town))
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    for players in 5..=12 {
+        let plain = rate(players, Special::None);
+        for special in [Special::Collectors, Special::Cult, Special::Heist] {
+            if special == Special::Cult && players == 5 {
+                continue;
+            }
+            let theirs = rate(players, special);
+            assert!(
+                (plain - theirs).abs() <= 15.0,
+                "at {players}: the town wins {theirs:.1}% against {special:?}, {plain:.1}% against a plain syndicate"
+            );
+        }
+    }
+}
+
+/// How often the town wins, in random play, for each syndicate and table
+/// size. `cargo test --test ex7_rules win_rates -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn win_rates() {
+    let rate = |players, special, returned| {
+        let n = 4000u64;
+        let town = (1..=n)
+            .filter(|&seed| play_with(players, special, seed, 200, returned) == Some(Winner::Town))
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    println!("town wins, %   none  dopp  coll  cult  heist(kept)  heist(returned)");
+    for players in 5..=12 {
+        print!("{players:>2} players    ");
+        for special in &SPECIALS[..4] {
+            print!("{:>5.1} ", rate(players, *special, true));
+        }
+        println!(
+            "  {:>5.1}        {:>5.1}",
+            rate(players, Special::Heist, false),
+            rate(players, Special::Heist, true)
+        );
+    }
+}
+
+/// The Heist at every haul target, beside the plain syndicate: how the
+/// target was chosen. `cargo test --test ex7_rules tune_the_heist --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+fn tune_the_heist() {
+    let rate = |players, special, need| {
+        let n = 4000u64;
+        let town = (1..=n)
+            .filter(|&seed| {
+                play_need(players, special, seed, 200, true, need) == Some(Winner::Town)
+            })
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    for players in 5..=12usize {
+        let chosen = haul_needed(players);
+        print!(
+            "{players:>2}: none {:>5.1} |",
+            rate(players, Special::None, 0)
+        );
+        for need in 1..=7usize {
+            print!(
+                " need {need}{} {:>5.1}",
+                if need == chosen { "*" } else { " " },
+                rate(players, Special::Heist, need)
+            );
+        }
+        println!();
+    }
+}
+
+/// A rule tried: its name in the table, and the rules for a table size.
+type Variant = (&'static str, fn(usize) -> Rules);
+
+/// The Cult and the Collectors under each rule tried, beside the plain
+/// syndicate. `cargo test --test ex7_rules tune_the_cult_and_collectors --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+fn tune_the_cult_and_collectors() {
+    let n = 3000u64;
+    let rate = |players: usize, special, r: Rules| {
+        let town = (1..=n)
+            .filter(|&seed| play_rules(players, special, seed, 200, &r) == Some(Winner::Town))
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    let b = Rules::before;
+    let cult: Vec<Variant> = vec![
+        ("before", Rules::before),
+        ("a", |p| Rules {
+            immune: true,
+            ..Rules::before(p)
+        }),
+        ("b", |p| Rules {
+            unanimous: Some(85),
+            ..Rules::before(p)
+        }),
+        ("c", |p| Rules {
+            alternate: true,
+            ..Rules::before(p)
+        }),
+        ("a+b", |p| Rules {
+            immune: true,
+            unanimous: Some(85),
+            ..Rules::before(p)
+        }),
+        ("a+rest2", |p| Rules {
+            immune: true,
+            rest_from: Some(2),
+            ..Rules::before(p)
+        }),
+        ("a+rest2+tie", |p| Rules {
+            immune: true,
+            rest_from: Some(2),
+            cult_ties: true,
+            ..Rules::before(p)
+        }),
+        ("a+c2+lone", |p| Rules {
+            immune: true,
+            alternate_from: Some(2),
+            lone_takes_any: true,
+            ..Rules::before(p)
+        }),
+        ("a+c2=now", Rules::draft),
+    ];
+    let coll: Vec<Variant> = vec![
+        ("before", Rules::before),
+        ("b", |p| Rules {
+            no_self_save: true,
+            ..Rules::before(p)
+        }),
+        ("2marks8+", |p| Rules {
+            two_marks: true,
+            ..Rules::before(p)
+        }),
+        ("pay2", |p| Rules {
+            pay_two_days: true,
+            ..Rules::before(p)
+        }),
+        ("b+2always", |p| Rules {
+            no_self_save: true,
+            two_marks_always: true,
+            ..Rules::before(p)
+        }),
+        ("2always=now", Rules::draft),
+    ];
+    for (title, special, set) in [
+        ("CULT", Special::Cult, &cult),
+        ("COLLECTORS", Special::Collectors, &coll),
+    ] {
+        print!("{title:<11} plain");
+        for (name, _) in set.iter() {
+            print!(" {name:>8}");
+        }
+        println!();
+        for players in 5..=12 {
+            print!(
+                "{players:>2} players  {:>5.1}",
+                rate(players, Special::None, b(players))
+            );
+            for (_, rules) in set.iter() {
+                print!(" {:>8.1}", rate(players, special, rules(players)));
+            }
+            println!();
+        }
     }
 }

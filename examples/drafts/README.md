@@ -69,12 +69,15 @@ special syndicates change the rules:
 
 - **the Doppelgänger Clan**: a killer takes the victim's face, so the
   morning reports the wrong death;
-- **the Debt Collectors**: they mark instead of killing, and a marked
-  name dies at the next nightfall unless someone pays with their vote;
+- **the Debt Collectors**: they mark two names a night instead of
+  killing, and a marked name dies at the next nightfall unless someone
+  pays with their vote;
 - **the Cult of the Long Night**: they convert instead of killing, and
-  only someone who voted with them that day;
-- **the Heist Crew**: no deaths; three keepsakes stolen from the players'
-  piles and they win.
+  only someone who voted with them that day; once there are two
+  Acolytes, on odd nights only; the One Who Left can never be taken;
+- **the Heist Crew**: no deaths; a third of the table's keepsakes, plus
+  one, stolen from the players' piles and they win. A thief voted out
+  gives back what they carried.
 
 Three ways to moderate: the engine's tables; MonkeyPaw, writing each
 morning fresh with the table's line as the fallback; or a Storyteller who
@@ -97,7 +100,38 @@ is not a fork (a morning MonkeyPaw writes); a `shown_as` that can be set
 in one mode (the Storyteller); a general ballot (`{ballot for: chosen,
 from: specials, ties: draw}`, for the table choosing a special syndicate
 when more than half ask for one); and a draw limited by `where:` (`roll
-syndicate where: it.special == chosen_special`).
+syndicate where: it.special == chosen_special`); a consensus that
+remembers who chose each target, in order (`victim.chosen_by`), with
+`first(…)`, so the first to vote for the chosen target does the deed for
+the group (decided 21 Nov); a pile on a set of players (`all(guest,
+where: …).loot`); putting each card back where it belongs (`move each
+found to it.owner.keepsake`), for a thief voted out, whose loot is
+returned (decided 21 Nov); a consensus on two targets (`~ consensus 2`,
+`targets`, `first(…)`, `last(…)`), for the Collectors' two marks a night; whether a vote was decided by the
+draw (`accusation.drawn`); and `measure` (built, 21 Nov), for what each
+game reports when it ends.
+
+### Ex 7: tuning from playtests
+
+`tests/ex7_rules.rs` tunes the specials against a plain syndicate with
+players who choose at random. Real tables will differ, so every game
+reports its measures when it ends (the engine's `measured` event), and
+the questions they answer are the ones the tuning asked:
+
+| Question | Measures |
+|---|---|
+| Is each special as fair as a plain syndicate, at each size? | the ending (who won), `special`, `players`, beside `syndicate == none` games of the same size |
+| Is the five-player Cult too easy for the town, as the model says? | the ending, `special == cult`, `players == 5` |
+| Do games run too long or too short? | `nights`, by `players` and `special` |
+| Does the town read the table, or vote at random? | `lynched_syndicate` against `lynched_town`, `draws`, `finds` |
+| Are the Doctor and the Detective too strong or too weak? | `saves`, `finds`, `doctor_lived`, `detective_lived` |
+| Does each special's rule do what it was tuned to? | `takings` (Cult), `faces` (Doppelgänger), `debts_paid` and `foreclosures` (Collectors), `haul`, `haul_needed` and `returned` (Heist) |
+| Do tables ask for specials, and does the moderator change the game? | `asked_for_special`, `moderator` |
+
+The first number to watch: the town's win rate per special and size, set
+beside the model's table. Where they differ by more than the model's
+tolerance (15 points), the rule is the one to look at, and the model is
+the place to try a fix before a table sees it.
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 

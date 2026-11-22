@@ -659,7 +659,7 @@ fn changes(
 }
 
 /// A value as JSON: a number is a number, an id or text a string.
-fn json_of(v: &crate::run::V) -> Value {
+pub(super) fn json_of(v: &crate::run::V) -> Value {
     use crate::run::V;
     match v {
         V::Null => Value::Null,

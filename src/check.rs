@@ -1119,6 +1119,28 @@ impl Checker {
                     );
                 }
             }
+            // `measure nights: nights`: reported when the reading ends.
+            "measure" => {
+                let name = first_word(rest);
+                if !is_ident(name) || colon.is_none() || value.is_empty() {
+                    self.err(
+                        line,
+                        rest_col,
+                        "a measure is written `measure name: expression`",
+                    );
+                } else if value
+                    .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                    .any(|w| POV_NAMES.contains(&w))
+                {
+                    self.err(
+                        line,
+                        vcol,
+                        "a measure is about the whole reading, not one Linker: it cannot say `me` or `you`",
+                    );
+                } else {
+                    self.expr(value, line, vcol);
+                }
+            }
             "narration" => {
                 if !NARRATIONS.contains(&value) {
                     self.err(

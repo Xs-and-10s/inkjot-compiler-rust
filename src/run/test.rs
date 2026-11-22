@@ -287,6 +287,9 @@ fn note_events(run: &mut Run, events: &mut Vec<String>) {
     let finale = run.story.passage_tags(&here).iter().any(|t| t == "finale");
     if finale && run.trail().contains(&here) {
         events.push("ending_reached".into());
+        if run.story.has_measures() {
+            events.push("measured".into());
+        }
     }
     let nothing_offered = run.choices().is_ok_and(|c| c.is_empty());
     let nothing_asked = run.asks().is_ok_and(|a| a.is_empty());
