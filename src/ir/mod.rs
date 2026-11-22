@@ -640,6 +640,13 @@ impl Builder {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
             "hint" => f.add("hint", quoted_styled(value).unwrap_or(Value::str(value))),
+            // `measure nights: nights` → `{"measure": "nights", "value": …}`.
+            "measure" => {
+                let (name, expr) = rest.split_once(':').unwrap_or((rest, ""));
+                f.add("measure", Value::str(name.trim()));
+                f.add("value", expression(expr.trim()));
+                return Value::Obj(f.into_pairs());
+            }
             "narration" => {
                 f.add("setting", Value::str("narration"));
                 f.add("value", narration(s));

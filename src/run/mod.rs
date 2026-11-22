@@ -73,6 +73,8 @@ pub struct Story {
     defaults: BTreeMap<String, Value>,
     /// Every `checkpoint name ~ on death in …` declaration.
     checkpoints: Vec<Value>,
+    /// `measure name: expression`, in order: reported when a reading ends.
+    measures: Vec<(String, Value)>,
     /// The `rewind:` setting, if the Inklink has one.
     rewind: Option<Value>,
     /// Does any passage show `{ballots}`? Then the Inker frames the tally.
@@ -153,6 +155,7 @@ impl Story {
             handlers: Vec::new(),
             defaults: BTreeMap::new(),
             checkpoints: Vec::new(),
+            measures: Vec::new(),
             rewind: None,
             shows_ballots: false,
             narration: None,
@@ -195,6 +198,10 @@ impl Story {
             }
             // `checkpoint cells ~ on death in prison …` declares one;
             // `checkpoint threshold` in a passage reaches it.
+            if let Some(name) = f(s, "measure").as_str() {
+                self.measures
+                    .push((name.to_string(), f(s, "value").clone()));
+            }
             if s.get("checkpoint").is_some() && s.get("on_death_in").is_some() {
                 self.checkpoints.push(s.clone());
             }
@@ -303,6 +310,11 @@ impl Story {
             }
             name = name.rsplit_once(':')?.0;
         }
+    }
+
+    /// Does the Inklink declare any `measure`?
+    pub fn has_measures(&self) -> bool {
+        !self.measures.is_empty()
     }
 
     pub fn passage_tags(&self, passage: &str) -> &[String] {
@@ -720,6 +732,17 @@ impl Run {
     /// Note something that happened, for the engine's events.
     pub(super) fn note(&mut self, kind: &'static str, data: Value) {
         self.noted.push((kind, data));
+    }
+
+    /// Every `measure`, worked out now, in the order written. One that
+    /// cannot be worked out reads as nothing, so the rest still report.
+    pub fn measures(&mut self) -> Vec<(String, V)> {
+        let story = Arc::clone(&self.story);
+        story
+            .measures
+            .iter()
+            .map(|(name, e)| (name.clone(), self.eval(e).unwrap_or(V::Null)))
+            .collect()
     }
 
     /// What was noted since the action began, oldest first.

@@ -226,6 +226,24 @@ shown as written.
 `cycle` (in the order written), `random` (any, each time) or `first`.
 `{all leo.aka}` shows every name.
 
+## Measures
+
+`measure name: expression` in the config is a value the Inklink reports
+when a reading reaches an ending, in the engine's `measured` event, so its
+Inker can tune it from real readings:
+
+```
+measure players: players
+measure special: syndicate.special
+measure nights: nights
+measure saves: saves
+```
+
+A measure is about the whole reading, so it cannot say `me` or `you`.
+Measures are worked out in the order written, at the ending; counters an
+Inklink wants reported are ordinary `state`s it raises as it goes. A test
+can check the event: `expect events: ending_reached, measured`.
+
 ## `on` handlers
 
 The interpreter fires these events. Every handler for an event runs, in the

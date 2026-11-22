@@ -88,6 +88,8 @@ pub(crate) const SETTINGS: &[&str] = &[
     "narration",
     // How a speech cue is styled: `cue names: capital, bold`.
     "cue",
+    // A value reported when the reading ends: `measure nights: nights`.
+    "measure",
     // A slot a generated fork fills: `pending: tragic ~ by monkeypaw`.
     "pending",
     // `[test]` passages.

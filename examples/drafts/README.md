@@ -107,7 +107,31 @@ the group (decided 21 Nov); a pile on a set of players (`all(guest,
 where: …).loot`); putting each card back where it belongs (`move each
 found to it.owner.keepsake`), for a thief voted out, whose loot is
 returned (decided 21 Nov); a consensus on two targets (`~ consensus 2`,
-`targets`, `first(…)`, `last(…)`), for the Collectors' two marks a night.
+`targets`, `first(…)`, `last(…)`), for the Collectors' two marks a night; whether a vote was decided by the
+draw (`accusation.drawn`); and `measure` (built, 21 Nov), for what each
+game reports when it ends.
+
+### Ex 7: tuning from playtests
+
+`tests/ex7_rules.rs` tunes the specials against a plain syndicate with
+players who choose at random. Real tables will differ, so every game
+reports its measures when it ends (the engine's `measured` event), and
+the questions they answer are the ones the tuning asked:
+
+| Question | Measures |
+|---|---|
+| Is each special as fair as a plain syndicate, at each size? | the ending (who won), `special`, `players`, beside `syndicate == none` games of the same size |
+| Is the five-player Cult too easy for the town, as the model says? | the ending, `special == cult`, `players == 5` |
+| Do games run too long or too short? | `nights`, by `players` and `special` |
+| Does the town read the table, or vote at random? | `lynched_syndicate` against `lynched_town`, `draws`, `finds` |
+| Are the Doctor and the Detective too strong or too weak? | `saves`, `finds`, `doctor_lived`, `detective_lived` |
+| Does each special's rule do what it was tuned to? | `takings` (Cult), `faces` (Doppelgänger), `debts_paid` and `foreclosures` (Collectors), `haul`, `haul_needed` and `returned` (Heist) |
+| Do tables ask for specials, and does the moderator change the game? | `asked_for_special`, `moderator` |
+
+The first number to watch: the town's win rate per special and size, set
+beside the model's table. Where they differ by more than the model's
+tolerance (15 points), the rule is the one to look at, and the model is
+the place to try a fix before a table sees it.
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 

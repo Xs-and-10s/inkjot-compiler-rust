@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Measures
+
+- `measure name: expression` in the config: values the engine reports in
+  a new `measured` event when a reading reaches an ending, for tuning
+  from real readings. A measure is about the whole reading, so it cannot
+  say `me`. Ex 7 declares the measures its tuning needs (who won, at what
+  size, against which special, in how many nights, how well the town read
+  the table, what each special's rule did), and the drafts README says
+  which question each answers.
+
 ### Milestone 19: the page
 
 - `narration: first person | second person | third person` (`~ omniscient`

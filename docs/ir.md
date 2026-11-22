@@ -209,6 +209,7 @@ A statement is an object whose first key says what it is. Statements are
 | `declare` | `npc marsh: "Colonel Marsh" ~ …` | `{"declare": "npc", "id": "marsh", "label": "Colonel Marsh", …}` |
 | `setting` | `cohort: 2..=5 ~ best 3..=4` | `{"setting": "cohort", "value": {range}, "best": {range}}` |
 | `goal`, `reaction` | `goal flee: ~ toward platform ~ weight 6` | `{"goal": "flee", "toward": "platform", "weight": 6}` |
+| `measure` | `measure players: count(guest)` | `{"measure": "players", "value": {"count": […]}}`: reported in the engine's `measured` event when an ending is reached |
 | `checkpoint` | `checkpoint cells: ~ on death in prison` | `{"checkpoint": "cells", "on_death_in": "prison", …}` |
 | `hint` | `hint: "…" ~ wits 3..` | `{"hint": "…", "stats": {"wits": {range}}}` |
 | `effect` | `learn secret` | the effect; `clauses` if it has any |
@@ -358,6 +359,7 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   "cue", "of": "names", "value": ["capital", "bold"]}`.
 - Modifier parts `then`, `quote` and `redacted`; the `redacted` insert.
 - `redacted_until` and `keep_case` on declarations.
+- `measure` statements (21 Nov 2026, after milestone 19).
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
 

@@ -208,6 +208,48 @@ objective cult: "Bring the island into the dark" ~ shown when syndicate.special 
 objective haul: "{haul_needed} keepsakes in the haul" ~ shown when syndicate.special == heist
 ~ done when count(haul) >= haul_needed
 
+(((
+What each game reports when it ends (the engine's `measured` event), so
+the tuning in `tests/ex7_rules.rs` can be checked against real tables:
+who won (the event's `ending`), at what size, against which syndicate and
+told how; how long it took; how well the town read the table (its
+lynches, the Detective, the saves); and what each special did. Counters
+for these are kept as the game goes.
+)))
+state saves: 0
+state finds: 0
+state lynched_syndicate: 0
+state lynched_town: 0
+state draws: 0
+state takings: 0
+state faces: 0
+state debts_paid: 0
+state foreclosures: 0
+state returned: 0
+measure players: players
+measure syndicate: syndicate
+measure special: syndicate.special
+measure asked_for_special: chosen_special != nothing
+measure moderator: moderator
+measure members: members
+measure nights: nights
+measure town_left: town_left
+measure syndicate_left: syndicate_left + cult_left
+measure lynched_syndicate: lynched_syndicate
+measure lynched_town: lynched_town
+measure draws: draws
+measure saves: saves
+measure finds: finds
+measure doctor_lived: some guest where: it.alive and it.role == doctor
+measure detective_lived: some guest where: it.alive and it.role == detective
+measure takings: takings
+measure faces: faces
+measure debts_paid: debts_paid
+measure foreclosures: foreclosures
+measure haul: count(haul)
+measure haul_needed: haul_needed
+measure returned: returned
+
 on phase begins night
 ~ then play night
 on phase begins day
@@ -317,6 +359,7 @@ today, dies now.
 )))
 let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now)
 set due.alive: no when syndicate.special == collectors
+raise foreclosures count(due) when syndicate.special == collectors
 set foreclosed: due when syndicate.special == collectors
 raise nights 1
 (((
@@ -369,7 +412,7 @@ The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it tur
 > [[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me and it != me.saved_last ~ when syndicate.special == cult ~ then set saved: target ~ then set me.saved_last: target
 
 > ~ for guest where: it.alive and it.role == detective
-> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town
+> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town ~ then raise finds 1 when target.team != town
 
 > [[Sleep->night:done]] ~ for guest where: it.alive and it.role == townsfolk
 > [[Wait for morning->night:done]] ~ for guest where: not it.alive or it.is(storyteller)
@@ -439,6 +482,9 @@ the first who voted for the victim.
 set first_voter.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
 set victim.shown_as: first_voter.name when syndicate.special == doppelganger and replacing and victim != nobody
 move taken to first_voter.loot when syndicate.special == heist and victim != nobody
+raise saves 1 when foiled
+raise takings 1 when victim != nobody and syndicate.special == cult
+raise faces 1 when victim != nobody and syndicate.special == doppelganger and replacing
 (((
 The taking is secret, and a mark is read from the slate, so only deaths
 and thefts make the report.
@@ -524,7 +570,7 @@ spreads to the next seat that hasn't heard it.
 You have five minutes. Make them count.
 
 [end]
-> [[Pay {target}’s debt->day]] ~ at guest where: it.alive and it.marked ~ when syndicate.special == collectors and me.alive and not me.voteless ~ then set target.marked: no ~ then set me.voteless: yes ~ id pay_debt
+> [[Pay {target}’s debt->day]] ~ at guest where: it.alive and it.marked ~ when syndicate.special == collectors and me.alive and not me.voteless ~ then set target.marked: no ~ then set me.voteless: yes ~ then raise debts_paid 1 ~ id pay_debt
 > [[Start a whisper about {target}->day:whisper]] ~ at guest where: it.alive and it != me ~ when me.alive and not whispered ~ id whisper
 > [[To the vote->vote]] ~ for cohort ~ after 5m ~ id to_vote
 
@@ -553,6 +599,9 @@ every game ends, even one where nobody can be killed at night.
 :: counted
 set lynched: accusation.who
 set lynched.alive: no
+raise lynched_syndicate 1 when lynched.team != town
+raise lynched_town 1 when lynched.team == town
+raise draws 1 when accusation.drawn
 set each guest.voteless: no
 (((
 A thief voted out is searched: what they stole goes back to its owners,
@@ -560,6 +609,7 @@ and can be stolen again.
 )))
 let found: lynched.loot
 move each found to it.owner.keepsake when syndicate.special == heist
+raise returned count(found) when syndicate.special == heist
 spreads 1 to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ then set it.heard: yes ~ when whispered
 --
 {ballots}
