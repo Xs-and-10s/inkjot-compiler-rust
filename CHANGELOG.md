@@ -52,6 +52,11 @@
   are decided by the vote, and it pays to vote quickly. A stolen keepsake
   goes into its thief's own loot; the haul is all the Crew's loot, so the
   win count is unchanged, and the epilogue shows whose luggage held what.
+- A thief voted out is searched, and what they stole goes back to its
+  owners. The Crew now needs a third of the table's keepsakes plus one
+  (`players / 3 + 1`, was `members + 2`), tuned so that, in random play,
+  the town wins the Heist about as often as against a plain syndicate at
+  every size from 5 to 12 (`tests/ex7_rules.rs`).
 - Last bug pass: the Doppelgänger's swap now happens before the morning
   report; debts fall due at nightfall, a full day after marking; the
   syndicate's size counts players only, after the deal; teammates are

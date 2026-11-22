@@ -25,7 +25,10 @@ fn the_model_follows_the_draft() {
         "~ card doctor: 1",
         "~ card detective: 1",
         "~ card townsfolk: rest",
-        "get haul_needed: members + 2",
+        "get haul_needed: players / 3 + 1",
+        "move each found to it.owner.keepsake when syndicate.special == heist",
+        "get haul: all(guest, where: it.team == syndicate).loot",
+        "let first_voter: first(victim.chosen_by)",
         "revote: 1, ties: draw}",
         "it.marked_since < clock.now)",
         "set victim.marked_since: clock.now when victim != nobody",
@@ -73,6 +76,8 @@ struct Guest {
     marked_since: Option<u32>,
     voteless: bool,
     keepsake: bool,
+    /// The Heist: whose keepsakes this member stole, owners by seat.
+    loot: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -122,6 +127,7 @@ fn deal(players: usize, special: Special, dice: &mut Dice) -> Vec<Guest> {
             marked_since: None,
             voteless: false,
             keepsake: true,
+            loot: Vec::new(),
         })
         .collect()
 }
@@ -132,10 +138,43 @@ fn alive(g: &[Guest], f: impl Fn(&Guest) -> bool) -> Vec<usize> {
 
 /// One game, to the end. `None` if it is still going after `limit` phases.
 fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winner> {
+    play_with(players, special, seed, limit, true)
+}
+
+/// One game; with `returned`, a thief voted out gives back their loot,
+/// as the draft says.
+fn play_with(
+    players: usize,
+    special: Special,
+    seed: u64,
+    limit: u32,
+    returned: bool,
+) -> Option<Winner> {
+    play_need(
+        players,
+        special,
+        seed,
+        limit,
+        returned,
+        haul_needed(players),
+    )
+}
+
+/// `get haul_needed: players / 3 + 1`.
+fn haul_needed(players: usize) -> usize {
+    players / 3 + 1
+}
+
+fn play_need(
+    players: usize,
+    special: Special,
+    seed: u64,
+    limit: u32,
+    returned: bool,
+    need: usize,
+) -> Option<Winner> {
     let mut dice = Dice(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     let mut g = deal(players, special, &mut dice);
-    let need = members(players) + 2;
-    let mut haul = 0;
     let mut saved_last: Option<usize> = None;
     // Who voted with a cultist yesterday.
     let mut voted_with_cult: Vec<usize> = Vec::new();
@@ -157,6 +196,12 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
         if special == Special::Cult && cult > town {
             return Some(Winner::Cult);
         }
+        // The haul: all the Crew's loot, dead members' included.
+        let haul: usize = g
+            .iter()
+            .filter(|x| x.team == Team::Syndicate)
+            .map(|x| x.loot.len())
+            .sum();
         if special == Special::Heist && haul >= need {
             return Some(Winner::Heist);
         }
@@ -203,9 +248,13 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
                     Special::None | Special::Doppelganger => g[t].alive = false,
                     Special::Collectors => g[t].marked_since = Some(now + 1),
                     Special::Cult => g[t].team = Team::Cult,
+                    // The first to vote for the target carries it; any of
+                    // the Crew, as far as the model knows.
                     Special::Heist => {
-                        g[t].keepsake = false;
-                        haul += 1;
+                        if let Some(thief) = dice.one(&alive(&g, |x| x.team == Team::Syndicate)) {
+                            g[t].keepsake = false;
+                            g[thief].loot.push(t);
+                        }
                     }
                 }
             }
@@ -235,6 +284,12 @@ fn play(players: usize, special: Special, seed: u64, limit: u32) -> Option<Winne
             // A tie votes once more; modelled as straight to the draw.
             if let Some(out) = dice.one(&tied) {
                 g[out].alive = false;
+                // Found in the luggage, and given back.
+                if returned {
+                    for owner in std::mem::take(&mut g[out].loot) {
+                        g[owner].keepsake = true;
+                    }
+                }
             }
             let cult_choices: Vec<usize> = ballots
                 .iter()
@@ -305,5 +360,85 @@ proptest! {
         let special = SPECIALS[which];
         let limit = 2 * players as u32 + 2;
         prop_assert!(play(players, special, seed, limit).is_some(), "{:?} at {} did not end", special, players);
+    }
+}
+
+/// The town's chance against the Heist Crew is about its chance against a
+/// plain syndicate, at every table size: within 15 points, in random play.
+/// Random play is a crude player, but the same crude player on both sides
+/// of the comparison, so it shows when a rule tips a special too far.
+#[test]
+fn the_heist_is_as_fair_as_a_plain_syndicate() {
+    let rate = |players, special| {
+        let n = 2000u64;
+        let town = (1..=n)
+            .filter(|&seed| play(players, special, seed, 200) == Some(Winner::Town))
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    for players in 5..=12 {
+        let (plain, heist) = (rate(players, Special::None), rate(players, Special::Heist));
+        assert!(
+            (plain - heist).abs() <= 15.0,
+            "at {players}: the town wins {heist:.1}% against the Heist, {plain:.1}% against a plain syndicate"
+        );
+    }
+}
+
+/// How often the town wins, in random play, for each syndicate and table
+/// size. `cargo test --test ex7_rules win_rates -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn win_rates() {
+    let rate = |players, special, returned| {
+        let n = 4000u64;
+        let town = (1..=n)
+            .filter(|&seed| play_with(players, special, seed, 200, returned) == Some(Winner::Town))
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    println!("town wins, %   none  dopp  coll  cult  heist(kept)  heist(returned)");
+    for players in 5..=12 {
+        print!("{players:>2} players    ");
+        for special in &SPECIALS[..4] {
+            print!("{:>5.1} ", rate(players, *special, true));
+        }
+        println!(
+            "  {:>5.1}        {:>5.1}",
+            rate(players, Special::Heist, false),
+            rate(players, Special::Heist, true)
+        );
+    }
+}
+
+/// The Heist at every haul target, beside the plain syndicate: how the
+/// target was chosen. `cargo test --test ex7_rules tune_the_heist --
+/// --ignored --nocapture`
+#[test]
+#[ignore]
+fn tune_the_heist() {
+    let rate = |players, special, need| {
+        let n = 4000u64;
+        let town = (1..=n)
+            .filter(|&seed| {
+                play_need(players, special, seed, 200, true, need) == Some(Winner::Town)
+            })
+            .count();
+        100.0 * town as f64 / n as f64
+    };
+    for players in 5..=12usize {
+        let chosen = haul_needed(players);
+        print!(
+            "{players:>2}: none {:>5.1} |",
+            rate(players, Special::None, 0)
+        );
+        for need in 1..=7usize {
+            print!(
+                " need {need}{} {:>5.1}",
+                if need == chosen { "*" } else { " " },
+                rate(players, Special::Heist, need)
+            );
+        }
+        println!();
     }
 }

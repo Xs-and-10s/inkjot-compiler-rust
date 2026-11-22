@@ -73,8 +73,9 @@ special syndicates change the rules:
   name dies at the next nightfall unless someone pays with their vote;
 - **the Cult of the Long Night**: they convert instead of killing, and
   only someone who voted with them that day;
-- **the Heist Crew**: no deaths; three keepsakes stolen from the players'
-  piles and they win.
+- **the Heist Crew**: no deaths; a third of the table's keepsakes, plus
+  one, stolen from the players' piles and they win. A thief voted out
+  gives back what they carried.
 
 Three ways to moderate: the engine's tables; MonkeyPaw, writing each
 morning fresh with the table's line as the fallback; or a Storyteller who
@@ -101,7 +102,9 @@ syndicate where: it.special == chosen_special`); a consensus that
 remembers who chose each target, in order (`victim.chosen_by`), with
 `first(…)`, so the first to vote for the chosen target does the deed for
 the group (decided 21 Nov); a pile on a set of players (`all(guest,
-where: …).loot`).
+where: …).loot`); putting each card back where it belongs (`move each
+found to it.owner.keepsake`), for a thief voted out, whose loot is
+returned (decided 21 Nov).
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 

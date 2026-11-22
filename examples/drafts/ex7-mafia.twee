@@ -178,11 +178,12 @@ get members: max(1, players / 4)
 get town_left: count(guest, where: it.alive and it.team == town)
 get syndicate_left: count(guest, where: it.alive and it.team == syndicate)
 (((
-The Heist Crew needs more keepsakes the more of them there are: two more
-than their number. They take one a night, so the town gets that many days
-to find them.
+The Heist Crew needs a third of the table's keepsakes, plus one. They take
+one a night, and a thief voted out gives back what they carried, so the
+town gets days to find them. Tuned against the plain syndicates, table
+size by table size, in `tests/ex7_rules.rs` (21 Nov 2026).
 )))
-get haul_needed: members + 2
+get haul_needed: players / 3 + 1
 get cult_left: count(guest, where: it.alive and it.team == cult)
 
 (((
@@ -398,6 +399,7 @@ vote on the target chosen.
 )))
 let first_voter: first(victim.chosen_by)
 let taken: top of victim.keepsake
+set taken.owner: victim when syndicate.special == heist and victim != nobody
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
 let foiled: victim != nobody and victim == saved
 set victim: nobody when foiled
@@ -529,6 +531,12 @@ every game ends, even one where nobody can be killed at night.
 set lynched: accusation.who
 set lynched.alive: no
 set each guest.voteless: no
+(((
+A thief voted out is searched: what they stole goes back to its owners,
+and can be stolen again.
+)))
+let found: lynched.loot
+move each found to it.owner.keepsake when syndicate.special == heist
 spreads 1 to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ then set it.heard: yes ~ when whispered
 --
 {ballots}
@@ -540,6 +548,9 @@ spreads 1 to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ the
 
 [if not (syndicate.special == doppelganger and lynched.shown_as != lynched.name)]
 @lamplighter {if lynched.team == town then syndicate.townsfolk else syndicate.mafia}.
+
+[if syndicate.special == heist and count(found) > 0]
+@lamplighter In {possessive(lynched)} luggage, wrapped in a shirt: {all found}. Each goes back to its owner, who pretends not to have been worried.
 
 [end]
 > [[Night falls->night]] ~ for cohort ~ id night_again ~ then wait until night
