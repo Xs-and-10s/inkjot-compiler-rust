@@ -270,10 +270,12 @@ repeats, lists extend and objects merge.
 | `moves a, b` / `moves none` / `moves 2 per chronon` | `moves` (list; `[]` for none) / `speed` |
 | `asleep during R`, `wakes on loud`, `stays awake n` | `asleep_during`, `wakes_on`, `stays_awake` |
 | `toward E`, `via X`, `pace X` | `toward`, `via`, `pace` |
+| `every 2 turns`, `where: E` (on a goal) | `every`: 2, `where`: expr |
+| `follows me when E` | `follows`: `{"who": "me", "when": expr}` |
 | `max n`, `per character`, `refill each chronon` / `refill on checkpoint` | `max`, `per`, `refill`: `"chronon"` / `"checkpoint"` |
 | `part of X`, `after X` | `part_of`, `after` |
 | `culprit X`, `method X`, `methods a, b` | `culprit`, `method`, `methods` |
-| `best R`, `advance x`, `turn limit 24h`, `turn ends when E`, `day n` | `best`, `advance`, `turn_limit`, `turn_ends_when`, `day` |
+| `best R`, `advance x`, `turn limit 24h`, `turn ends when E`, `day n`, `each action` | `best`, `advance`, `turn_limit`, `turn_ends_when`, `day`, `each_action: true` |
 | `switch freely`, `lead X`, `order each other within earshot` | `switch`, `lead`, `order_within` |
 | `timed 40ms`, `beat 1s`, `shows visited` | `timed`, `beat`, `shows` |
 | `on death in X`, `keeps a, b`, `resets a, b` | `on_death_in`, `keeps`, `resets` |
@@ -295,6 +297,11 @@ several phrases match, the longest wins.
 { "do": "set", "target": {"get": ["vell", "cornered"]}, "value": true, "when": null }
 { "do": "say", "who": "hask", "text": "Again! From the top!", "when": null }
 ```
+
+A timing clause after an effect is the effect's: `~ for 3 turns` adds
+`"lasts": 3`, `~ after 2 turns` adds `"delay": 2`, and a `when` on the
+timing clause joins the effect's own (`{"and": [own, timing's]}`). On a
+header line, the timing clause is taken out of `clauses`.
 
 `args` are the effect's words in order. A number is a number, a quoted string
 is `{"str": "…"}`, and anything that reads as an expression is lowered
@@ -367,6 +374,10 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   carries its group's clauses. `all(…)` and `with: {"where": …}` in calls.
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
+- Milestone 20b: `lasts` and `delay` on effects; `each_action` on the clock
+  setting; `follows` on declarations; `every` and `where` on goals (and
+  `wanders` among a goal's tags); the event `move` for `on` handlers, whose
+  `what` may be a kind, a tag or an archetype.
 
 ## Changes from version 2
 

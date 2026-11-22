@@ -67,6 +67,30 @@ pub(super) struct Snapshot {
     aka: BTreeMap<String, (Vec<usize>, usize)>,
     handler_counts: Vec<u32>,
     sightings: BTreeMap<String, Vec<Sighting>>,
+    timers: Vec<Timer>,
+}
+
+/// Something waiting on the clock: an effect `after N turns`, or a value
+/// put back when an effect `for N turns` wears off.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Timer {
+    /// The chronon it happens at.
+    pub due: u32,
+    pub what: Due,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum Due {
+    /// `set planks_out: yes ~ after 2 turns`: the effect, with the values
+    /// of the names it was written among (`target`), and whose it was.
+    Effect {
+        effect: Value,
+        locals: Vec<(String, V)>,
+        pov: String,
+    },
+    /// `set me.hushed: yes ~ for 4 turns`: what `key` held before, or
+    /// nothing.
+    Restore { key: String, old: Option<V> },
 }
 
 impl Snapshot {
@@ -93,6 +117,7 @@ impl Run {
             aka: self.aka.clone(),
             handler_counts: self.handler_counts.clone(),
             sightings: self.sightings.clone(),
+            timers: self.timers.clone(),
         }
     }
 
@@ -111,6 +136,7 @@ impl Run {
         self.aka = s.aka;
         self.handler_counts = s.handler_counts;
         self.sightings = s.sightings;
+        self.timers = s.timers;
     }
 
     /// The first snapshot, and every declared checkpoint set to it.
@@ -576,6 +602,7 @@ impl Run {
         }
         if categories.iter().any(|c| c == "world") {
             base.lists = from.lists.clone();
+            base.timers = from.timers.clone();
         }
     }
 

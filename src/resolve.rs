@@ -60,6 +60,12 @@ pub const BUILTINS: &[&str] = &[
     "accusation",
     // What a Link with `~ at` was taken on, in its effects and its passage.
     "target",
+    // What an `on` handler's event happened to: `on enter shaft when entered.burnt`.
+    "entered",
+    "left",
+    "crossed",
+    "moved",
+    "taken",
     "yes",
     "no",
     "nobody",

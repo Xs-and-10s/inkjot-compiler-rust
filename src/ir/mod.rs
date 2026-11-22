@@ -122,6 +122,39 @@ fn split_when(text: &str) -> (&str, Option<Value>) {
     }
 }
 
+/// `for 3 turns`, `after 2 turns when lit`: how long an effect lasts, or
+/// how long until it happens. `("lasts" | "delay", N, when)`.
+pub(super) fn timing(text: &str) -> Option<(&'static str, Value, Option<Value>)> {
+    let (head, when) = split_when(text.trim());
+    let words: Vec<&str> = head.split_whitespace().collect();
+    let key = match words.as_slice() {
+        ["for", _, "turn" | "turns"] => "lasts",
+        ["after", _, "turn" | "turns"] => "delay",
+        _ => return None,
+    };
+    Some((key, token(words[1]), when))
+}
+
+/// Put a timing clause on the effect before it: `~ then set me.hushed: yes
+/// ~ for 4 turns`. A `when` on the clause joins the effect's own. `false`
+/// if `text` is not a timing clause.
+pub(super) fn time_effect(effect: Option<&mut Value>, text: &str) -> bool {
+    let (Some(Value::Obj(pairs)), Some((key, n, when))) = (effect, timing(text)) else {
+        return false;
+    };
+    pairs.push((key.to_string(), n));
+    if let Some(when) = when {
+        match pairs.iter_mut().find(|(k, _)| k == "when") {
+            Some((_, have)) if *have != Value::Null => {
+                *have = Value::obj([("and", Value::Arr(vec![have.clone(), when]))]);
+            }
+            Some((_, have)) => *have = when,
+            None => pairs.push(("when".to_string(), when)),
+        }
+    }
+    true
+}
+
 /// The text inside the first pair of double quotes, if any, as written:
 /// braces may hold quotes of their own, and escapes are left in.
 fn quoted(text: &str) -> Option<&str> {
@@ -388,6 +421,9 @@ impl Builder {
         let head = &s.clauses[0].text;
         let first = head.split_once(':').map_or("", |(_, v)| v.trim());
         for clause in std::iter::once(first).chain(s.clauses[1..].iter().map(|c| c.text.as_str())) {
+            if time_effect(def.effects.last_mut(), clause) {
+                continue;
+            }
             let word = first_word(clause);
             let rest = clause[word.len()..].trim();
             match word {
@@ -524,7 +560,6 @@ impl Builder {
         let head = s.clauses[0].text.as_str();
         let kw = s.kw.as_str();
         let rest = head.get(kw.len()..).unwrap_or("").trim_start();
-        let tail = || Value::Arr(s.clauses[1..].iter().map(|c| clause(&c.text)).collect());
         let source = || {
             s.clauses
                 .iter()
@@ -572,9 +607,16 @@ impl Builder {
             }
             _ if DECLS.contains(&kw) => self.declaration(s, kw, rest),
             _ if is_effect(kw, rest) => {
-                let mut pairs = vec![("effect".to_string(), effect(head))];
-                if s.clauses.len() > 1 {
-                    pairs.push(("clauses".to_string(), tail()));
+                // `set planks_out: yes ~ after 2 turns`: the timing is the effect's.
+                let mut done = effect(head);
+                let rest: Vec<Value> = s.clauses[1..]
+                    .iter()
+                    .filter(|c| !time_effect(Some(&mut done), &c.text))
+                    .map(|c| clause(&c.text))
+                    .collect();
+                let mut pairs = vec![("effect".to_string(), done)];
+                if !rest.is_empty() {
+                    pairs.push(("clauses".to_string(), Value::Arr(rest)));
                 }
                 Value::Obj(pairs)
             }
@@ -873,6 +915,9 @@ impl Builder {
 
         for c in &clauses {
             let text = c.text.as_str();
+            if time_effect(effects.last_mut(), text) {
+                continue;
+            }
             let word = first_word(text);
             let rest = text[word.len()..].trim();
             match word {
@@ -1239,6 +1284,10 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
     } else {
         words.remove(0)
     };
+    // `on turn ends`: the turn has nothing it happens to.
+    if event == "turn" && words.first() == Some(&"ends") {
+        words.remove(0);
+    }
     let by = words.iter().position(|w| *w == "by").map(|i| {
         let who = words.get(i + 1).copied().unwrap_or("");
         words.truncate(i);
@@ -1250,6 +1299,9 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
     let mut tags = Vec::new();
     for c in clauses {
         let text = c.text.as_str();
+        if time_effect(then.last_mut(), text) {
+            continue;
+        }
         if let Some(e) = text.strip_prefix("then ") {
             then.push(effect(e));
         } else if text == "once" {

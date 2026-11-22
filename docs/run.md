@@ -293,6 +293,19 @@ The interpreter fires these events. Every handler for an event runs, in the
 order written. Inside one, `actor` is who did it and `self` is the character
 or NPC whose margin holds the handler (so `say self "…"` is the Host).
 
+A handler names what its event happened to: one thing (`on enter marrow`),
+or a kind, a tag or an archetype, for every thing of it (`on enter place`,
+`on enter shaft`). Inside, the thing itself is `entered`, `left`,
+`crossed`, `moved` or `taken`, by the event:
+
+```text
+on enter shaft by me when entered.burnt
+~ then lower entered.crossings 1
+```
+
+`by me` keeps a handler to what the pov does; without it, an NPC walking
+into a shaft would count too. `on turn ends` is `on turn`.
+
 | Event | When | `what` |
 |---|---|---|
 | `start` | the run begins | — |
@@ -302,6 +315,7 @@ or NPC whose margin holds the handler (so `say self "…"` is the Host).
 | `take` | a pov takes an item | the item |
 | `learn` | a pov learns a fact they did not know | the fact |
 | `raise`, `lower`, `set` | a value changes | the value, `cleverness` or `glyph.broken` |
+| `move` | anyone changes place, after `leave` and `enter` | who moved |
 | `turn` | a turn ends | — |
 | `death` | anyone dies | — (`actor` is who died) |
 | `loud` | a pov does a `loud` act, or takes a Link marked `~ loud` | the act |
@@ -331,8 +345,33 @@ takes one move. Dead, detained and `fix`ed NPCs sit it out.
    goal leads to (while there is a way there), and `self.leaving` means that
    place is `offstage`.
 5. **Otherwise it walks**: one place a turn, two at `pace dash`, or what its
-   `moves N per chronon` says (`moves none`: never). Each step fires `leave`
-   and `enter`. On arriving it runs the goal's `then`.
+   `moves N per chronon` says (`moves none`: never). Each step fires `leave`,
+   `enter` and `move`. On arriving it runs the goal's `then`.
+
+A goal may also say how it goes:
+
+```text
+:: warden [npc]
+goal chase:
+~ toward me
+~ when self.roused and not self.paid
+~ every 2 turns
+~ where: it.salted and it.heat == 0
+
+:: gleaner [npc]
+goal glean:
+~ wanders
+~ where: it.salted and it.depth < 300
+```
+
+- `~ every 2 turns`: it walks only when the clock is a multiple of 2. The
+  goal is still its goal on the other turns, and its reactions still run.
+- `~ where: E`: it only goes through places where `E` holds, with `it` as
+  the place. If the place it heads for fails `E` too (the pov is on
+  unsalted ground), there is no way there, and it waits.
+- `~ wanders`, in place of `~ toward`: each move is to a place next to it,
+  picked at random from those it may go to. A goal with nowhere to wander
+  to is passed over.
 
 The words agendas lean on:
 
@@ -360,6 +399,49 @@ The words agendas lean on:
 - `dash toward p`, in a reaction: the NPC runs up to two places toward `p`,
   loudly. Vell's `chase` races a Linker to where she is going.
 - `kill pov.all` kills every pov; `kill each in oubliette` everyone there.
+
+## Time and motion
+
+**A turn for each action.** `clock: 0.. ~ each action` makes every Link the
+Linker takes a turn: after the act is done and shown, the turn ends (the
+`turn` handlers, the clock, what was waiting on it, the NPCs' moves), and
+the Links are offered again for the world as it is now. Not a turn: a hint,
+switching pov, going back (`[[Undo->rewind]]` and the menu it opens), a
+`pass` (which ends the turn itself), or a Link that leads to an ending.
+Without `each action`, turns end as before: on a `pass`, or on a walk in a
+world of stops.
+
+**Effects on the clock.** A timing clause belongs to the effect before it,
+on a header line, after a Link's or an act's `~ then`, or in a handler:
+
+```text
+set planks_out: yes ~ after 2 turns
+> [[Whistle->here]] ~ then set hushed: yes ~ for 2 turns
+~ then set gleaner.candle_lit: yes ~ after 3 turns when not gleaner.candle_lit
+```
+
+- `after N turns`: the effect's `when` is checked now, and the effect is
+  done when the clock has gone on N turns, with the names it was written
+  among (`target`) as they were. Asked again while it waits, it still
+  happens once, when first asked.
+- `for N turns`: the effect is done now, and N turns later what it changed
+  is put back. Only `set`, `raise`, `lower` and `toggle` can last. Done
+  again while it lasts, it lasts N turns from then, and still puts back
+  what was there before the first.
+
+N is a number or a name that holds one. Effects done on turn 0 `for 3
+turns` hold on turns 0, 1 and 2. The waiting effects are part of the
+world: a rewind or a checkpoint that resets `world` puts them back as they
+were.
+
+**Following.** `npc thwaite ~ follows me when self.with_me and way_free`:
+when the pov changes place, an NPC that follows and was with them, and whose
+`when` holds (`self` is the NPC), comes along: after the pov's `leave`,
+before their `enter`, so `thwaite.here` already holds in the pov's `enter`
+handlers. An act does not move the pov, wherever its passage is kept: a
+spellbook's act is done where they stand.
+
+`x.place` is where a person or thing is: `{gleaner.place}`.
 
 ## What an act asks first
 

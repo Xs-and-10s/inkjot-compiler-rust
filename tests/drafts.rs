@@ -338,7 +338,7 @@ fn lint(src: &str) -> Vec<String> {
             let after = &rest[k + 2..];
             if let Some(end) = after.find("]]") {
                 let target = after[..end].trim();
-                if !passages.contains(target) && target != "here" {
+                if !passages.contains(target) && !["here", "rewind"].contains(&target) {
                     out.push(format!(
                         "line {no}: the Link goes to `{target}`, which is not a passage"
                     ));

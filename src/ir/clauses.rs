@@ -11,7 +11,9 @@
 
 use std::collections::HashSet;
 
-use super::{cost, effect, expression, quoted, quoted_text, token, word, words};
+use super::{
+    cost, effect, expression, quoted, quoted_text, split_when, time_effect, token, word, words,
+};
 use crate::json::Value;
 use crate::syntax::{is_ident, top_mask};
 
@@ -44,6 +46,10 @@ enum Shape {
     Aka,
     /// `holds a, b: "label", c as mark`: list entries.
     Holds,
+    /// `follows me when self.with_me`: who, and when.
+    Follows,
+    /// `every 2 turns`: a number of turns.
+    Turns,
     /// `oubliette for roland, chapel for eldric`, or a single word.
     PerWho,
 }
@@ -121,6 +127,9 @@ const PATTERNS: &[Pattern] = &[
     p(&["toward"], "toward", Shape::Expr),
     p(&["via"], "via", Shape::Token),
     p(&["pace"], "pace", Shape::Token),
+    p(&["follows"], "follows", Shape::Follows),
+    p(&["every"], "every", Shape::Turns),
+    p(&["where:"], "where", Shape::Expr),
     // Resources.
     p(&["max"], "max", Shape::Token),
     p(&["per"], "per", Shape::Token),
@@ -138,6 +147,7 @@ const PATTERNS: &[Pattern] = &[
     p(&["day"], "day", Shape::Token),
     p(&["turn", "limit"], "turn_limit", Shape::Token),
     p(&["turn", "ends", "when"], "turn_ends_when", Shape::Expr),
+    p(&["each", "action"], "each_action", Shape::Flag),
     p(&["switch"], "switch", Shape::Token),
     p(&["lead"], "lead", Shape::Id),
     p(
@@ -254,6 +264,12 @@ impl<'a> Fields<'a> {
         if text.is_empty() {
             return;
         }
+        // `~ then set me.held: yes ~ for 1 turn`: the timing is the effect's.
+        if let Some((_, Value::Arr(then))) = self.pairs.iter_mut().find(|(k, _)| k == "then") {
+            if time_effect(then.last_mut(), text) {
+                return;
+            }
+        }
         if text.starts_with('"') {
             // The first quoted phrase is a label; a later one is a description.
             let key = if self.pairs.iter().any(|(k, _)| k == "label") {
@@ -365,6 +381,14 @@ impl<'a> Fields<'a> {
                 Value::Arr(entries)
             }
             Shape::PerWho => per_who(rest),
+            Shape::Follows => {
+                let (who, when) = split_when(rest);
+                Value::obj([
+                    ("who", Value::str(who.trim())),
+                    ("when", when.unwrap_or(Value::Null)),
+                ])
+            }
+            Shape::Turns => token(rest.split_whitespace().next().unwrap_or("")),
         };
         self.add(pat.key, value);
     }

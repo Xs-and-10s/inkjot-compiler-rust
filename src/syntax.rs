@@ -176,7 +176,7 @@ pub(crate) const CHOICES: &[&str] = &["proactive", "reactive", "inactive"];
 
 pub(crate) const EVENTS: &[&str] = &[
     "start", "enter", "leave", "cross", "take", "learn", "act", "turn", "death", "rewind", "out",
-    "loud", "raise", "lower", "set",
+    "loud", "raise", "lower", "set", "move",
 ];
 
 /// Acts every Inklink has, whether or not its config tunes them.

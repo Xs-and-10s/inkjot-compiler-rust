@@ -821,6 +821,26 @@ impl Checker {
         }
     }
 
+    /// `~ for 3 turns`, `~ after 2 turns when lit`: a number of turns, or a
+    /// name that holds one.
+    fn timing(&mut self, c: &Clause) {
+        let words: Vec<&str> = before_when(&c.text).split_whitespace().collect();
+        let timed = matches!(words.first(), Some(&("for" | "after")))
+            && matches!(words.last(), Some(&("turn" | "turns")));
+        if !timed {
+            return;
+        }
+        match words.as_slice() {
+            [_, n, _] if n.parse::<u32>().is_ok() => {}
+            [lead, n, _] => self.expr(n, c.line, c.col + cols(lead) + 1),
+            _ => self.err(
+                c.line,
+                c.col,
+                "a time is `~ for 3 turns` or `~ after 3 turns`, after the effect it belongs to",
+            ),
+        }
+    }
+
     /// Checks shared by every clause: `when`, `until`, `then`, `check`, `like`, table rows.
     fn clause_common(&mut self, c: &Clause, is_tail: bool) {
         if let Some(i) = after_word(&c.text, "when") {
@@ -839,6 +859,7 @@ impl Checker {
         if let Some(stat) = c.text.strip_prefix("check ") {
             self.need(first_word(stat), &["stat"], "stat", c.line, c.col + 6);
         }
+        self.timing(c);
         if !is_tail {
             return;
         }
@@ -887,6 +908,12 @@ impl Checker {
             ),
             ["knows", fact] => self.need(fact, &["fact"], "fact", c.line, c.col + 6),
             ["moves", ..] => self.moves(&c.text[5..], c.line, c.col + 5),
+            // `follows me when self.with_me`: only the pov is followed.
+            ["follows", who, ..] if *who != "me" => self.err(
+                c.line,
+                c.col + 8,
+                "an NPC follows the pov: `~ follows me`, or `~ follows me when …`",
+            ),
             _ => {}
         }
     }
@@ -1423,11 +1450,26 @@ impl Checker {
         }
         let Some(arg) = words.next() else { return };
         let arg_col = col + cols(&rest[..rest.find(arg).unwrap_or(0)]);
+        // `on turn ends`: the turn has nothing it happens to.
+        if arg == "by" || (event == "turn" && arg == "ends") {
+            return;
+        }
+        // A kind or an archetype names every thing of it: `on enter place`,
+        // `on enter shaft`.
+        let kinds: &[&str] = match event {
+            "cross" => &["way"],
+            "enter" | "leave" => &["place"],
+            "take" => &["item"],
+            "move" => &["npc", "character"],
+            _ => &[],
+        };
+        if kinds.contains(&arg) || self.has(arg, &["archetype"]) {
+            return;
+        }
         match event {
             "act" => self.need_passage(arg, "the act", line, arg_col),
-            "cross" => self.need(arg, &["way"], "way", line, arg_col),
-            "enter" | "leave" => self.need(arg, &["place"], "place", line, arg_col),
-            "take" => self.need(arg, &["item"], "item", line, arg_col),
+            "cross" | "enter" | "leave" | "take" => self.need(arg, kinds, kinds[0], line, arg_col),
+            "move" => self.need(arg, kinds, "person", line, arg_col),
             _ => {}
         }
     }

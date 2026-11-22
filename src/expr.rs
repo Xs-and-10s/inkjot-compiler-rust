@@ -251,6 +251,11 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
             out.push((start, Tok::Op(op)));
         } else if c == b'\'' {
             return Err((start, "text takes double quotes: \"like this\"".into()));
+        } else if c == b'%' {
+            return Err((
+                start,
+                "a remainder is written `mod`: `clock.now mod 4 == 0`".into(),
+            ));
         } else {
             let ch = src[i..].chars().next().unwrap_or('?');
             return Err((start, format!("unexpected `{ch}` in an expression")));
