@@ -870,7 +870,7 @@ fn the_book_says_what_the_spells_do() {
 fn every_spell_is_in_the_book() {
     let src = draft();
     let map = parse(&src);
-    let start = src.find("> ~ for apprentice ~ everywhere").unwrap();
+    let start = src.find("> ~ for apprentice\n").unwrap();
     let group: Vec<&str> = src[start..]
         .lines()
         .skip(1)

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Milestone 20a: targets and filters
+
+- `where:` with `it` in kind filters, and `all(…)`: `count(guest, where:
+  it.alive and it != me)`. `it` is known only inside `where:`.
+- Tags read as yes (`it.timbered`), and `x.next_to(y)`, `x.like(shaft)`,
+  `x.held_by(who)`.
+- `~ at item here where: …` on a Link or an act: one Link per target, with
+  `target` in its label, conditions, effects and the passage it leads to.
+- An act's `~ at`, `~ when`, `~ learned from` and `~ then` go to every Link
+  that names it; a combo needs its acts known too.
+- Link groups: `> ~ clause` lends its clauses to the Links below it.
+- Effects on a set: `set due.alive: no` with `due` a list.
+- The config's `let`s and `get`s are in scope in every passage (they were
+  checked as such, but never loaded).
+- A colon no longer starts a sentence for capitalising; a speaker's line
+  does (a fix to milestone 19).
+- Ex 9's spellbook is a `[lib everywhere]` passage, the built way to offer
+  Links everywhere, so no new word was needed.
+
 ### Measures
 
 - `measure name: expression` in the config: values the engine reports in

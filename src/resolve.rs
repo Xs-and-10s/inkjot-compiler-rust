@@ -38,6 +38,7 @@ pub struct Problem {
 pub const FUNCTIONS: &[&str] = &[
     "count",
     "one",
+    "all",
     "alone_with",
     "nearest",
     // Helpers for text.
@@ -57,6 +58,8 @@ pub const BUILTINS: &[&str] = &[
     "pov",
     "scenario",
     "accusation",
+    // What a Link with `~ at` was taken on, in its effects and its passage.
+    "target",
     "yes",
     "no",
     "nobody",
@@ -106,7 +109,26 @@ pub fn unresolved(e: &Expr, lookup: &impl Lookup) -> Vec<Problem> {
     out
 }
 
-fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
+/// Inside a `where:` filter, `it` is each candidate in turn.
+struct WithIt<'a>(&'a dyn Lookup);
+
+impl Lookup for WithIt<'_> {
+    fn is_known(&self, name: &str) -> bool {
+        name == "it" || self.0.is_known(name)
+    }
+    fn is_kind(&self, name: &str, kind: &str) -> bool {
+        self.0.is_kind(name, kind)
+    }
+}
+
+/// Every name in a `where:` condition that does not resolve, `it` known.
+pub fn unresolved_where(e: &Expr, lookup: &impl Lookup) -> Vec<Problem> {
+    let mut out = Vec::new();
+    walk(e, &WithIt(lookup), &mut out);
+    out
+}
+
+fn walk(e: &Expr, lookup: &dyn Lookup, out: &mut Vec<Problem>) {
     match e {
         Expr::Num(_) | Expr::Str(_) => {}
         Expr::Text(parts) => parts.iter().for_each(|p| {
@@ -161,7 +183,11 @@ fn walk(e: &Expr, lookup: &impl Lookup, out: &mut Vec<Problem>) {
                 other => walk(other, lookup, out),
             }
             for arg in args {
-                walk(&arg.value, lookup, out);
+                if arg.key.as_deref() == Some("where") {
+                    walk(&arg.value, &WithIt(lookup), out);
+                } else {
+                    walk(&arg.value, lookup, out);
+                }
             }
         }
         Expr::Index(target, index) => {

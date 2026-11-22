@@ -196,6 +196,59 @@ impl Checker {
         }
     }
 
+    /// A `where:` condition: an expression in which `it` is each candidate.
+    fn where_expr(&mut self, text: &str, line: usize, col: usize) {
+        let body = text.trim();
+        let col = col + cols(&text[..text.len() - text.trim_start().len()]);
+        self.stats.expressions += 1;
+        match expr::parse(body) {
+            Ok(e) => {
+                for Problem { at, name, .. } in resolve::unresolved_where(&e, self) {
+                    self.err(
+                        line,
+                        col + cols(&body[..at.min(body.len())]),
+                        format!("`{name}` is not declared: it is not a builtin, a declared id, a tag, or a `let` in scope"),
+                    );
+                }
+            }
+            Err((off, msg)) => {
+                let off = off.min(body.len());
+                self.err(line, col + cols(&body[..off]), msg);
+            }
+        }
+    }
+
+    /// `~ at item here where: not it.lit`: a kind, `here`, and a condition.
+    fn target_clause(&mut self, c: &Clause) {
+        let rest = c.text["at".len()..].trim_start();
+        let rest_col = c.col + cols(&c.text[..c.text.len() - rest.len()]);
+        let (head, condition) = match rest.split_once("where:") {
+            Some((h, w)) => (h, Some((w, rest_col + cols(h) + 6))),
+            None => (rest, None),
+        };
+        let mut words = head.split_whitespace();
+        let kind = words.next().unwrap_or("");
+        if !self.is_kind_word(kind) {
+            self.err(
+                c.line,
+                rest_col,
+                format!("`~ at` names a kind of thing, such as `item` or `place`, then `here` or `where:`; `{kind}` is not one"),
+            );
+        }
+        for w in words {
+            if w != "here" {
+                self.err(
+                    c.line,
+                    rest_col,
+                    format!("`~ at {kind}` may be followed by `here` and `where: …`, not `{w}`"),
+                );
+            }
+        }
+        if let Some((w, col)) = condition {
+            self.where_expr(w, c.line, col);
+        }
+    }
+
     /// Report every name in `e` that refers to nothing.
     fn resolve(&mut self, e: &expr::Expr, src: &str, line: usize, col: usize) {
         for Problem { at, name, want } in resolve::unresolved(e, self) {
@@ -937,16 +990,19 @@ impl Checker {
                     }
                 }
             }
-            "act" => {
+            "act" | "combo" => {
                 for c in &s.clauses[1..] {
                     if let Some(v) = c.text.strip_prefix("choice ") {
                         self.choice(v.trim(), c.line, c.col + 7);
                     }
+                    if c.text.starts_with("at ") {
+                        self.target_clause(c);
+                    }
                 }
-            }
-            "combo" => {
-                for act in value.split(',') {
-                    self.need(act.trim(), &["act", "combo"], "act", head.line, value_col);
+                if kind == "combo" {
+                    for act in value.split(',') {
+                        self.need(act.trim(), &["act", "combo"], "act", head.line, value_col);
+                    }
                 }
             }
             _ => {}
@@ -1459,6 +1515,22 @@ impl Checker {
             let col = 1 + cols(&l.text[..l.text.len() - l.text.trim_start().len()]);
             if t.is_empty() {
                 last = Last::Nothing;
+            } else if t.starts_with('>') && !t.contains("[[") {
+                // A Link group: its clauses go to every Link below it.
+                let rest = t.trim_start_matches('>').trim_start();
+                if !rest.starts_with('~') {
+                    self.err(
+                        l.no,
+                        col,
+                        "a Link line is written `> [[label->target]]`; a Link group is `> ~ clause`",
+                    );
+                }
+                for c in split_clauses(&l.text, l.no, 1) {
+                    if c.text != ">" {
+                        self.link_clause(&c);
+                    }
+                }
+                last = Last::Fork;
             } else if t.starts_with('>') {
                 self.fork(l, col);
                 last = Last::Fork;
@@ -1579,6 +1651,7 @@ impl Checker {
         let arg = c.text[word.len()..].split_whitespace().next().unwrap_or("");
         let arg_col = c.col + cols(word) + 1;
         match word {
+            "at" => self.target_clause(c),
             "cost" => self.cost_seen(c.line, c.col),
             "choice" => self.choice(arg, c.line, arg_col),
             "inquest" => self.inquest_clause(c),

@@ -140,6 +140,8 @@ pub(crate) const LINK_CLAUSES: &[&str] = &[
     // Analysis: read by the Inker's reports, never by play.
     "beat", "weighs", "arc", "stakes", "plants", "pays", "predict", "lasting", "tone", "reveals",
     "pass", "release", "requires", "once", "loud", "quiet", "choice",
+    // A target chosen by the Linker: `~ at item here where: …`.
+    "at",
 ];
 
 /// The input family: `{name input for: me.name}`.

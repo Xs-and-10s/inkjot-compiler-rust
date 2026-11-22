@@ -345,12 +345,16 @@ combo updraught: gust, lighten ~ spell ~ air ~ learned from notes_greater
 ~ "You ride the air up the cage shaft, with no cage. Self."
 ~ when here == incline
 
+
+:: spellbook [lib everywhere]
 (((
-The book's Links, offered wherever you are, outside a fight: one per
-spell, and one per target where a spell has a range. Each goes to a short
-passage saying what happened. A spell you have not learned is not offered.
+The book's Links, offered wherever you are (`[lib everywhere]`), outside a
+fight: one per spell, and one per target where a spell has a range. Each
+goes to a short passage saying what happened. A spell you have not learned
+is not offered: each act says `~ learned from`, and its Links inherit it.
 )))
-> ~ for apprentice ~ everywhere
+--
+> ~ for apprentice
 > [[Kindle {target}->spell:kindle]] ~ kindle
 > [[Glimmer->spell:glimmer]] ~ glimmer
 > [[Quench->spell:quench]] ~ quench

@@ -180,17 +180,22 @@ impl Para {
         self.len() == 0
     }
 
-    /// Does the text so far end where a sentence starts? At the start of a
-    /// paragraph, or after `.`, `!`, `?` or `:` and a space, with any
-    /// opening quote marks between.
-    pub fn at_sentence_start(&self) -> bool {
-        let text: String = self.runs.iter().map(|r| r.text.as_str()).collect();
+    /// Does the text so far end where a sentence starts? At the start of
+    /// the line (character `from` on: after a speaker's cue, say), or after
+    /// `.`, `!` or `?` and a space, with any opening quote marks between.
+    pub fn at_sentence_start(&self, from: usize) -> bool {
+        let text: String = self
+            .runs
+            .iter()
+            .flat_map(|r| r.text.chars())
+            .skip(from)
+            .collect();
         let t = text.trim_end_matches(['“', '‘', '"', '(', '[']);
         if t.trim().is_empty() {
             return true;
         }
         let spaced = t.len() > t.trim_end().len();
-        spaced && t.trim_end().ends_with(['.', '!', '?', ':'])
+        spaced && t.trim_end().ends_with(['.', '!', '?'])
     }
 
     pub fn is_blank(&self) -> bool {

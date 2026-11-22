@@ -42,6 +42,12 @@ struct ActDef {
     check: Option<Value>,
     /// `~ choice proactive | reactive | inactive`.
     choice: Option<String>,
+    /// `~ at item here where: …`: what it is done to, chosen by the Linker.
+    at: Option<Value>,
+    /// `~ when …`, and `~ learned from x` as `me.knows.x`: when it may be done.
+    whens: Vec<Value>,
+    /// `~ then …`: what it does, wherever it is done.
+    effects: Vec<Value>,
 }
 
 struct Builder {
@@ -354,6 +360,16 @@ impl Builder {
                         if def.cost.is_empty() {
                             def.cost.push(Value::obj([("amount", num(total))]));
                         }
+                        // A combo needs each of its acts known as well as itself.
+                        for act in list.split(',') {
+                            if let Some(part) = b.acts.get(act.trim()) {
+                                for w in &part.whens {
+                                    if !def.whens.contains(w) {
+                                        def.whens.push(w.clone());
+                                    }
+                                }
+                            }
+                        }
                         b.acts.insert(name.trim().to_string(), def);
                     }
                     "default" if head.starts_with("default clash:") => {
@@ -381,6 +397,13 @@ impl Builder {
                 "ends" => def.ends_turn = true,
                 "check" => def.check = Some(expression(rest)),
                 "choice" => def.choice = Some(rest.to_string()),
+                "at" => def.at = Some(target_filter(rest)),
+                "when" => def.whens.push(expression(rest)),
+                "learned" => {
+                    let fact = rest.strip_prefix("from").unwrap_or(rest).trim();
+                    def.whens.push(expression(&format!("me.knows.{fact}")));
+                }
+                "then" => def.effects.push(effect(rest)),
                 _ => {}
             }
         }
@@ -720,6 +743,9 @@ impl Builder {
         // An author's note runs from `[note]` to the next modifier. It is
         // for the Inker, so it never reaches the IR.
         let mut in_note = false;
+        // A Link group: a `>` line with clauses and no Link lends its
+        // clauses to every Link below it, up to the next blank line.
+        let mut group: Vec<String> = Vec::new();
         while i < lines.len() {
             let t = lines[i].text.trim();
             i += 1;
@@ -732,8 +758,17 @@ impl Builder {
                 }
             }
             if t.is_empty() {
+                group.clear();
+                continue;
+            } else if t.starts_with('>') && !t.contains("[[") {
+                group = std::iter::once(t.trim_start_matches('>').trim().to_string())
+                    .chain(more.iter().map(|m| m.to_string()))
+                    .collect();
                 continue;
             } else if t.starts_with('>') {
+                let mut lent: Vec<&str> = group.iter().map(String::as_str).collect();
+                lent.extend(more.iter().copied());
+                let more = lent;
                 let mut link = self.link(p, t, &more, &mut derived);
                 let id = link.get("id").and_then(Value::as_str).map(str::to_string);
                 match &mut link {
@@ -834,6 +869,7 @@ impl Builder {
         // Analysis tags, for the Inker's reports.
         let mut analysis: Vec<(String, Value)> = Vec::new();
         let list = |rest: &str| strings(rest.split(',').map(str::trim));
+        let mut at: Option<Value> = None;
 
         for c in &clauses {
             let text = c.text.as_str();
@@ -855,6 +891,8 @@ impl Builder {
                 "check" => check_ = Some(expression(rest)),
                 "choice" => choice = Some(rest.to_string()),
                 "with" => extra.push(("with".into(), parameters(rest))),
+                // `~ at item here where: …`: one Link for each that fits.
+                "at" => at = Some(target_filter(rest)),
                 "id" => inker_id = Some(rest.to_string()),
                 "switch" | "pass" | "hint" | "release" => kind = word,
                 "inquest" => {
@@ -913,6 +951,12 @@ impl Builder {
         }
 
         let def = act.as_ref().map(|(_, d)| d.clone()).unwrap_or_default();
+        // An act's conditions and effects hold wherever it is done.
+        whens.splice(0..0, def.whens.iter().cloned());
+        effects.splice(0..0, def.effects.iter().cloned());
+        if let Some(at) = at.or(def.at.clone()) {
+            extra.push(("at".into(), at));
+        }
         // An act's costs come first; a Link's follow. The last one whose
         // condition holds is the one that applies.
         let mut all_costs = def.cost.clone();
@@ -1227,6 +1271,25 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
         ("at_most", at_most),
         ("tags", strings(tags)),
     ])
+}
+
+/// `item here where: not it.lit` → `{"kind": "item", "here": true, "where": …}`.
+pub(crate) fn target_filter(text: &str) -> Value {
+    let (head, condition) = match text.split_once("where:") {
+        Some((h, c)) => (h.trim(), Some(c.trim())),
+        None => (text.trim(), None),
+    };
+    let mut words = head.split_whitespace();
+    let kind = words.next().unwrap_or("");
+    let here = words.any(|w| w == "here");
+    let mut pairs = vec![
+        ("kind".to_string(), Value::str(kind)),
+        ("here".to_string(), Value::Bool(here)),
+    ];
+    if let Some(c) = condition {
+        pairs.push(("where".to_string(), expression(c)));
+    }
+    Value::Obj(pairs)
 }
 
 /// `narration: second person ~ omniscient` → `{"person": "second", "omniscient": true}`.
