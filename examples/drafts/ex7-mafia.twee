@@ -115,6 +115,14 @@ state moderator: engine ~ of moderator
 list moderators: "how the game is told" ~ holds engine: "the Lamplighter (the engine)", monkeypaw: "MonkeyPaw, fresh each morning", storyteller: "a Storyteller at the table"
 state syndicate: nobody ~ of syndicate
 state victim: nobody ~ of guest
+(((
+The Collectors mark two names a night: `victim` and `second`.
+)))
+state second: nobody ~ of guest
+(((
+Nights gone by, for the Long Night's calendar.
+)))
+state nights: 0
 state replacing: no
 state foreclosed: nothing
 state rumour_about: nobody ~ of guest
@@ -127,6 +135,7 @@ get special_wanted: count(guest, where: it.wants_special) * 2 > players
 state report: ""
 
 fact cult_secret: "The lamp turns. You see it now. You will vote as the lamp would have you vote." ~ secret
+fact cult_calendar: "The Long Night keeps its own calendar. Once there are two of you, you go out on odd nights only. And the One Who Left is beyond your reach: the lamp lost them once, and cannot have them back." ~ secret
 
 (((
 The syndicates. A table with named columns: `{syndicate.mafia}` reads the
@@ -244,10 +253,10 @@ tied. "Surprise us" draws among all four.
 @lamplighter And when one of them kills, they may *become* the one they killed. Mind whom you think you are talking to.
 
 [if syndicate.special == collectors]
-@lamplighter The Collectors don’t kill. They call in debts. A marked name dies at the next nightfall, unless somebody pays, and the price is a vote.
+@lamplighter The Collectors don’t kill. They call in debts, two a night. A marked name dies at the next nightfall, unless somebody pays, and the price is a vote.
 
 [if syndicate.special == cult]
-@lamplighter The Acolytes don’t kill. They take people into the dark, and only those who voted with them that day. The taken still speak with their old voices.
+@lamplighter The Acolytes don’t kill. They take people into the dark, and only those who voted with them that day. The taken still speak with their old voices. Once there are two of them, they go out on odd nights only, and the One Who Left they can never take again.
 
 [if syndicate.special == heist]
 @lamplighter Nobody dies this weekend. Something, every night, goes missing. {haul_needed} keepsakes in the Crew’s bag and they’re off on the morning train.
@@ -287,7 +296,7 @@ You are **{syndicate.doctor}**. Each night you may save someone; never the same 
 You are **{syndicate.doctor}**. Each night you may take someone in, and no Collector marks a name under your roof; never the same one two nights running.
 
 [if me.role == doctor and syndicate.special == cult]
-You are **{syndicate.doctor}**. You were in the dark once, and you got out. Each night you may sit up with someone and keep them turned from the light; never the same one two nights running.
+You are **{syndicate.doctor}**. You were in the dark once, and you got out, and you will never go back: the lamp cannot take you again. So you never sit up for yourself. Each night you may sit up with someone else and keep them turned from the light; never the same one two nights running.
 
 [if me.role == detective]
 You are **{syndicate.detective}**. Each night you may look into someone, and learn which side they are on.
@@ -309,6 +318,7 @@ today, dies now.
 let due: all(guest, where: it.alive and it.marked and it.marked_since < clock.now)
 set due.alive: no when syndicate.special == collectors
 set foreclosed: due when syndicate.special == collectors
+raise nights 1
 (((
 Night: each acts in private. Every target is `~ at guest` with a `where:`
 that says which guests may be picked. Links grouped by who may take them.
@@ -320,6 +330,10 @@ Where one member does the deed for all (the Doppelgänger who takes the
 face, the thief who carries the keepsake), it is the first who placed
 their vote on the target chosen: `first(victim.chosen_by)`. So it pays to
 decide quickly.
+
+The Collectors choose two: `~ consensus 2` makes each member choose two
+names, and the two most chosen are `targets`, most chosen first. The Cult,
+once it has two Acolytes, goes out on odd nights only.
 )))
 --
 [if me.alive]
@@ -329,6 +343,10 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 {syndicate.dead}
 
 [end]
+[if me.alive and me.team == cult and cult_left >= 2 and nights % 2 == 0]
+The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it turns again.
+
+[end]
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == none ~ consensus
 > [[{capital(syndicate.kills)}: {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target
 
@@ -336,11 +354,11 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 > [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: yes
 > [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: no
 
-> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus
-> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: target
+> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus 2
+> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: first(targets) ~ then set second: last(targets)
 
-> ~ for guest where: it.alive and it.team == cult ~ consensus
-> [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.voted_with(cult) ~ then set victim: target
+> ~ for guest where: it.alive and it.team == cult ~ consensus ~ when cult_left < 2 or nights % 2 == 1
+> [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.role != doctor and it.voted_with(cult) ~ then set victim: target
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus
 > [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target
@@ -348,7 +366,7 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 > ~ for guest where: it.alive and it.role == doctor
 > [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special != collectors and syndicate.special != cult ~ then set saved: target ~ then set me.saved_last: target
 > [[Take {target} in->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special == collectors ~ then set saved: target ~ then set me.saved_last: target
-> [[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special == cult ~ then set saved: target ~ then set me.saved_last: target
+> [[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me and it != me.saved_last ~ when syndicate.special == cult ~ then set saved: target ~ then set me.saved_last: target
 
 > ~ for guest where: it.alive and it.role == detective
 > [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town
@@ -401,13 +419,18 @@ let first_voter: first(victim.chosen_by)
 let taken: top of victim.keepsake
 set taken.owner: victim when syndicate.special == heist and victim != nobody
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
-let foiled: victim != nobody and victim == saved
-set victim: nobody when foiled
+let foiled_second: second != nobody and second == saved
+let foiled: (victim != nobody and victim == saved) or foiled_second
+set victim: nobody when victim == saved
+set second: nobody when foiled_second
+set second.marked: yes when second != nobody and syndicate.special == collectors
+set second.marked_since: clock.now when second != nobody and syndicate.special == collectors
 set victim.alive: no when victim != nobody and syndicate.special in [none, doppelganger]
 set victim.marked: yes when victim != nobody and syndicate.special == collectors
 set victim.marked_since: clock.now when victim != nobody and syndicate.special == collectors
 set victim.team: cult when victim != nobody and syndicate.special == cult
 teach victim cult_secret when victim != nobody and syndicate.special == cult
+teach victim cult_calendar when victim != nobody and syndicate.special == cult
 (((
 The Doppelgänger's swap happens before the report is written, so the
 report names the face on the body: the killer's old one. The killer is
@@ -448,7 +471,7 @@ The table’s version: *{report}*. Tell it your way, or let it stand.
 
 [end]
 > [[Talk it over->day]] ~ for cohort ~ id to_day
-~ then set victim: nobody ~ then set saved: nobody
+~ then set victim: nobody ~ then set second: nobody ~ then set saved: nobody
 
 :: morning:told
 (((

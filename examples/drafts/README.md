@@ -69,10 +69,12 @@ special syndicates change the rules:
 
 - **the Doppelgänger Clan**: a killer takes the victim's face, so the
   morning reports the wrong death;
-- **the Debt Collectors**: they mark instead of killing, and a marked
-  name dies at the next nightfall unless someone pays with their vote;
+- **the Debt Collectors**: they mark two names a night instead of
+  killing, and a marked name dies at the next nightfall unless someone
+  pays with their vote;
 - **the Cult of the Long Night**: they convert instead of killing, and
-  only someone who voted with them that day;
+  only someone who voted with them that day; once there are two
+  Acolytes, on odd nights only; the One Who Left can never be taken;
 - **the Heist Crew**: no deaths; a third of the table's keepsakes, plus
   one, stolen from the players' piles and they win. A thief voted out
   gives back what they carried.
@@ -104,7 +106,8 @@ remembers who chose each target, in order (`victim.chosen_by`), with
 the group (decided 21 Nov); a pile on a set of players (`all(guest,
 where: …).loot`); putting each card back where it belongs (`move each
 found to it.owner.keepsake`), for a thief voted out, whose loot is
-returned (decided 21 Nov).
+returned (decided 21 Nov); a consensus on two targets (`~ consensus 2`,
+`targets`, `first(…)`, `last(…)`), for the Collectors' two marks a night.
 
 ## Ex 8: The Inquest (`ex8-the-inquest.twee`)
 

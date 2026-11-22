@@ -57,6 +57,14 @@
   (`players / 3 + 1`, was `members + 2`), tuned so that, in random play,
   the town wins the Heist about as often as against a plain syndicate at
   every size from 5 to 12 (`tests/ex7_rules.rs`).
+- The Cult and the Collectors, retuned the same way. The Cult: the One
+  Who Left can never be taken again (and so sits up only for others), and
+  once there are two Acolytes they go out on odd nights only; a notice
+  tells the Acolytes, and the newly taken learn it. The Collectors mark two
+  names a night. In random play the town now wins within about 12 points
+  of its rate against a plain syndicate at every size, the Cult at five
+  players excepted (a lone Acolyte; it leans to the town). A property
+  checks every special against the plain game.
 - Last bug pass: the Doppelgänger's swap now happens before the morning
   report; debts fall due at nightfall, a full day after marking; the
   syndicate's size counts players only, after the deal; teammates are
