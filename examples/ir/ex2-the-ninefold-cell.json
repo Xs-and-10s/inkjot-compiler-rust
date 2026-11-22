@@ -8501,7 +8501,14 @@
           "check": null,
           "choice": null,
           "when": {
-            "knows": ["roland", "lodestone"]
+            "and": [
+              {
+                "knows": ["me", "lodestone"]
+              },
+              {
+                "knows": ["roland", "lodestone"]
+              }
+            ]
           },
           "hidden_until": null,
           "for": ["roland"],

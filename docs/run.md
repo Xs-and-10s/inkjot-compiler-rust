@@ -107,6 +107,8 @@ running the three examples.
   back), `hints` and `inquests`. A rewind does not restore them. Every
   other name is the Inker's.
 - **`[lib everywhere]`** passages add their Links to every passage.
+- **The config's `let`s and `get`s** are in scope in every passage, worked
+  out on arrival like a passage's own (a `get` each time it is read).
 - **Randomness** comes from the run's seed, so the same seed and the same
   choices always give the same story. A bare `d6` or `d20` rolls a die each
   time it is read, as in `table standoff: roll d6 + bonus`.
@@ -159,8 +161,9 @@ reduced motion.
 
 **Names at the start of a sentence** are capitalised: "{foreman} stands"
 reads "The foreman stands", and so does a speech cue, `@foreman`. A
-sentence starts at the start of a paragraph, or after `.`, `!`, `?` or `:`
-and a space, with any opening quote marks between. `~ keep case` on a name
+sentence starts at the start of a paragraph or of a speaker's line, or
+after `.`, `!` or `?` and a space, with any opening quote marks between (a
+colon does not start one). `~ keep case` on a name
 opts out (`npc poet: "ee cummings" ~ keep case`). A list's entries are
 shown as written, being entries, not sentences.
 
@@ -225,6 +228,46 @@ shown as written.
 `shuffled` (the default: each name once, in a seeded order, then again),
 `cycle` (in the order written), `random` (any, each time) or `first`.
 `{all leo.aka}` shows every name.
+
+## Targets and filters
+
+**`where:` with `it`.** A kind filter may say which of the things it
+counts: `count(guest, where: it.alive and it != me)`, `one(place, where:
+it.next_to(here))`, and `all(…)`, the list of them. `it` is each candidate
+in turn, and only inside `where:`. `in: here` still narrows to a place.
+
+**Tags read as yes.** `it.timbered` is `yes` for a thing tagged `timbered`
+(or made `like` an archetype that is), unless the thing stores a value of
+that name. Three methods help filters: `x.next_to(y)` (a way joins their
+places), `x.like(shaft)` (made from that archetype), `x.held_by(who)`.
+
+**`~ at`: one Link per target.** `> [[Kindle {target}->spell:kindle]] ~ at
+item here where: it.catches and not it.lit` is one Link for each item here
+that fits, labelled with it, and `target` is that thing in the Link's
+conditions, its effects, and the passage it goes to. `here` narrows to the
+pov's place; `where:` filters with `it`. With no target, no Link. Each
+Link's id is the Link's with `@target` added: `room->spell:kindle@lamp`.
+
+**An act carries itself.** An `act` declaration's `~ at`, `~ when`, `~
+learned from x` (as `me.knows.x`) and `~ then` go to every Link that names
+it, so a spell is written once:
+
+```
+act kindle: cost 1 ~ learned from primer
+~ at item here where: it.catches and not it.lit
+~ then set target.lit: yes
+```
+
+A combo needs each of its acts known as well as itself, and costs their
+sum unless it says.
+
+**Link groups.** A `>` line with clauses and no Link lends its clauses to
+every Link below it, up to the next blank line: `> ~ for eldric ~ when not
+eldric.frozen`.
+
+**Effects on a set.** Where a path starts with a list, the effect is done
+to each member: `let due: all(guest, where: it.marked)` then `set
+due.alive: no`, `raise growing.heat 1`.
 
 ## Measures
 

@@ -209,6 +209,7 @@ A statement is an object whose first key says what it is. Statements are
 | `declare` | `npc marsh: "Colonel Marsh" ~ …` | `{"declare": "npc", "id": "marsh", "label": "Colonel Marsh", …}` |
 | `setting` | `cohort: 2..=5 ~ best 3..=4` | `{"setting": "cohort", "value": {range}, "best": {range}}` |
 | `goal`, `reaction` | `goal flee: ~ toward platform ~ weight 6` | `{"goal": "flee", "toward": "platform", "weight": 6}` |
+| `at` on a Link | `~ at item here where: not it.lit` | `"at": {"kind": "item", "here": true, "where": …}`: one Link per target at run time |
 | `measure` | `measure players: count(guest)` | `{"measure": "players", "value": {"count": […]}}`: reported in the engine's `measured` event when an ending is reached |
 | `checkpoint` | `checkpoint cells: ~ on death in prison` | `{"checkpoint": "cells", "on_death_in": "prison", …}` |
 | `hint` | `hint: "…" ~ wits 3..` | `{"hint": "…", "stats": {"wits": {range}}}` |
@@ -360,6 +361,10 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
 - Modifier parts `then`, `quote` and `redacted`; the `redacted` insert.
 - `redacted_until` and `keep_case` on declarations.
 - `measure` statements (21 Nov 2026, after milestone 19).
+- Milestone 20a: a Link's `at` (`{"kind", "here", "where"}`); a Link that
+  names an act carries the act's `when` (with `learned from x` as
+  `me.knows.x`), `then` and `at`. Link groups are lowered away: each Link
+  carries its group's clauses. `all(…)` and `with: {"where": …}` in calls.
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
 

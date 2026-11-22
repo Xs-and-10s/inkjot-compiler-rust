@@ -75,6 +75,8 @@ pub struct Story {
     checkpoints: Vec<Value>,
     /// `measure name: expression`, in order: reported when a reading ends.
     measures: Vec<(String, Value)>,
+    /// The config's `let`s and `get`s, in order: in scope in every passage.
+    config_lets: Vec<Value>,
     /// The `rewind:` setting, if the Inklink has one.
     rewind: Option<Value>,
     /// Does any passage show `{ballots}`? Then the Inker frames the tally.
@@ -156,6 +158,7 @@ impl Story {
             defaults: BTreeMap::new(),
             checkpoints: Vec::new(),
             measures: Vec::new(),
+            config_lets: Vec::new(),
             rewind: None,
             shows_ballots: false,
             narration: None,
@@ -187,6 +190,11 @@ impl Story {
             );
         }
         story.shows_ballots = ir.to_string().contains("\"insert\": \"ballots\"");
+        story.config_lets = config
+            .iter()
+            .filter(|s| s.get("let").is_some())
+            .cloned()
+            .collect();
         Ok(story)
     }
 
@@ -475,6 +483,9 @@ pub struct Run {
     /// an event: `(type, data)`, in order. Not part of the world, so a
     /// rewind never takes it back.
     noted: Vec<(&'static str, Value)>,
+    /// Where the line being shown starts, in characters: after a speech
+    /// cue's `Name: `, so the first word of the line counts as a sentence's.
+    line_start: usize,
     /// Whose words the engine writes in the passage being shown:
     /// `first`, `second` or `third` (`narration:`), or not said.
     telling: Option<String>,
@@ -557,6 +568,7 @@ impl Run {
             trail: Vec::new(),
             noted: Vec::new(),
             telling: None,
+            line_start: 0,
         };
         run.init();
         run.place_npcs();
@@ -913,13 +925,113 @@ impl Run {
             if link.get("inquest").is_some() {
                 continue;
             }
-            if self.available(&link)? {
+            let shown = self.with_link(&link, |run| {
+                Ok(if run.available(&link)? {
+                    Some(run.label_of(&link)?)
+                } else {
+                    None
+                })
+            })?;
+            if let Some(label) = shown {
                 let id = f(&link, "id").as_str().unwrap_or("").to_string();
-                let label = self.label_of(&link)?;
                 out.push((id, label));
             }
         }
         Ok(out)
+    }
+
+    /// A Link with `~ at item here where: …` is one Link for each thing
+    /// that fits, with `target` set to it: `lamp->here@lamp`. Any other
+    /// Link is itself.
+    fn expand(&mut self, link: &Value) -> R<Vec<Value>> {
+        let Some(at) = link.get("at") else {
+            return Ok(vec![link.clone()]);
+        };
+        let kind = f(at, "kind").as_str().unwrap_or("").to_string();
+        let place =
+            (f(at, "here") == &Value::Bool(true)).then(|| place_of(self.here()).to_string());
+        let mut targets = self.things(&kind, place.as_deref());
+        let cond = f(at, "where").clone();
+        if cond != Value::Null {
+            targets = self.where_filter(targets, &cond)?;
+        }
+        let id = f(link, "id").as_str().unwrap_or("").to_string();
+        Ok(targets
+            .into_iter()
+            .map(|t| {
+                let mut one = link.clone();
+                if let Value::Obj(pairs) = &mut one {
+                    for (k, v) in pairs.iter_mut() {
+                        if k == "id" {
+                            *v = Value::str(format!("{id}@{t}"));
+                        }
+                    }
+                    match pairs.iter_mut().find(|(k, _)| k == "with") {
+                        Some((_, Value::Obj(with))) => {
+                            with.retain(|(k, _)| k != "target");
+                            with.push(("target".into(), Value::str(&t)));
+                        }
+                        _ => pairs.push(("with".into(), Value::obj([("target", Value::str(&t))]))),
+                    }
+                }
+                one
+            })
+            .collect())
+    }
+
+    /// The things that pass a `where:` condition, `it` each in turn.
+    fn where_filter(&mut self, ids: Vec<String>, cond: &Value) -> R<Vec<String>> {
+        let saved = self.locals.get("it").cloned();
+        let mut out = Vec::new();
+        for id in ids {
+            self.locals
+                .insert("it".into(), Local::Value(V::Id(id.clone())));
+            match self.eval(cond) {
+                Ok(v) if v.truthy() => out.push(id),
+                Ok(_) => {}
+                Err(e) => {
+                    self.restore_local("it", saved);
+                    return Err(e);
+                }
+            }
+        }
+        self.restore_local("it", saved);
+        Ok(out)
+    }
+
+    fn restore_local(&mut self, name: &str, old: Option<Local>) {
+        match old {
+            Some(v) => {
+                self.locals.insert(name.into(), v);
+            }
+            None => {
+                self.locals.remove(name);
+            }
+        }
+    }
+
+    /// Work something out with a Link's `~ with` values in scope: its
+    /// `target`, chiefly, for its label, its conditions and its effects.
+    fn with_link<T>(&mut self, link: &Value, work: impl FnOnce(&mut Self) -> R<T>) -> R<T> {
+        let params: Vec<(String, V)> = match f(link, "with") {
+            Value::Obj(pairs) => pairs
+                .iter()
+                .map(|(k, v)| (k.clone(), self.constant(v)))
+                .collect(),
+            _ => return work(self),
+        };
+        let saved: Vec<(String, Option<Local>)> = params
+            .iter()
+            .map(|(k, _)| (k.clone(), self.locals.get(k).cloned()))
+            .collect();
+        for (k, v) in params {
+            self.locals.insert(k, Local::Value(v));
+        }
+        let result = work(self);
+        for (k, old) in saved {
+            self.restore_local(&k, old);
+        }
+        result
     }
 
     /// The forks that stand in for the offered Link `link_id`, in the order
@@ -1008,7 +1120,7 @@ impl Run {
             .find(|l| f(l, "id").as_str() == Some(id))
             .cloned()
             .ok_or_else(|| format!("there is no Link `{id}` here"))?;
-        if !self.available(&link)? {
+        if !self.with_link(&link, |run| run.available(&link))? {
             return Err(format!("the Link `{id}` is not available"));
         }
         self.take(&link)?;
@@ -1280,9 +1392,13 @@ impl Run {
                 before: false,
             })?;
         }
-        for effect in f(link, "effects").as_arr().unwrap_or(&[]).to_vec() {
-            self.apply(&effect, &[])?;
-        }
+        let effects = f(link, "effects").as_arr().unwrap_or(&[]).to_vec();
+        self.with_link(link, |run| {
+            for effect in &effects {
+                run.apply(effect, &[])?;
+            }
+            Ok(())
+        })?;
         self.pov = pov;
         let target = f(link, "target").as_str().unwrap_or("here").to_string();
         let params = match f(link, "with") {
@@ -1462,10 +1578,14 @@ impl Run {
         if let Some(n) = cell_time.filter(|_| !self.in_past()) {
             self.chronon = n;
         }
-        self.locals = params
-            .into_iter()
-            .map(|(k, v)| (k, Local::Value(v)))
-            .collect();
+        self.locals.clear();
+        // The config's `let`s and `get`s, in scope everywhere; then the
+        // Link's `~ with` values; then the passages this one belongs to.
+        for stmt in story.config_lets.clone() {
+            self.statement(&stmt)?;
+        }
+        self.locals
+            .extend(params.into_iter().map(|(k, v)| (k, Local::Value(v))));
         self.parent_lets(passage)?;
         self.arrive(passage, &from, 0, None)
     }
@@ -1836,7 +1956,7 @@ impl Run {
                         }
                     }
                 }
-                Some("link") if show => links.push(node.clone()),
+                Some("link") if show => links.extend(self.expand(node)?),
                 Some("prose") | Some("speech") if show => {
                     let lead = match f(node, "who").as_str() {
                         Some(who) => self.cue(who, f(node, "direction").as_str())?,
@@ -1853,8 +1973,10 @@ impl Run {
                             text.extend(lead.clone());
                         }
                         let kept = text.len();
+                        self.line_start = kept;
                         let mut more = Vec::new();
                         self.parts(para, &[], quiet, &mut text, &mut more)?;
+                        self.line_start = 0;
                         links.extend(more);
                         if quiet || text.is_blank() {
                             continue;
@@ -2019,7 +2141,7 @@ impl Run {
                     }
                     _ => self.eval(v)?,
                 };
-                let at_start = text.at_sentence_start();
+                let at_start = text.at_sentence_start(self.line_start);
                 if let V::Id(id) = &v {
                     if self.is_redacted(id)? {
                         let n = self.label(id).chars().count();
@@ -2307,14 +2429,16 @@ impl Run {
                     self.locals.insert(name.to_string(), Local::Value(v));
                     return Ok(());
                 }
-                let key = self.path(f(e, "target"))?;
-                self.vals.insert(key.clone(), v);
-                self.fire(Event {
-                    on: "set",
-                    what: &key,
-                    actor: &pov,
-                    before: false,
-                })?;
+                // `set due.alive: no`, where `due` is a list: each of them.
+                for key in self.paths(f(e, "target"))? {
+                    self.vals.insert(key.clone(), v.clone());
+                    self.fire(Event {
+                        on: "set",
+                        what: &key,
+                        actor: &pov,
+                        before: false,
+                    })?;
+                }
             }
             "raise" | "lower" | "toggle" => {
                 self.change(f(e, "do").as_str().unwrap_or(""), &args)?
@@ -2451,7 +2575,14 @@ impl Run {
 
     /// `raise trust 1`, `lower x 2`, `raise orrery.ember 1 mod 6`, `toggle x`.
     fn change(&mut self, verb: &str, args: &[Value]) -> R<()> {
-        let key = self.path(args.first().unwrap_or(&Value::Null))?;
+        // `raise growing.heat 1`, where `growing` is a list: each of them.
+        for key in self.paths(args.first().unwrap_or(&Value::Null))? {
+            self.change_one(verb, key, args)?;
+        }
+        Ok(())
+    }
+
+    fn change_one(&mut self, verb: &str, key: String, args: &[Value]) -> R<()> {
         let now = self.vals.get(&key).cloned().unwrap_or(V::Null);
         let v = if verb == "toggle" {
             V::Bool(!now.truthy())
@@ -2603,6 +2734,33 @@ impl Run {
         match self.eval(arg)? {
             V::Id(id) | V::Str(id) => Ok(id),
             other => Err(format!("expected someone or something, found `{other}`")),
+        }
+    }
+
+    /// The storage keys an expression names: one, or one for each member
+    /// when its root is a list (`due.alive`, with `due` a list of guests).
+    fn paths(&mut self, target: &Value) -> R<Vec<String>> {
+        if let Some(parts) = target.get("get").and_then(Value::as_arr) {
+            if let Some(root) = parts.first() {
+                if let V::List(items) = self.eval(root)? {
+                    let rest: Vec<&str> = parts[1..].iter().filter_map(Value::as_str).collect();
+                    return Ok(items
+                        .iter()
+                        .filter_map(|i| i.name().map(str::to_string))
+                        .map(|id| format!("{id}.{}", rest.join(".")))
+                        .collect());
+                }
+            }
+        }
+        Ok(vec![self.path(target)?])
+    }
+
+    /// A thing's place: a place is its own; anything else is where it is.
+    fn place_id(&self, id: &str) -> String {
+        if self.story.kind(id) == Some("place") {
+            id.to_string()
+        } else {
+            place_of(&self.location(id)).to_string()
         }
     }
 
@@ -2820,7 +2978,7 @@ impl Run {
                         .collect(),
                 )
             }
-            "count" | "one" => {
+            "count" | "one" | "all" => {
                 let tag = items
                     .first()
                     .and_then(Value::as_str)
@@ -2835,17 +2993,48 @@ impl Run {
                             .unwrap_or_default(),
                     ),
                 };
-                let found = self.things(&tag, place.as_deref());
-                if op == "count" {
-                    V::Num(found.len() as f64)
-                } else {
+                let mut found = self.things(&tag, place.as_deref());
+                // `where: it.alive and it != me`: `it` is each in turn.
+                let cond = named("where").clone();
+                if cond != Value::Null {
+                    found = self.where_filter(found, &cond)?;
+                }
+                match op.as_str() {
+                    "count" => V::Num(found.len() as f64),
+                    "all" => V::List(found.into_iter().map(V::Id).collect()),
                     // One of them, or nothing if there are none.
-                    found.first().map_or(V::Null, |id| V::Id(id.clone()))
+                    _ => found.first().map_or(V::Null, |id| V::Id(id.clone())),
                 }
             }
             "asleep" => {
                 let who = self.who(&items[1])?;
                 V::Bool(self.is_asleep(&who))
+            }
+            // `it.next_to(here)`: a way joins the two places.
+            "next_to" => {
+                let a = self.who(&items[0])?;
+                let b = self.who(&items[1])?;
+                let (a, b) = (self.place_id(&a), self.place_id(&b));
+                V::Bool(
+                    a != b
+                        && self
+                            .story
+                            .ways
+                            .iter()
+                            .any(|(_, from, to)| *from == a && *to == b),
+                )
+            }
+            // `it.like(shaft)`: made from that archetype.
+            "like" => {
+                let a = self.who(&items[0])?;
+                let arch = items.get(1).and_then(Value::as_str).unwrap_or("");
+                V::Bool(self.story.field(&a, "like").as_str() == Some(arch))
+            }
+            // `it.held_by(me)`.
+            "held_by" => {
+                let a = self.who(&items[0])?;
+                let b = self.who(&items[1])?;
+                V::Bool(self.holder.get(&a) == Some(&b))
             }
             "nearest" => {
                 let tag = items.first().and_then(Value::as_str).unwrap_or("");
@@ -3036,6 +3225,10 @@ impl Run {
                 && *story.field(&id, m) != Value::Null =>
             {
                 self.constant(story.field(&id, m))
+            }
+            // Not stored: a tag it has, `it.timbered`, reads yes.
+            _ if !self.vals.contains_key(&format!("{id}.{m}")) && self.tagged(&id, m) => {
+                V::Bool(true)
             }
             _ => self
                 .vals

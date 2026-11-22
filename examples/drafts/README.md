@@ -214,7 +214,7 @@ What it asks of v0.6, beyond the plan and the encounter milestone:
 | Handlers on a kind, naming the thing | `on enter shaft when entered.burnt`, `on leave shaft when left.crossings == 0` |
 | Handlers on an NPC's move | `on move warden when warden.roused and warden.here` |
 | Taking and dropping, offered like moves | `default takes: take, drop` |
-| Links offered everywhere | `> ~ for apprentice ~ everywhere`, the spellbook's Links |
+| Links offered everywhere | the spellbook, a `[lib everywhere]` passage (built), with `~ at` Links (built in 20a) |
 | Items that come in a number | `item stave: … ~ count 4`, `count(stave, held by: me)`, `lose stave 2` |
 | A recipe with a part twice | `recipe stretcher: stave, stave, sacking` |
 | A tool used by a Link, so it may break | `[[Dig at the fall->…]] ~ uses pick` with `item pick: … ~ breaks 1 in 6` |

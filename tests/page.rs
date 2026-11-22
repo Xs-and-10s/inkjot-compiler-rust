@@ -118,14 +118,15 @@ npc fenwick: "Mr. Fenwick""#;
 fn a_name_starting_a_sentence_is_capitalised() {
     let src = story(
         NAMED,
-        "{foreman} stands. He looks at {foreman}. “{foreman}!” Then: {foreman} sits.\n{poet} reads.\n@foreman We find accidental death.",
+        "{foreman} stands. He looks at {foreman}. “{foreman}!” Then: {foreman} sits.\n{poet} reads.\n@foreman {foreman} finds accidental death.",
     );
     assert_eq!(
         plain(&start(&src)),
         [
-            "The foreman stands. He looks at the foreman. “The foreman!” Then: The foreman sits.",
+            // A colon does not start a sentence; a speaker's line does.
+            "The foreman stands. He looks at the foreman. “The foreman!” Then: the foreman sits.",
             "ee cummings reads.",
-            "The foreman: We find accidental death.",
+            "The foreman: The foreman finds accidental death.",
         ]
     );
 }
