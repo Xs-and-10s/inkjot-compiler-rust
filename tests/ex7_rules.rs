@@ -29,7 +29,7 @@ fn the_model_follows_the_draft() {
         "move each found to it.owner.keepsake when syndicate.special == heist",
         "get haul: all(guest, where: it.team == syndicate).loot",
         "let first_voter: first(victim.chosen_by)",
-        "~ consensus ~ when cult_left < 2 or nights % 2 == 1",
+        "~ consensus ~ when cult_left < 2 or nights mod 2 == 1",
         "it.team != cult and it.role != doctor and it.voted_with(cult)",
         "[[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me and it != me.saved_last",
         "syndicate.special == collectors ~ consensus 2",

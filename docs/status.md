@@ -34,6 +34,8 @@ here.
 | 18d | Costs name their resource: `default cost: vults`, `{"amount": …}` in the IR, `requires full x` for any resource; `hushed` is no longer built in (Ex 2 declares it); the reserved resource names documented | #29 |
 | — | Ex 6 to 9 drafted, reviewed and ready: *Seven Names* (the Library) with its public cut *Cloakroom*, *The Inquest*, *Mafia, by Lamplight*, *Saltmarrow*; pacing reaches the view | #30 to #38 |
 | 19 | The page: `narration:`, `~ selectable` (with `inkjot migrate`), names capitalised at the start of a sentence (`~ keep case`), `cue names:` and `cue directions:`, `[if c; then e]` and `[unless c; then e]`, blocks that `[end]` closes in order, blockquotes, redaction three ways (the hidden words never reach the view), `expect events:`, `expect fork:`, `take fork:`. Ex 8 runs as written | #39 |
+| 20a | Targets and filters: `where:` with `it`, `all(…)`, `~ at` (a Link per target, with `target`), acts that carry their conditions and effects to their Links, Link groups, effects on a set, the config's `let`s in every passage | #41 |
+| 20b | Time and motion: `clock: … ~ each action`, `~ for N turns` and `~ after N turns` (kept in snapshots), handlers on a kind with `entered`, `left`, `crossed`, `moved`, `taken` and `by me`, `on move`, `~ follows me when …`, goals that keep to places (`~ where:`), move every so often (`~ every 2 turns`) or wander; a played passage runs its header | #42 |
 
 ## Next
 
@@ -57,6 +59,12 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      that follow or pursue, `spreads`, threats and counters, recipes,
      `~ breaks` and `~ uses`, counted items, `default takes`, dice, tables
      read as values. Done when Ex 9 and the Ex 2 duel in general words run.
+     In four parts: 20a, targets and filters (#41); 20b, time and motion
+     (#42); 20c, making and the rest (recipes, `~ breaks` and `~ uses`,
+     counted items, `default takes`, tables read as values, `gain` of a
+     resource, `spreads`, `destroy all`, `give one`, `nearest(…, where:)`,
+     `toward`, a played ending that ends the reading); 20d, encounters
+     (threats and counters, the duel).
    - 21, **the table**: decks and piles, periods and named clocks,
      `{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating, settable
      `shown_as`, `finale when:`, text tables. Done when Ex 7 runs.

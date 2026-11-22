@@ -28,6 +28,15 @@
 //! 5. Otherwise it walks: one step a turn, two at `pace dash`, or its own
 //!    `moves N per chronon`. Arriving runs the goal's `then`.
 //!
+//! A goal may also say how it goes. `~ every 2 turns`: it moves only on
+//! every second turn. `~ where: it.salted`: it only goes through places
+//! where that holds. `~ wanders`, instead of `~ toward`: each move is to a
+//! place next to it, at random, that it may go to.
+//!
+//! Following is not a goal. `npc thwaite ~ follows me when self.with_me`
+//! moves her with the pov, the moment they move, and not at the end of the
+//! turn.
+//!
 //! An `[archetype]` passage is an agenda shared by every NPC `like` it:
 //! the three statues of Ex 2 all follow `:: statue [archetype]`.
 
@@ -42,6 +51,11 @@ use crate::json::Value;
 pub(super) enum Walker {
     Npc,
     Linker,
+}
+
+/// Does a goal wander, `~ wanders`, rather than head somewhere?
+fn wanders(goal: &Value) -> bool {
+    strs(f(goal, "tags")).iter().any(|t| t == "wanders")
 }
 
 /// An NPC's agenda: its own margin, then its archetype's.
@@ -148,7 +162,14 @@ impl Run {
             if *when != Value::Null && !self.eval(when)?.truthy() {
                 continue;
             }
-            let Some(target) = self.goal_place(goal)? else {
+            self.keep_to = goal.get("where").cloned();
+            let target = if wanders(goal) {
+                self.wander(&here, f(goal, "via").as_str())
+            } else {
+                self.goal_place(goal)
+            };
+            self.keep_to = None;
+            let Some(target) = target? else {
                 continue;
             };
             let weight = |g: &Value| f(g, "weight").as_u64().unwrap_or(0);
@@ -168,8 +189,10 @@ impl Run {
         let route = match goal {
             Some(goal) => {
                 let via = f(goal, "via").as_str();
-                self.route(&here, &target, via, Walker::Npc)?
-                    .unwrap_or_default()
+                self.keep_to = goal.get("where").cloned();
+                let route = self.route(&here, &target, via, Walker::Npc);
+                self.keep_to = None;
+                route?.unwrap_or_default()
             }
             None => Vec::new(),
         };
@@ -201,7 +224,13 @@ impl Run {
             return Ok(());
         };
         let dashing = f(goal, "pace").as_str() == Some("dash");
-        let steps = if dashing { 2 } else { self.speed(npc, agenda) };
+        let mut steps = if dashing { 2 } else { self.speed(npc, agenda) };
+        // `~ every 2 turns`: it only moves on every second one.
+        if let Some(every) = f(goal, "every").as_u64().filter(|n| *n > 1) {
+            if u64::from(self.chronon) % every != 0 {
+                steps = 0;
+            }
+        }
         for place in route.iter().take(steps) {
             let from = self.location(npc);
             self.step(npc, place)?;
@@ -270,6 +299,90 @@ impl Run {
             actor: npc,
             before: false,
         })?;
+        self.fire(Event {
+            on: "move",
+            what: npc,
+            actor: npc,
+            before: false,
+        })?;
+        Ok(())
+    }
+
+    /// A wandering goal's next place: one next to `here`, at random, that
+    /// the NPC may go to. `None` if there is none.
+    fn wander(&mut self, here: &str, via: Option<&str>) -> R<Option<String>> {
+        let mut next: Vec<String> = Vec::new();
+        for (way, a, b) in self.story.ways.clone() {
+            if a == here
+                && !next.contains(&b)
+                && self.may_use(&way, via, Walker::Npc)?
+                && self.keeps_to(&b)?
+            {
+                next.push(b);
+            }
+        }
+        next.sort();
+        if next.is_empty() {
+            return Ok(None);
+        }
+        let i = self.roll(next.len() as u64) as usize - 1;
+        Ok(Some(next.swap_remove(i)))
+    }
+
+    /// Does a goal's `~ where:` let the NPC go to `place`?
+    fn keeps_to(&mut self, place: &str) -> R<bool> {
+        let Some(cond) = self.keep_to.clone() else {
+            return Ok(true);
+        };
+        Ok(!self
+            .where_filter(vec![place.to_string()], &cond)?
+            .is_empty())
+    }
+
+    /// The pov has gone from `from` to `to`: whoever `follows me` and was
+    /// with them comes too. `npc thwaite ~ follows me when self.with_me`.
+    pub(super) fn followers(&mut self, from: &str, to: &str) -> R<()> {
+        let story = Arc::clone(&self.story);
+        for id in story
+            .ids_of("npc")
+            .into_iter()
+            .chain(story.ids_of("character"))
+        {
+            let follows = story.field(&id, "follows");
+            if *follows == Value::Null || id == self.pov || self.location(&id) != from {
+                continue;
+            }
+            let who = match f(follows, "who").as_str() {
+                Some("me") | None => self.pov.clone(),
+                Some(who) => who.to_string(),
+            };
+            if who != self.pov {
+                continue;
+            }
+            let out = ["dead", "detained", "fixed"].iter().any(|fact| {
+                self.vals
+                    .get(&format!("{id}.{fact}"))
+                    .is_some_and(V::truthy)
+            });
+            if out {
+                continue;
+            }
+            let when = f(follows, "when");
+            if *when != Value::Null {
+                let saved = self
+                    .locals
+                    .insert("self".into(), Local::Value(V::Id(id.clone())));
+                let holds = self.eval(when).map(|v| v.truthy());
+                match saved {
+                    Some(old) => self.locals.insert("self".into(), old),
+                    None => self.locals.remove("self"),
+                };
+                if !holds? {
+                    continue;
+                }
+            }
+            self.step(&id, to)?;
+        }
         Ok(())
     }
 
@@ -321,7 +434,11 @@ impl Run {
         let mut queue = VecDeque::from([from.to_string()]);
         while let Some(at) = queue.pop_front() {
             for (way, a, b) in self.story.ways.clone() {
-                if a != at || seen.contains_key(&b) || !self.may_use(&way, via, who)? {
+                if a != at
+                    || seen.contains_key(&b)
+                    || !self.may_use(&way, via, who)?
+                    || !self.keeps_to(&b)?
+                {
                     continue;
                 }
                 seen.insert(b.clone(), seen[&at] + 1);

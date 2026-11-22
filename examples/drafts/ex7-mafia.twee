@@ -386,7 +386,7 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 {syndicate.dead}
 
 [end]
-[if me.alive and me.team == cult and cult_left >= 2 and nights % 2 == 0]
+[if me.alive and me.team == cult and cult_left >= 2 and nights mod 2 == 0]
 The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it turns again.
 
 [end]
@@ -400,7 +400,7 @@ The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it tur
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus 2
 > [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: first(targets) ~ then set second: last(targets)
 
-> ~ for guest where: it.alive and it.team == cult ~ consensus ~ when cult_left < 2 or nights % 2 == 1
+> ~ for guest where: it.alive and it.team == cult ~ consensus ~ when cult_left < 2 or nights mod 2 == 1
 > [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.role != doctor and it.voted_with(cult) ~ then set victim: target
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus

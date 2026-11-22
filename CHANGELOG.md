@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Milestone 20b: time and motion
+
+- `clock: 0.. ~ each action`: every Link taken is a turn, ended after the
+  act is shown; hints, switching pov, going back and endings are not.
+- `~ for N turns` and `~ after N turns [when …]` after an effect, on a
+  header line, a Link, an act or a handler. A lasting effect puts back what
+  it changed, and lasts from the latest time it was done; a waiting effect
+  happens once. Both are kept in the world's snapshots, so an undo puts
+  them back too.
+- Handlers on a kind, tag or archetype (`on enter place`, `on enter
+  shaft`), with `entered`, `left`, `crossed`, `moved` and `taken` for what
+  it happened to, and `by me` for what the pov did. `on turn ends` reads as
+  `on turn`.
+- A `move` event, after `leave` and `enter`, for the pov and NPCs.
+- `npc x ~ follows me when …`: the NPC moves with the pov, as they move.
+- Goals: `~ every N turns`, `~ where: …` (the places an NPC may go
+  through), and `~ wanders` in place of `~ toward`.
+- A played passage (`then play fire:turn`) runs its header before it is
+  shown.
+- `x.place`, where a person or thing is.
+- An act is done where the pov stands: an act kept in a `[lib]` passage no
+  longer fires `leave` and `enter` for the lib.
+- A remainder is `mod`; `%` is now an error that says so (Ex 7 and Ex 9
+  wrote `%`).
+- Ex 9's NPCs are goals now, its handlers `by me`, and its undo Links go to
+  `rewind`.
+
 ### Milestone 20a: targets and filters
 
 - `where:` with `it` in kind filters, and `all(…)`: `count(guest, where:

@@ -17,6 +17,7 @@ mod prose;
 mod senses;
 pub mod test;
 mod time;
+mod timers;
 mod value;
 
 use events::Event;
@@ -247,6 +248,8 @@ impl Story {
                 Some("clock") => {
                     self.defaults.insert("clock".into(), f(s, "value").clone());
                     self.defaults
+                        .insert("clock_each_action".into(), f(s, "each_action").clone());
+                    self.defaults
                         .insert("clock_shown_as".into(), f(s, "shown_as").clone());
                     self.defaults
                         .insert("clock_day".into(), f(s, "day").clone());
@@ -475,6 +478,10 @@ pub struct Run {
     seen: BTreeMap<String, Vec<senses::SeenMove>>,
     /// Uses of acts that rewind: the player's, so a rewind keeps them.
     player_uses: BTreeMap<String, V>,
+    /// Effects waiting on the clock: `after 2 turns`, `for 4 turns`.
+    timers: Vec<time::Timer>,
+    /// While an NPC finds its way: the places it keeps to (`~ where:`).
+    keep_to: Option<Value>,
     /// What the action in hand has done so far, against the step limit.
     work: Work,
     /// The passages the action in hand entered, in order.
@@ -549,6 +556,8 @@ impl Run {
             claimants: String::new(),
             verdict: None,
             sightings: BTreeMap::new(),
+            timers: Vec::new(),
+            keep_to: None,
             history: Vec::new(),
             saved: BTreeMap::new(),
             reached: Vec::new(),
@@ -1304,7 +1313,30 @@ impl Run {
         if self.is_claim(link) {
             return self.claim(link);
         }
-        self.perform(link, false)
+        self.perform(link, false)?;
+        // `clock: 0.. ~ each action`: whatever the Linker does is a turn.
+        // Not a hint or a switch of pov, which are not done in the story,
+        // nor a `pass`, which ended the turn itself; and not once the story
+        // has ended, or is waiting on an answer.
+        let free = matches!(
+            f(link, "kind").as_str(),
+            Some("hint" | "switch" | "pass" | "rewind")
+        ) || f(link, "target").as_str() == Some("rewind");
+        if self.each_action()
+            && !free
+            && !self.in_past()
+            && self.paused.is_none()
+            && !self.links.is_empty()
+        {
+            self.end_turn()?;
+            self.relist()?;
+        }
+        Ok(())
+    }
+
+    /// Does every action take a turn? `clock: 0.. ~ each action`.
+    fn each_action(&self) -> bool {
+        self.story.defaults.get("clock_each_action") == Some(&Value::Bool(true))
     }
 
     /// Pay what a Link costs, from whoever acts.
@@ -1512,6 +1544,8 @@ impl Run {
                 }
             }
         }
+        // What was waiting on the clock.
+        self.run_timers()?;
         // A fuse that was lit with `light` burns down by one each turn.
         for id in story.ids_of("fuse") {
             if self
@@ -1549,7 +1583,14 @@ impl Run {
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
         let actor = self.pov.clone();
-        if place_of(&from) != place_of(passage) {
+        // An act is done where the pov is, wherever its passage is kept: a
+        // spellbook's act does not take them to the spellbook.
+        let to = if p.tags.iter().any(|t| t == "act") && !from.is_empty() {
+            place_of(&from).to_string()
+        } else {
+            place_of(passage).to_string()
+        };
+        if place_of(&from) != to {
             if !from.is_empty() {
                 self.fire(Event {
                     on: "leave",
@@ -1557,13 +1598,23 @@ impl Run {
                     actor: &actor,
                     before: false,
                 })?;
+                // Whoever `follows me` comes too, before the pov arrives.
+                self.followers(place_of(&from), &to)?;
             }
             self.fire(Event {
                 on: "enter",
-                what: place_of(passage),
+                what: &to,
                 actor: &actor,
                 before: false,
             })?;
+            if !from.is_empty() {
+                self.fire(Event {
+                    on: "move",
+                    what: &actor,
+                    actor: &actor,
+                    before: false,
+                })?;
+            }
         }
         if p.tags.iter().any(|t| t == "act") {
             self.fire(Event {
@@ -2367,6 +2418,16 @@ impl Run {
         if f(e, "once") == &Value::Bool(true) && !self.once.insert(e.to_string()) {
             return Ok(());
         }
+        // `~ after 2 turns`, `~ for 4 turns`: see `timers.rs`.
+        if let Some(n) = e.get("delay") {
+            let turns = self.turns(n)?;
+            self.delay(e, turns);
+            return Ok(());
+        }
+        if let Some(n) = e.get("lasts") {
+            let turns = self.turns(n)?;
+            return self.last(e, turns, clauses);
+        }
         let args = f(e, "args").as_arr().unwrap_or(&[]).to_vec();
         let word = |i: usize| {
             args.get(i)
@@ -2512,8 +2573,24 @@ impl Run {
                     }
                 }
             }
+            // `play fire:turn`: its header runs, then it is shown, among
+            // the names of whatever played it.
             "play" => {
-                self.render(&word(0), false)?;
+                let passage = word(0);
+                let saved = self.locals.clone();
+                let header = self
+                    .story
+                    .passages
+                    .get(&passage)
+                    .map(|p| p.header.clone())
+                    .unwrap_or_default();
+                let result = header
+                    .iter()
+                    .filter(|s| !inputs::is_input(s))
+                    .try_for_each(|s| self.statement(s).map(|_| ()))
+                    .and_then(|()| self.render(&passage, false).map(|_| ()));
+                self.locals = saved;
+                result?;
             }
             // `roll standoff`: roll on a table.
             "roll" => self.roll_table(&word(0))?,
@@ -3218,6 +3295,8 @@ impl Run {
             ),
             (_, "watched") => V::Bool(self.watched(&id)?),
             (_, "offstage") => V::Bool(self.offstage(&id)?),
+            // `gleaner.place`: where someone or something is.
+            (_, "place") if story.kind(&id) != Some("place") => V::Id(self.place_id(&id)),
             // `x.here`: is x where the pov is?
             (_, "here") => V::Bool(self.location(&id) == place_of(self.here())),
             // Not stored: a field of the thing's declaration, `knight.weight`.

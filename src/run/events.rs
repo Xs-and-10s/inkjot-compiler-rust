@@ -7,7 +7,13 @@
 //! ```
 //!
 //! The interpreter calls [`Run::fire`] at each event: a walk across a way, a
-//! take, a fact raised, a turn ending. Every handler for that event runs in
+//! take, a fact raised, a turn ending, someone moving.
+//!
+//! A handler names what the event happened to: one thing (`on enter
+//! marrow`), or a kind, tag or archetype, for every thing of it (`on enter
+//! place`, `on enter shaft`). Inside, `entered`, `left`, `crossed`, `moved`
+//! or `taken` is the thing itself, and `actor` who did it; `by me` keeps a
+//! handler to what the pov does. Every handler for that event runs in
 //! the order it was written. A `before` handler may cancel the thing with
 //! `~ then stop`.
 
@@ -48,13 +54,20 @@ impl Run {
                 continue;
             }
             // `what`: the handler's first word after the event must name the thing.
+            // A kind, a tag or an archetype names every thing of it:
+            // `on enter place`, `on enter shaft`.
             if let Some(what) = f(handler, "what")
                 .as_arr()
                 .and_then(|w| w.first())
                 .and_then(Value::as_str)
             {
                 let last = event.what.rsplit('.').next().unwrap_or(event.what);
-                if what != event.what && what != last {
+                let fits = what == event.what
+                    || what == last
+                    || story.kind(event.what) == Some(what)
+                    || story.has_tag(event.what, what)
+                    || story.field(event.what, "like").as_str() == Some(what);
+                if !fits {
                     continue;
                 }
             }
@@ -63,6 +76,7 @@ impl Run {
                 continue;
             }
             if let Some(by) = f(handler, "by").as_str() {
+                let by = if by == "me" { self.pov.as_str() } else { by };
                 let a = event.actor;
                 let fits = a == by
                     || story.has_tag(a, by)
@@ -88,6 +102,19 @@ impl Run {
             if let Some(owner) = owner {
                 self.locals
                     .insert("self".into(), Local::Value(V::Id(owner.clone())));
+            }
+            // What it happened to, by the event's own word.
+            let name = match event.on {
+                "enter" => Some("entered"),
+                "leave" => Some("left"),
+                "cross" => Some("crossed"),
+                "move" => Some("moved"),
+                "take" => Some("taken"),
+                _ => None,
+            };
+            if let Some(name) = name {
+                self.locals
+                    .insert(name.into(), Local::Value(V::Id(event.what.to_string())));
             }
             self.firing += 1;
             let result = self.run_handler(handler);

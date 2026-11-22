@@ -59,7 +59,7 @@ ages: 10..
 mode: solo
 pov: apprentice
 narration: second person
-clock: 0.. ~ shown as "turn"
+clock: 0.. ~ shown as "turn" ~ each action
 start: prologue
 default moves: walk
 default takes: take, drop
@@ -152,27 +152,27 @@ next to it that has not burnt and is not burning.
 on turn ends
 ~ then play fire:turn
 
-on enter place when entered.heat >= 2
+on enter place by me when entered.heat >= 2
 ~ then play burned
 
-on enter shaft when entered.burnt
+on enter shaft by me when entered.burnt
 ~ then lower entered.crossings 1
 ~ then play shaft:creaks
 
-on leave shaft when left.burnt and left.crossings == 0
+on leave shaft by me when left.burnt and left.crossings == 0
 ~ then set left.fallen: yes
 ~ then play shaft:falls
 
-on leave marrow when me.holds.shard
+on leave marrow by me when me.holds.shard
 ~ then play warden:wakes
 
 on move warden when warden.roused and warden.here and not warden.unmade
 ~ then play warden:fight
 
-on enter place when gleaner.here
+on enter place by me when gleaner.here
 ~ then play gleaner:about
 
-on enter place when thwaite.here and thwaite.with_me and not way_free
+on enter place by me when thwaite.here and thwaite.with_me and not way_free
 ~ then play thwaite:waiting
 
 fuse lamp_oil: 90 ~ shown as "lamp oil" ~ lit
@@ -239,9 +239,7 @@ character apprentice: "Thwaite’s apprentice" ~ selectable ~ pronouns chosen ~ 
 npc thwaite: "Agnes Thwaite" ~ pronouns she ~ in marrow ~ moves none
 ~ follows me when self.with_me and way_free
 npc warden: "the Brinewarden" ~ pronouns it ~ in wardens_hall
-~ moves toward me 1 every 2 turns when self.roused and not self.paid and not self.unmade ~ where: it.salted and it.heat == 0
 npc gleaner: "the Gleaner" ~ pronouns they ~ in stables
-~ moves 1 per turn ~ where: it.salted and it.depth < 300 and it.heat == 0 and not it.like(shaft) and not (it == drift and gas > 0)
 
 objective find: "Find Agnes Thwaite" ~ done when thwaite.found
 objective bring: "Bring her up" ~ after find ~ done when thwaite.here and here.way_out
@@ -393,6 +391,12 @@ Marrow with marrow salt (`warden:wakes`). Roused, it
 follows one place every two turns, on salt only, and never into fire;
 when it reaches you, it fights.
 )))
+goal chase:
+~ toward me
+~ when self.roused and not self.paid and not self.unmade
+~ every 2 turns
+~ where: it.salted and it.heat == 0
+
 pattern blows: crush, grasp, crush, douse ~ repeat ~ one per round
 
 threat crush: at me ~ answered by cover
@@ -411,8 +415,13 @@ state met: no
 The Gleaner wanders the upper workings with a candle. In a place you are
 not in, they take one loose thing worth having. In a dry timbered place,
 their candle may start a fire. Gust blows it out; they light it again
-three turns later.
+three turns later. They keep to salt above the winze, out of fire, off
+the ladders, and out of the drift while it has gas.
 )))
+goal glean:
+~ wanders
+~ where: it.salted and it.depth < 300 and it.heat == 0 and not it.like(shaft) and not (it == drift and gas > 0)
+
 on turn ends when not gleaner.here
 ~ then give one(item, in: gleaner.place, where: it.like(treasure) or it.like(tool)) to gleaner
 ~ then roll candle when gleaner.candle_lit and gleaner.place.timbered and not gleaner.place.burnt and gleaner.place.heat == 0
@@ -830,7 +839,7 @@ Where the walls meet the floor, new salt has grown, like frost on a step.
 [end]
 > [[Thwaite!->marrow:found]] ~ when not thwaite.found
 > [[Take her with you->marrow:take_her]] ~ when thwaite.found and thwaite.here and not thwaite.with_me and way_free
-> [[Set staves under the fall->marrow:prop]] ~ when rubble > 0 and not propped and count(stave, held by: me) >= 2
+> [[Set staves under the fall->marrow:prop]] ~ when rubble > 0 and not propped and count(stave, where: it.held_by(me)) >= 2
 > [[Gather the new salt->scrape]] ~ when here.crust > 0
 > [[Dig at the fall->marrow:dig]] ~ uses pick ~ when rubble > 0 and propped and me.holds.pick and not pick.broken
 
@@ -953,7 +962,7 @@ set ablaze.heat: 0
 set ablaze.burnt: yes
 raise growing.heat 1
 let crusting: all(place, where: it.crusts and it.crust < 3)
-raise crusting.crust 1 when clock.now % 4 == 0
+raise crusting.crust 1 when clock.now mod 4 == 0
 lower gas 1 when air_door_open and gas > 0
 move thwaite to nearest(place, where: it.heat == 0 and not it.timbered) ~ along way when thwaite.place.heat > 0 and not thwaite.here
 set flame_warned: yes when here == drift and gas > 0 and open_flame
@@ -1185,13 +1194,13 @@ The salt comes down on you like a wave on a beach, and the beach is you.
 
 [end]
 
-> [[Undo->here]] ~ rewind
+> [[Undo->rewind]]
 
 :: burned [ending]
 --
 You walk into the heat, or the heat walks into you. There is a great deal of light and then none.
 
-> [[Undo->here]] ~ rewind
+> [[Undo->rewind]]
 
 :: home [finale]
 raise score 20
