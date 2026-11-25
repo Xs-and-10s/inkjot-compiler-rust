@@ -749,6 +749,9 @@ impl Checker {
             *self.stretch.entry(kw.to_string()).or_default() += 1;
             return;
         }
+        if let Some((_, now)) = RETIRED.iter().find(|(w, _)| *w == kw) {
+            return self.err(head.line, head.col, now.to_string());
+        }
         if RESERVED_LATER.contains(&kw) {
             return self.err(
                 head.line,
@@ -1024,6 +1027,36 @@ impl Checker {
                     }
                 }
             }
+            // `threat flame: fire ~ at roland ~ answered by prevent, block`.
+            "threat" => {
+                let first = Clause {
+                    text: value.to_string(),
+                    line: head.line,
+                    col: value_col,
+                };
+                for c in std::iter::once(&first).chain(&s.clauses[1..]) {
+                    if let Some(who) = c.text.strip_prefix("at ") {
+                        self.expr(who, c.line, c.col + 3);
+                    }
+                    if let Some(kinds) = c.text.strip_prefix("answered by ") {
+                        for k in kinds.split(',').map(str::trim) {
+                            if !COUNTERS.contains(&k) {
+                                self.err(
+                                    c.line,
+                                    c.col + 12,
+                                    format!(
+                                        "`{k}` is not a counter; counters are: {}",
+                                        COUNTERS.join(", ")
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                    if let Some(e) = c.text.strip_prefix("on fail:") {
+                        self.effect(e.trim(), c.line, c.col + 9);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -1192,6 +1225,44 @@ impl Checker {
                         vcol,
                         "a title is quoted text: `title: \"The Millpond\"`",
                     );
+                }
+            }
+            // `pattern rhyme: flame, frost ~ repeat ~ recall first when …`.
+            "pattern" => {
+                let steps = rest.split_once(':').map_or("", |(_, v)| v);
+                for step in steps.split(',').map(str::trim).filter(|t| !t.is_empty()) {
+                    self.need(step, &["threat"], "threat", line, vcol);
+                }
+                for c in &s.clauses[1..] {
+                    let words: Vec<&str> = before_when(&c.text).split_whitespace().collect();
+                    match words.as_slice() {
+                        ["repeat"] | ["one", "per", "round"] => {}
+                        [threat, "first"] => self.need(threat, &["threat"], "threat", c.line, c.col),
+                        [threat, "instead", "of", of] => {
+                            self.need(threat, &["threat"], "threat", c.line, c.col);
+                            self.need(of, &["threat"], "threat", c.line, c.col);
+                        }
+                        _ => self.err(
+                            c.line,
+                            c.col,
+                            "a pattern's clause is `repeat`, `one per round`, `x first when …` or `x instead of y when …`",
+                        ),
+                    }
+                }
+            }
+            // `encounter hask ~ round by round ~ acts last ~ until …`.
+            "encounter" => {
+                self.need(
+                    first_word(rest),
+                    &["npc", "character"],
+                    "NPC",
+                    line,
+                    rest_col,
+                );
+                for c in &s.clauses[1..] {
+                    if let Some(e) = c.text.strip_prefix("until ") {
+                        self.expr(e, c.line, c.col + 6);
+                    }
                 }
             }
             // `recipe stretcher: stave, stave, sacking ~ using hammer ~ make`.
@@ -1531,6 +1602,28 @@ impl Checker {
                 } else {
                     self.need(arg(2), &["fact"], "fact", line, word_col(2));
                 }
+            }
+            // Counters: `prevent hask`, `block for roland`, `cover me`,
+            // `absorb with lumen`; and `pin hask`, `skip hask this round`.
+            "prevent" | "cover" | "pin" | "skip" => {
+                self.who_arg(arg(1), line, col + cols(verb) + 1)
+            }
+            "block" => {
+                if arg(1) != "for" {
+                    self.err(line, col, "`block` is written `block for who`");
+                } else {
+                    self.who_arg(arg(2), line, col);
+                }
+            }
+            "absorb" => {
+                if arg(1) != "with" {
+                    self.err(line, col, "`absorb` is written `absorb with item`");
+                } else {
+                    self.need(arg(2), &["item"], "item", line, col);
+                }
+            }
+            "end" if arg(1) != "encounter" => {
+                self.err(line, col, "`end` is written `end encounter`");
             }
             // `gain salt 2`, `gain tally`, `give one(item, …) to gleaner`,
             // `give target to me`, `destroy all(item, …)`, `lose stave 2`.
@@ -2229,6 +2322,18 @@ impl Checker {
 }
 
 impl Checker {
+    /// Whom a counter names: a person, or a name for one (`target`, `me`).
+    fn who_arg(&mut self, who: &str, line: usize, col: usize) {
+        if who.is_empty() {
+            return self.err(line, col, "say whom: `cover me`, `prevent hask`");
+        }
+        if is_ident(who) && !self.is_known_local(who) && !crate::syntax::POV_NAMES.contains(&who) {
+            self.need(who, &["character", "npc"], "character or NPC", line, col);
+        } else if !is_ident(who) {
+            self.expr(who, line, col);
+        }
+    }
+
     /// A builtin (`target`, `it`) or a `let` in scope: not a declared id.
     fn is_known_local(&self, name: &str) -> bool {
         resolve::BUILTINS.contains(&name) || self.locals.contains(name) || name == "it"

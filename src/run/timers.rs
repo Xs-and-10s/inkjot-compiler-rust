@@ -54,6 +54,26 @@ impl Run {
     /// have passed.
     pub(super) fn last(&mut self, e: &Value, turns: u32, clauses: &[Value]) -> R<()> {
         let verb = f(e, "do").as_str().unwrap_or("");
+        // `cover me ~ for 3 turns`: the cover wears off, if no threat used it.
+        if verb == "cover" {
+            let args = f(e, "args").as_arr().unwrap_or(&[]).to_vec();
+            let who = self.targets(&args[..args.len().min(1)], &self.pov.clone())?;
+            let keys: Vec<String> = who.iter().map(|w| format!("{w}.covered")).collect();
+            self.apply(&without(e, &["lasts", "when"]), clauses)?;
+            let due = self.chronon + turns;
+            for key in keys {
+                self.timers
+                    .retain(|t| !matches!(&t.what, Due::Restore { key: k, .. } if *k == key));
+                self.timers.push(Timer {
+                    due,
+                    what: Due::Restore {
+                        key,
+                        old: Some(V::Bool(false)),
+                    },
+                });
+            }
+            return Ok(());
+        }
         let target = match verb {
             "set" => f(e, "target").clone(),
             "raise" | "lower" | "toggle" => f(e, "args")

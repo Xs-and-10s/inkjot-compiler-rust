@@ -375,6 +375,15 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   carries its group's clauses. `all(…)` and `with: {"where": …}` in calls.
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
+- Milestone 20d: `threat` declarations (`at` an expression, `answered_by`,
+  `fails_when`, `on_fail`, `then`, the tag among `tags`); `pattern`
+  statements, `{"pattern": "rhyme", "steps": […], "repeat": true,
+  "first": [{"threat", "when"}], "instead": [{"threat", "of", "when"}]}`;
+  `encounter` statements, `{"encounter": "hask", "until": expr,
+  "acts_last": true, "round_by_round": true, "countdown", "plus",
+  "timeout"}`; effects `prevent`, `block`, `cover`, `absorb`, `pin`,
+  `skip`, `end`; `next round` on an effect as `"delay": 1`; items'
+  `deflects` and `absorbs`; the event `absorb`.
 - Milestone 20c: `recipe` statements, `{"recipe": "stretcher", "parts":
   ["stave", "stave", "sacking"], "using": ["hammer"], "verb": "make",
   "label": "…"}`; `spreads` statements, `{"spreads": 1, "from": expr,

@@ -248,3 +248,117 @@ given: set collapse.left: 1
 do: "End the turn"
 expect text: "You wake where you began"
 expect: not roland.dead and not eldric.dead
+
+:: the_duel_begins_with_flame_for_the_fool [test]
+start: sanctum
+~ as roland
+given: move eldric to sanctum
+given: set gate.sun_setter: roland
+expect: hask.wards == 3
+do: "Begin"
+expect: hask.rhyme.next == flame
+expect text: "He draws a line of red across the air"
+
+:: a_rime_shield_takes_the_flame [test]
+start: sanctum
+~ as roland
+given: move eldric to sanctum
+given: set gate.sun_setter: roland
+do: "Begin"
+do: "Rime Shield on Roland Vey, scholar and thief"
+expect: roland.covered
+do: "Let him cast"
+expect: threat.name == flame and threat.outcome == cover
+expect text: "The spell breaks on Roland Vey, scholar and thief’s ice"
+expect: roland.alive and not roland.covered
+do: "Next round"
+expect: hask.rhyme.next == frost
+
+:: thunderclap_unmakes_the_flame [test]
+start: sanctum
+~ as roland
+given: move eldric to sanctum
+given: set gate.sun_setter: roland
+do: "Begin"
+do: "Thunderclap"
+expect text: "whatever he was weaving comes apart"
+do: "Let him cast"
+expect: threat.outcome == prevent
+expect text: "Nothing comes. The spell died in his hands."
+
+:: the_longsword_turns_the_flame_aside [test]
+start: sanctum
+~ as eldric
+given: move roland to sanctum
+given: set gate.sun_setter: roland
+given: give abelard_sword to eldric
+do: "Begin"
+do: "Guard Roland"
+do: "Let him cast"
+expect: threat.outcome == deflect
+expect text: "Eldric turns the flame aside on Abelard’s blade"
+expect: roland.alive
+
+:: eldric_takes_the_flame_himself_without_a_sword [test]
+start: sanctum
+~ as eldric
+given: move roland to sanctum
+given: set gate.sun_setter: roland
+do: "Begin"
+do: "Guard Roland"
+do: "Let him cast"
+expect: threat.outcome == block
+expect: roland.alive and eldric.hp == 1
+
+:: lumen_drinks_a_spell_and_strikes_twice [test]
+start: sanctum
+~ as eldric
+given: move roland to sanctum
+given: set gate.sun_setter: roland
+given: give lumen to eldric
+do: "Begin"
+do: "Raise Lumen"
+do: "Let him cast"
+expect: threat.outcome == absorb and lumen.charged
+expect text: "Lumen drinks the spell whole"
+
+:: unanswered_the_flame_kills_roland_and_the_threshold_catches_him [test]
+start: sanctum
+~ as roland
+given: move eldric to sanctum
+given: set gate.sun_setter: roland
+do: "Begin"
+do: "Let him cast"
+expect text: "Fire takes Roland full in the chest."
+expect text: "You wake on the threshold"
+
+:: with_the_mirrors_frosted_he_cannot_blink [test]
+start: sanctum
+~ as roland
+given: move eldric to sanctum
+given: set gate.sun_setter: roland
+given: set east_mirror.open: no
+given: set west_mirror.open: no
+given: set hask.rhyme.at: 2
+do: "Begin"
+expect: hask.rhyme.next == blink
+do: "Let him cast"
+expect: threat.name == blink and threat.outcome == fail
+expect: hask.grounded
+expect text: "He throws himself at the glass and hits frost"
+
+:: the_last_ward_and_he_falls [test]
+start: sanctum
+~ as eldric
+given: move roland to sanctum
+given: set gate.sun_setter: roland
+given: give abelard_sword to eldric
+given: set hask.grounded: yes
+given: cover roland
+do: "Begin"
+given: set hask.wards: 1
+do: "Strike"
+expect: hask.wards == 0
+do: "Let him cast"
+expect link: "He falls"
+expect no link: "Next round"

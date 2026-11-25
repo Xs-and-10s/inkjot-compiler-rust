@@ -8,6 +8,7 @@
 
 mod agenda;
 mod cohort;
+mod encounter;
 mod events;
 mod hints;
 mod inputs;
@@ -540,6 +541,10 @@ pub struct Run {
     /// While the pov does an act kept away from any place (a spellbook's,
     /// `spell:kindle`): the place they are doing it in.
     acting_in: Option<String>,
+    /// The encounter under way, if any (`encounter.rs`).
+    encounter: Option<encounter::Encounter>,
+    /// Who asked for a hint this round: `me.asked_hint`.
+    hinted: BTreeSet<String>,
     /// What the action in hand has done so far, against the step limit.
     work: Work,
     /// The passages the action in hand entered, in order.
@@ -619,6 +624,8 @@ impl Run {
             near: None,
             go_to: None,
             acting_in: None,
+            encounter: None,
+            hinted: BTreeSet::new(),
             history: Vec::new(),
             saved: BTreeMap::new(),
             reached: Vec::new(),
@@ -997,6 +1004,9 @@ impl Run {
     /// The place someone at `passage` stands in: the passage's own, or,
     /// for an act kept away from any place, where the act is done.
     fn stands(&self, passage: &str) -> String {
+        if let Some(place) = self.encounter_place(passage) {
+            return place;
+        }
         match &self.acting_in {
             Some(place)
                 if self.story.kind(place_of(passage)) != Some("place")
@@ -1425,7 +1435,8 @@ impl Run {
         let free = matches!(
             f(link, "kind").as_str(),
             Some("hint" | "switch" | "pass" | "rewind")
-        ) || f(link, "target").as_str() == Some("rewind");
+        ) || f(link, "target").as_str() == Some("rewind")
+            || self.reads_round(link);
         if self.each_action()
             && !free
             && !self.in_past()
@@ -1436,8 +1447,13 @@ impl Run {
             if let Some(ending) = self.go_to.take() {
                 return self.enter(&ending, BTreeMap::new());
             }
-            self.relist()?;
+            if !self.show_resolve()? {
+                self.relist()?;
+            }
+            return Ok(());
         }
+        // A round ended by a `pass` that led somewhere else: its outcome.
+        self.show_resolve()?;
         Ok(())
     }
 
@@ -1619,6 +1635,12 @@ impl Run {
             self.pov = who.to_string();
         }
         match target.as_str() {
+            "here" if self.leave_encounter().is_some() => {
+                let place = self.leave_encounter().unwrap_or_default();
+                self.encounter = None;
+                let to = self.arrival(&place).unwrap_or(place);
+                self.enter(&to, BTreeMap::new())?;
+            }
             "here" => self.relist()?,
             "rewind" => self.begin_rewind()?,
             _ => self.enter(&target, params)?,
@@ -1679,6 +1701,11 @@ impl Run {
         }
         // What was waiting on the clock.
         self.run_timers()?;
+        // In an encounter, the round ends with the opponent's threat.
+        if self.encounter.as_ref().is_some_and(|e| !e.over) && self.in_encounter(self.here()) {
+            self.resolve_round()?;
+        }
+        self.hinted.clear();
         // A fuse that was lit with `light` burns down by one each turn.
         for id in story.ids_of("fuse") {
             if self
@@ -1704,7 +1731,6 @@ impl Run {
             .passages
             .get(passage)
             .ok_or_else(|| format!("there is no passage `{passage}`"))?;
-        not_yet(passage, p)?;
         self.work.entered += 1;
         if self.work.entered > MAX_ENTERED {
             return Err(format!(
@@ -1713,6 +1739,14 @@ impl Run {
             ));
         }
         self.trail.push(passage.to_string());
+        // An encounter begins where the pov stands; leaving its passages
+        // ends it.
+        let is_act = p.tags.iter().any(|t| t == "act");
+        if p.tags.iter().any(|t| t == "encounter") && !self.in_encounter(passage) {
+            self.begin_encounter(passage);
+        } else if self.encounter.is_some() && !self.in_encounter(passage) && !is_act {
+            self.encounter = None;
+        }
         let from = self.here().to_string();
         self.at.insert(self.pov.clone(), passage.to_string());
         *self.visits.entry(passage.to_string()).or_default() += 1;
@@ -1931,6 +1965,11 @@ impl Run {
         libs.sort();
         for lib in libs {
             links.extend(self.render(lib, true)?);
+        }
+        // In an encounter, the round's Links are the moves: no walks, takes
+        // or recipes (running away is the encounter's own Link).
+        if self.in_encounter(self.here()) {
+            return Ok(links);
         }
         // In a world of stops, moving ends the turn: walk, dash, slip, stay.
         if story.field("walk", "ends_turn") == &Value::Bool(true) {
@@ -2799,6 +2838,44 @@ impl Run {
                     self.destroy_item(&item);
                 }
             }
+            // Counters, and what the Linkers do to the opponent (encounter.rs).
+            "prevent" | "block" | "cover" | "absorb" | "pin" | "skip" | "end" => {
+                self.counter(f(e, "do").as_str().unwrap_or(""), &args)?
+            }
+            // `take heart`: whoever acts, in a threat the opponent.
+            "take" => {
+                let taker = match self.locals.get("actor") {
+                    Some(Local::Value(V::Id(a))) => a.clone(),
+                    _ => pov.clone(),
+                };
+                for item in self.items_named(args.first().unwrap_or(&Value::Null))? {
+                    self.hold(&item, &taker);
+                }
+            }
+            // `wound target 1`: with `hp`, it costs that many; none left is
+            // death.
+            "wound" if self.story.kind("hp") == Some("resource") => {
+                let by = match args.get(1) {
+                    Some(n) => self.eval(n)?.num().unwrap_or(1.0),
+                    None => 1.0,
+                };
+                for who in self.targets(&args[..args.len().min(1)], &pov)? {
+                    self.vals.insert(format!("{who}.wounded"), V::Bool(true));
+                    let key = format!("{who}.hp");
+                    let Some(hp) = self.vals.get(&key).and_then(V::num) else {
+                        continue;
+                    };
+                    self.vals.insert(key, V::Num((hp - by).max(0.0)));
+                    if hp - by <= 0.0 {
+                        let kill = Value::obj([
+                            ("do", Value::str("kill")),
+                            ("args", Value::Arr(vec![Value::str(&who)])),
+                            ("when", Value::Null),
+                        ]);
+                        self.apply(&kill, &[])?;
+                    }
+                }
+            }
             "kill" | "detain" | "wake" | "wound" => {
                 let fact = match f(e, "do").as_str() {
                     Some("kill") => "dead",
@@ -2832,10 +2909,11 @@ impl Run {
                 let passage = word(0);
                 // An ending is not shown in passing: the pov goes there,
                 // once the action is done.
+                // An encounter, likewise: it begins where they stand.
                 let ending = self.story.passages.get(&passage).is_some_and(|p| {
-                    p.tags
-                        .iter()
-                        .any(|t| matches!(t.as_str(), "ending" | "finale" | "epilogue"))
+                    p.tags.iter().any(|t| {
+                        matches!(t.as_str(), "ending" | "finale" | "epilogue" | "encounter")
+                    })
                 });
                 if ending {
                     self.go_to.get_or_insert(passage);
@@ -2848,9 +2926,6 @@ impl Run {
                     .get(&passage)
                     .map(|p| p.header.clone())
                     .unwrap_or_default();
-                if let Some(p) = self.story.passages.get(&passage) {
-                    not_yet(&passage, p)?;
-                }
                 let result = header
                     .iter()
                     .filter(|s| !inputs::is_input(s))
@@ -3318,11 +3393,13 @@ impl Run {
                     None => self.who(&items[0])?,
                 };
                 let tag = items.get(1).and_then(Value::as_str).unwrap_or("");
-                V::Bool(
-                    self.holder
-                        .iter()
-                        .any(|(item, h)| *h == who && self.story.has_tag(item, tag)),
-                )
+                // A tag of its own or its archetype's, or the archetype:
+                // `holds.any(sword)` for a thing `like sword`.
+                V::Bool(self.holder.iter().any(|(item, h)| {
+                    *h == who
+                        && (self.tagged(item, tag)
+                            || self.story.field(item, "like").as_str() == Some(tag))
+                }))
             }
             "where" => {
                 let list = self.who(&items[0])?;
@@ -3516,7 +3593,11 @@ impl Run {
     fn global(&self, n: &str) -> V {
         match n {
             "me" => return V::Id(self.pov.clone()),
-            "here" if self.acting_in.is_some() => return V::Id(self.stands(self.here())),
+            "here" if self.acting_in.is_some() || self.encounter_place(self.here()).is_some() => {
+                return V::Id(self.stands(self.here()))
+            }
+            // `threat.outcome`: the last threat, in a `[resolve]` passage.
+            "threat" if self.encounter.is_some() => return V::Id("threat".into()),
             "here" => return V::Id(self.here().to_string()),
             "nothing" | "nobody" => return V::Null,
             _ => {}
@@ -3567,6 +3648,7 @@ impl Run {
         };
         let story = Arc::clone(&self.story);
         Ok(match (id.as_str(), m) {
+            ("threat", _) if self.encounter.is_some() => self.threat_member(m),
             ("clock", "now") => V::Num(f64::from(self.when())),
             ("pov", _) => {
                 return Err(format!(
@@ -3620,6 +3702,29 @@ impl Run {
             ),
             (_, "watched") => V::Bool(self.watched(&id)?),
             (_, "offstage") => V::Bool(self.offstage(&id)?),
+            // `hask.rhyme`: the opponent's pattern; `hask.rhyme.next`.
+            (_, _) if self.is_pattern(m) && story.kind(&id).is_some() => V::Id(format!("{id}.{m}")),
+            (_, "next") if id.split_once('.').is_some_and(|(_, p)| self.is_pattern(p)) => {
+                let opp = id
+                    .split_once('.')
+                    .map(|(o, _)| o.to_string())
+                    .unwrap_or_default();
+                match self.pattern_next(&opp, false)? {
+                    Some(t) => V::Id(t),
+                    None => V::Null,
+                }
+            }
+            // `me.down`: dead, or with no `hp` left; `me.up`, not.
+            (_, "down" | "up") if matches!(story.kind(&id), Some("character" | "npc")) => {
+                let dead = self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)
+                    || self
+                        .vals
+                        .get(&format!("{id}.hp"))
+                        .and_then(V::num)
+                        .is_some_and(|hp| hp <= 0.0);
+                V::Bool(if m == "down" { dead } else { !dead })
+            }
+            (_, "asked_hint") => V::Bool(self.hinted.contains(&id)),
             // `gleaner.place`: where someone or something is.
             (_, "place") if story.kind(&id) != Some("place") => V::Id(self.place_id(&id)),
             // `x.here`: is x where the pov is?
@@ -3774,21 +3879,6 @@ impl Run {
         self.rng ^= self.rng >> 7;
         self.rng ^= self.rng << 17;
         1 + self.rng % sides.max(1)
-    }
-}
-
-/// An encounter's passages (`[encounter]`, `[round]`, `[resolve]`) are
-/// v0.6 work not built yet: say so, rather than show what they hold.
-fn not_yet(name: &str, p: &Passage) -> R<()> {
-    match p
-        .tags
-        .iter()
-        .find(|t| matches!(t.as_str(), "encounter" | "round" | "resolve"))
-    {
-        Some(tag) => Err(format!(
-            "`{name}` is an `[{tag}]` passage, and encounters are not built yet (milestone 20d)"
-        )),
-        None => Ok(()),
     }
 }
 

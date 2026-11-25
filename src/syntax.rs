@@ -12,6 +12,7 @@ pub(crate) const MARGIN_TAGS: &[&str] =
 
 /// Statements that declare an id.
 pub(crate) const DECLS: &[&str] = &[
+    "threat",
     "place",
     "spot",
     "way",
@@ -94,6 +95,9 @@ pub(crate) const SETTINGS: &[&str] = &[
     "recipe",
     // `spreads 1 from ablaze to nearest(place, where: …) ~ along way`.
     "spreads",
+    // Encounters: `pattern rhyme: flame, frost ~ repeat`, `encounter hask`.
+    "pattern",
+    "encounter",
     // A slot a generated fork fills: `pending: tragic ~ by monkeypaw`.
     "pending",
     // `[test]` passages.
@@ -110,6 +114,8 @@ pub(crate) const EFFECTS: &[&str] = &[
     "learn", "teach", "gain", "lose", "give", "set", "raise", "lower", "toggle", "burn", "light",
     "wake", "move", "kill", "wound", "destroy", "detain", "add", "remove", "strike", "roll",
     "play", "say", "stop", "fix", "take", "dash", "feign", "nothing", "wait", "reveal",
+    // Encounters: counters, and what an Inker can do to the opponent.
+    "prevent", "block", "cover", "absorb", "pin", "skip", "end",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -119,21 +125,22 @@ pub(crate) fn is_effect(kw: &str, rest: &str) -> bool {
 }
 
 /// Deferred to v0.6: parsed far enough to skip, then reported in one notice.
-pub(crate) const STRETCH: &[&str] = &[
-    "encounter",
-    "pattern",
-    "spell",
-    "retell",
-    "shield",
-    "interrupt",
-    "pin",
-    "skip",
-    "guard",
-    "absorb",
-    "parry",
-    "freeze",
+pub(crate) const STRETCH: &[&str] = &["retell"];
+pub(crate) const STRETCH_TAGS: &[&str] = &["retell"];
+
+/// What a threat may be `answered by`.
+pub(crate) const COUNTERS: &[&str] = &["prevent", "block", "cover", "absorb"];
+
+/// v0.5's duel words, gone in the encounter milestone, and what says each
+/// now.
+pub(crate) const RETIRED: &[(&str, &str)] = &[
+    ("spell", "`spell` is now `threat`: `threat flame: fire ~ at roland ~ answered by prevent, block, cover, absorb`"),
+    ("shield", "`shield x` is now `cover x`"),
+    ("interrupt", "`interrupt x` is now `prevent x`"),
+    ("guard", "`guard x` is now `block for x`"),
+    ("parry", "parrying is now a tag on the item: `~ deflects fire`"),
+    ("freeze", "`freeze x` is now `set x.frozen: yes`"),
 ];
-pub(crate) const STRETCH_TAGS: &[&str] = &["encounter", "round", "resolve", "retell"];
 
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
@@ -181,7 +188,7 @@ pub(crate) const CHOICES: &[&str] = &["proactive", "reactive", "inactive"];
 
 pub(crate) const EVENTS: &[&str] = &[
     "start", "enter", "leave", "cross", "take", "learn", "act", "turn", "death", "rewind", "out",
-    "loud", "raise", "lower", "set", "move", "drop", "make",
+    "loud", "raise", "lower", "set", "move", "drop", "make", "absorb",
 ];
 
 /// Acts every Inklink has, whether or not its config tunes them.

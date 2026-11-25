@@ -582,12 +582,7 @@
       "id": "abelard_sword",
       "label": "Abelard’s longsword",
       "like": "sword",
-      "other": [
-        {
-          "text": "parries flame",
-          "words": ["parries", "flame"]
-        }
-      ],
+      "deflects": ["fire"],
       "in": "well"
     },
     {
@@ -596,16 +591,31 @@
       "label": "Lumen, the holy sword of the Dawn",
       "like": "sword",
       "tags": ["holy"],
-      "other": [
-        {
-          "text": "absorbs spells",
-          "words": ["absorbs", "spells"]
-        }
-      ],
+      "absorbs": ["any"],
       "in": "orrery",
       "fixed_until": {
         "get": ["orrery", "aligned"]
       }
+    },
+    {
+      "on": "absorb",
+      "timing": "after",
+      "what": ["lumen"],
+      "by": null,
+      "when": null,
+      "then": [
+        {
+          "do": "set",
+          "target": {
+            "get": ["lumen", "charged"]
+          },
+          "value": true,
+          "when": null
+        }
+      ],
+      "once": false,
+      "at_most": null,
+      "tags": []
     },
     {
       "declare": "item",
@@ -838,6 +848,19 @@
           0
         ]
       }
+    },
+    {
+      "let": "holder",
+      "value": {
+        "one": ["character"],
+        "with": {
+          "where": {
+            "holds": ["it", "heart"]
+          }
+        }
+      },
+      "when": null,
+      "derived": true
     }
   ],
   "acts": {
@@ -1202,16 +1225,20 @@
           "declare": "combo",
           "id": "ember_lance",
           "acts": ["spark", "gust", "spark"],
-          "tags": ["spell"],
+          "tags": ["spell", "fire"],
           "label": "flame, fanned, then lit into a lance",
-          "other": [
+          "at": "character here",
+          "when": {
+            "get": ["target", "frozen"]
+          },
+          "then": [
             {
-              "text": "thaws ice",
-              "words": ["thaws", "ice"]
-            },
-            {
-              "text": "cracks glass",
-              "words": ["cracks", "glass"]
+              "do": "set",
+              "target": {
+                "get": ["target", "frozen"]
+              },
+              "value": false,
+              "when": null
             }
           ]
         },
@@ -1219,12 +1246,14 @@
           "declare": "combo",
           "id": "rime_shield",
           "acts": ["chill", "mend", "chill"],
-          "tags": ["spell"],
+          "tags": ["spell", "frost"],
           "label": "a shell of ice that heals its own cracks",
-          "other": [
+          "at": "character here",
+          "then": [
             {
-              "text": "shields target from the next spell",
-              "words": ["shields", "target", "from", "the", "next", "spell"]
+              "do": "cover",
+              "args": ["target"],
+              "when": null
             }
           ]
         },
@@ -1232,19 +1261,43 @@
           "declare": "combo",
           "id": "frostglass",
           "acts": ["chill", "gust"],
-          "tags": ["spell"],
-          "label": "rimes a mirror over until it shows nothing"
+          "tags": ["spell", "frost"],
+          "label": "rimes a mirror over until it shows nothing",
+          "at": "mirror here",
+          "when": {
+            "get": ["target", "open"]
+          },
+          "then": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "open"]
+              },
+              "value": false,
+              "when": null
+            }
+          ]
         },
         {
           "declare": "combo",
           "id": "thunderclap",
           "acts": ["hush", "gust", "spark"],
-          "tags": ["spell"],
+          "tags": ["spell", "loud"],
           "label": "a swallowed sound, carried, then let go at once",
-          "other": [
+          "then": [
             {
-              "text": "interrupts flame, frost",
-              "words": ["interrupts", "flame", "frost"]
+              "do": "prevent",
+              "args": ["hask"],
+              "when": {
+                "within": [
+                  {
+                    "get": ["hask", "rhyme", "next"]
+                  },
+                  {
+                    "list": ["flame", "frost"]
+                  }
+                ]
+              }
             }
           ]
         },
@@ -1270,7 +1323,23 @@
           ],
           "tags": ["spell"],
           "learned_from": "lodestone",
-          "label": "makes one thing very, very heavy, for one breath"
+          "label": "makes one thing very, very heavy, for one breath",
+          "at": "npc here",
+          "then": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "grounded"]
+              },
+              "value": true,
+              "when": null
+            },
+            {
+              "do": "pin",
+              "args": ["target"],
+              "when": null
+            }
+          ]
         }
       ],
       "body": []
@@ -1375,15 +1444,6 @@
           "id": "mortal",
           "type": "boolean",
           "value": false
-        },
-        {
-          "let": "holder",
-          "value": {
-            "one": ["character"],
-            "with": {"holding": "heart"}
-          },
-          "when": null,
-          "derived": true
         },
         {"setting": "starts", "value": "sanctum"},
         {
@@ -7889,13 +7949,174 @@
             "get": ["heart", "cracked"]
           }
         },
-        {"stretch": "pattern", "source": "pattern rhyme: flame, frost, blink, sunfall ~ repeat ~ one per round ~ recall first when hask.saw_heart and holder != nobody and not heart.cracked ~ falter instead of sunfall when holder != nobody and not heart.cracked"},
-        {"stretch": "spell", "source": "spell flame: at roland ~ then wound target 1 ~ blocked by shield, absorb, parry, interrupt ~ redirected by guard"},
-        {"stretch": "spell", "source": "spell frost: at eldric ~ then freeze target ~ kill target when target.frozen ~ blocked by shield, absorb, interrupt"},
-        {"stretch": "spell", "source": "spell blink: through mirror ~ then set hask.dodging: yes ~ then set hask.grounded: yes next round ~ fails when count(mirror, in: here, open: yes) == 0 or hask.pinned ~ on fail: set hask.grounded: yes"},
-        {"stretch": "spell", "source": "spell sunfall: at pov.all ~ then kill target ~ blocked by shield, absorb"},
-        {"stretch": "spell", "source": "spell recall: at holder ~ then take heart ~ blocked by shield, absorb, guard"},
-        {"stretch": "spell", "source": "spell falter ~ then nothing"}
+        {
+          "pattern": "rhyme",
+          "steps": ["flame", "frost", "blink", "sunfall"],
+          "repeat": true,
+          "first": [
+            {
+              "threat": "recall",
+              "when": {
+                "and": [
+                  {
+                    "and": [
+                      {
+                        "get": ["hask", "saw_heart"]
+                      },
+                      {
+                        "!=": ["holder", "nobody"]
+                      }
+                    ]
+                  },
+                  {
+                    "not": {
+                      "get": ["heart", "cracked"]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "instead": [
+            {
+              "threat": "falter",
+              "of": "sunfall",
+              "when": {
+                "and": [
+                  {
+                    "!=": ["holder", "nobody"]
+                  },
+                  {
+                    "not": {
+                      "get": ["heart", "cracked"]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "declare": "threat",
+          "id": "flame",
+          "tags": ["fire"],
+          "at": "roland",
+          "answered_by": ["prevent", "block", "cover", "absorb"],
+          "then": [
+            {
+              "do": "wound",
+              "args": ["target", 1],
+              "when": null
+            }
+          ]
+        },
+        {
+          "declare": "threat",
+          "id": "frost",
+          "tags": ["frost"],
+          "at": "eldric",
+          "answered_by": ["prevent", "cover", "absorb"],
+          "then": [
+            {
+              "do": "kill",
+              "args": ["target"],
+              "when": {
+                "get": ["target", "frozen"]
+              }
+            },
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "frozen"]
+              },
+              "value": true,
+              "when": null
+            }
+          ]
+        },
+        {
+          "declare": "threat",
+          "id": "blink",
+          "fails_when": {
+            "or": [
+              {
+                "==": [
+                  {
+                    "count": ["mirror"],
+                    "with": {
+                      "in": "here",
+                      "where": {
+                        "get": ["it", "open"]
+                      }
+                    }
+                  },
+                  0
+                ]
+              },
+              {
+                "get": ["hask", "pinned"]
+              }
+            ]
+          },
+          "then": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["hask", "dodging"]
+              },
+              "value": true,
+              "when": null
+            },
+            {
+              "do": "set",
+              "target": {
+                "get": ["hask", "grounded"]
+              },
+              "value": true,
+              "when": null,
+              "delay": 1
+            }
+          ],
+          "on_fail": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["hask", "grounded"]
+              },
+              "value": true,
+              "when": null
+            }
+          ]
+        },
+        {
+          "declare": "threat",
+          "id": "sunfall",
+          "at": {
+            "get": ["pov", "all"]
+          },
+          "answered_by": ["cover", "absorb"],
+          "then": [
+            {
+              "do": "kill",
+              "args": ["target"],
+              "when": null
+            }
+          ]
+        },
+        {
+          "declare": "threat",
+          "id": "recall",
+          "at": "holder",
+          "answered_by": ["block", "cover", "absorb"],
+          "then": [
+            {
+              "do": "take",
+              "args": ["heart"],
+              "when": null
+            }
+          ]
+        },
+        {"declare": "threat", "id": "falter"}
       ],
       "body": []
     },
@@ -7904,7 +8125,29 @@
       "tags": ["encounter"],
       "margin": false,
       "header": [
-        {"stretch": "encounter", "source": "encounter hask ~ round by round ~ countdown 3s per act ~ plus 2s when hinted ~ timeout stay ~ hask casts last ~ until hask.wards == 0 or pov.all.down"},
+        {
+          "encounter": "hask",
+          "round_by_round": true,
+          "countdown": "3s per act",
+          "plus": "2s when me.asked_hint",
+          "timeout": "stay",
+          "acts_last": true,
+          "until": {
+            "or": [
+              {
+                "==": [
+                  {
+                    "get": ["hask", "wards"]
+                  },
+                  0
+                ]
+              },
+              {
+                "get": ["pov", "all", "down"]
+              }
+            ]
+          }
+        },
         {
           "declare": "item",
           "id": "east_mirror",
@@ -8337,7 +8580,11 @@
           "type": "link",
           "id": "sanctum:round->sanctum:lance",
           "id_from": "target",
-          "label": ["Ember Lance at Eldric’s ice"],
+          "label": [
+            "Ember Lance at ",
+            {"value": "target"},
+            "’s ice"
+          ],
           "target": "sanctum:lance",
           "kind": "act",
           "act": "ember_lance",
@@ -8351,19 +8598,32 @@
           "check": null,
           "choice": null,
           "when": {
-            "get": ["eldric", "frozen"]
+            "get": ["target", "frozen"]
           },
           "hidden_until": null,
           "for": ["roland"],
-          "effects": [],
+          "effects": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "frozen"]
+              },
+              "value": false,
+              "when": null
+            }
+          ],
           "ends_turn": false,
-          "overrides": []
+          "overrides": [],
+          "at": {"kind": "character", "here": true}
         },
         {
           "type": "link",
           "id": "sanctum:round->sanctum:shield",
           "id_from": "target",
-          "label": ["Rime Shield on yourself"],
+          "label": [
+            "Rime Shield on ",
+            {"value": "target"}
+          ],
           "target": "sanctum:shield",
           "kind": "act",
           "act": "rime_shield",
@@ -8379,41 +8639,25 @@
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
-          "effects": [],
-          "ends_turn": false,
-          "overrides": [],
-          "with": {"target": "roland"}
-        },
-        {
-          "type": "link",
-          "id": "sanctum:round->sanctum:shield#2",
-          "id_from": "target",
-          "label": ["Rime Shield on Eldric"],
-          "target": "sanctum:shield",
-          "kind": "act",
-          "act": "rime_shield",
-          "arg": null,
-          "cost": [
-            {"amount": 30}
+          "effects": [
+            {
+              "do": "cover",
+              "args": ["target"],
+              "when": null
+            }
           ],
-          "scope": "private",
-          "capacity": null,
-          "clash": "none",
-          "check": null,
-          "choice": null,
-          "when": null,
-          "hidden_until": null,
-          "for": ["roland"],
-          "effects": [],
           "ends_turn": false,
           "overrides": [],
-          "with": {"target": "eldric"}
+          "at": {"kind": "character", "here": true}
         },
         {
           "type": "link",
           "id": "sanctum:round->sanctum:frostglass",
           "id_from": "target",
-          "label": ["Frostglass the east mirror"],
+          "label": [
+            "Frostglass ",
+            {"value": "target"}
+          ],
           "target": "sanctum:frostglass",
           "kind": "act",
           "act": "frostglass",
@@ -8426,38 +8670,24 @@
           "clash": "none",
           "check": null,
           "choice": null,
-          "when": null,
+          "when": {
+            "get": ["target", "open"]
+          },
           "hidden_until": null,
           "for": ["roland"],
-          "effects": [],
-          "ends_turn": false,
-          "overrides": [],
-          "with": {"mirror": "east_mirror"}
-        },
-        {
-          "type": "link",
-          "id": "sanctum:round->sanctum:frostglass#2",
-          "id_from": "target",
-          "label": ["Frostglass the west mirror"],
-          "target": "sanctum:frostglass",
-          "kind": "act",
-          "act": "frostglass",
-          "arg": null,
-          "cost": [
-            {"amount": 20}
+          "effects": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "open"]
+              },
+              "value": false,
+              "when": null
+            }
           ],
-          "scope": "private",
-          "capacity": null,
-          "clash": "none",
-          "check": null,
-          "choice": null,
-          "when": null,
-          "hidden_until": null,
-          "for": ["roland"],
-          "effects": [],
           "ends_turn": false,
           "overrides": [],
-          "with": {"mirror": "west_mirror"}
+          "at": {"kind": "mirror", "here": true}
         },
         {
           "type": "link",
@@ -8479,7 +8709,22 @@
           "when": null,
           "hidden_until": null,
           "for": ["roland"],
-          "effects": [],
+          "effects": [
+            {
+              "do": "prevent",
+              "args": ["hask"],
+              "when": {
+                "within": [
+                  {
+                    "get": ["hask", "rhyme", "next"]
+                  },
+                  {
+                    "list": ["flame", "frost"]
+                  }
+                ]
+              }
+            }
+          ],
           "ends_turn": false,
           "overrides": []
         },
@@ -8512,21 +8757,36 @@
           },
           "hidden_until": null,
           "for": ["roland"],
-          "effects": [],
+          "effects": [
+            {
+              "do": "set",
+              "target": {
+                "get": ["target", "grounded"]
+              },
+              "value": true,
+              "when": null
+            },
+            {
+              "do": "pin",
+              "args": ["target"],
+              "when": null
+            }
+          ],
           "ends_turn": false,
-          "overrides": []
+          "overrides": [],
+          "at": {"kind": "npc", "here": true}
         },
         {
           "type": "link",
-          "id": "sanctum:round->sanctum:show_heart",
+          "id": "sanctum:round->sanctum:hand_over",
           "id_from": "target",
-          "label": ["Hold up his heart"],
-          "target": "sanctum:show_heart",
+          "label": ["Hand him the heart"],
+          "target": "sanctum:hand_over",
           "kind": "go",
           "act": null,
           "arg": null,
           "cost": [
-            {"amount": 10}
+            {"amount": 0}
           ],
           "scope": "private",
           "capacity": null,
@@ -8534,19 +8794,10 @@
           "check": null,
           "choice": null,
           "when": {
-            "and": [
-              {
-                "holds": ["me", "heart"]
-              },
-              {
-                "not": {
-                  "get": ["hask", "shown_heart"]
-                }
-              }
-            ]
+            "holds": ["me", "heart"]
           },
           "hidden_until": null,
-          "for": null,
+          "for": ["roland"],
           "effects": [],
           "ends_turn": false,
           "overrides": ["cost"]
@@ -8665,7 +8916,10 @@
           "type": "link",
           "id": "sanctum:round->sanctum:shatter",
           "id_from": "target",
-          "label": ["Shatter a mirror"],
+          "label": [
+            "Shatter ",
+            {"value": "target"}
+          ],
           "target": "sanctum:shatter",
           "kind": "act",
           "act": "force",
@@ -8682,15 +8936,23 @@
           },
           "choice": null,
           "when": {
-            "not": {
-              "get": ["eldric", "frozen"]
-            }
+            "and": [
+              {
+                "get": ["target", "open"]
+              },
+              {
+                "not": {
+                  "get": ["eldric", "frozen"]
+                }
+              }
+            ]
           },
           "hidden_until": null,
           "for": ["eldric"],
           "effects": [],
           "ends_turn": false,
-          "overrides": ["cost"]
+          "overrides": ["cost"],
+          "at": {"kind": "mirror", "here": true}
         },
         {
           "type": "link",
@@ -8732,15 +8994,15 @@
         },
         {
           "type": "link",
-          "id": "sanctum:round->sanctum:hand_over",
+          "id": "sanctum:round->sanctum:show_heart",
           "id_from": "target",
-          "label": ["Hand him the heart"],
-          "target": "sanctum:hand_over",
+          "label": ["Hold up his heart"],
+          "target": "sanctum:show_heart",
           "kind": "go",
           "act": null,
           "arg": null,
           "cost": [
-            {"amount": 0}
+            {"amount": 10}
           ],
           "scope": "private",
           "capacity": null,
@@ -8748,10 +9010,19 @@
           "check": null,
           "choice": null,
           "when": {
-            "holds": ["me", "heart"]
+            "and": [
+              {
+                "holds": ["me", "heart"]
+              },
+              {
+                "not": {
+                  "get": ["hask", "shown_heart"]
+                }
+              }
+            ]
           },
           "hidden_until": null,
-          "for": ["roland"],
+          "for": null,
           "effects": [],
           "ends_turn": false,
           "overrides": ["cost"]
@@ -8827,18 +9098,7 @@
       "name": "sanctum:lance",
       "tags": ["act"],
       "margin": false,
-      "header": [
-        {
-          "effect": {
-            "do": "set",
-            "target": {
-              "get": ["eldric", "frozen"]
-            },
-            "value": false,
-            "when": null
-          }
-        }
-      ],
+      "header": [],
       "body": [
         {
           "type": "prose",
@@ -8852,9 +9112,7 @@
       "name": "sanctum:shield",
       "tags": ["act"],
       "margin": false,
-      "header": [
-        {"stretch": "shield", "source": "shield target"}
-      ],
+      "header": [],
       "body": [
         {
           "type": "prose",
@@ -8876,18 +9134,7 @@
       "name": "sanctum:frostglass",
       "tags": ["act"],
       "margin": false,
-      "header": [
-        {
-          "effect": {
-            "do": "set",
-            "target": {
-              "get": ["mirror", "open"]
-            },
-            "value": false,
-            "when": null
-          }
-        }
-      ],
+      "header": [],
       "body": [
         {
           "type": "prose",
@@ -8896,7 +9143,7 @@
               "Chill and gust: frost runs across ",
               {
                 "value": {
-                  "get": ["mirror", "name"]
+                  "get": ["target", "name"]
                 }
               },
               " until it shows nothing at all."
@@ -8916,8 +9163,7 @@
             "get": ["hask", "rhyme", "next"]
           },
           "when": null
-        },
-        {"stretch": "interrupt", "source": "interrupt hask when next in [flame, frost]"}
+        }
       ],
       "body": [
         {
@@ -8967,19 +9213,7 @@
       "name": "sanctum:lodestone",
       "tags": ["act"],
       "margin": false,
-      "header": [
-        {
-          "effect": {
-            "do": "set",
-            "target": {
-              "get": ["hask", "grounded"]
-            },
-            "value": true,
-            "when": null
-          }
-        },
-        {"stretch": "pin", "source": "pin hask"}
-      ],
+      "header": [],
       "body": [
         {
           "type": "prose",
@@ -9004,7 +9238,17 @@
             "when": null
           }
         },
-        {"stretch": "skip", "source": "skip hask this round when not hask.saw_heart"}
+        {
+          "effect": {
+            "do": "skip",
+            "args": ["hask", "this", "round"],
+            "when": {
+              "not": {
+                "get": ["hask", "saw_heart"]
+              }
+            }
+          }
+        }
       ],
       "body": [
         {
@@ -9187,7 +9431,13 @@
       "tags": ["act"],
       "margin": false,
       "header": [
-        {"stretch": "guard", "source": "guard roland ~ parry with abelard_sword ~ absorb with lumen"}
+        {
+          "effect": {
+            "do": "block",
+            "args": ["for", "roland"],
+            "when": null
+          }
+        }
       ],
       "body": [
         {
@@ -9203,15 +9453,11 @@
       "tags": ["act"],
       "margin": false,
       "header": [
-        {"stretch": "absorb", "source": "absorb with lumen"},
         {
           "effect": {
-            "do": "set",
-            "target": {
-              "get": ["lumen", "charged"]
-            },
-            "value": true,
-            "when": "absorbed"
+            "do": "absorb",
+            "args": ["with", "lumen"],
+            "when": null
           }
         }
       ],
@@ -9233,7 +9479,7 @@
           "effect": {
             "do": "set",
             "target": {
-              "get": ["mirror", "open"]
+              "get": ["target", "open"]
             },
             "value": false,
             "when": null
@@ -9377,7 +9623,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "flame"
                     ]
@@ -9385,7 +9631,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
                       "hit"
                     ]
@@ -9411,7 +9657,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "flame"
                     ]
@@ -9419,9 +9665,9 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
-                      "guarded"
+                      "block"
                     ]
                   }
                 ]
@@ -9445,7 +9691,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "flame"
                     ]
@@ -9453,9 +9699,9 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
-                      "parried"
+                      "deflect"
                     ]
                   }
                 ]
@@ -9479,7 +9725,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "frost"
                     ]
@@ -9487,7 +9733,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
                       "hit"
                     ]
@@ -9513,7 +9759,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "blink"
                     ]
@@ -9521,7 +9767,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
                       "hit"
                     ]
@@ -9547,7 +9793,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "blink"
                     ]
@@ -9555,9 +9801,9 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
-                      "failed"
+                      "fail"
                     ]
                   }
                 ]
@@ -9581,7 +9827,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "sunfall"
                     ]
@@ -9589,7 +9835,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
                       "hit"
                     ]
@@ -9615,7 +9861,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "spell"]
+                        "get": ["threat", "name"]
                       },
                       "recall"
                     ]
@@ -9623,7 +9869,7 @@
                   {
                     "==": [
                       {
-                        "get": ["cast", "outcome"]
+                        "get": ["threat", "outcome"]
                       },
                       "hit"
                     ]
@@ -9647,9 +9893,9 @@
               "when": {
                 "==": [
                   {
-                    "get": ["cast", "outcome"]
+                    "get": ["threat", "outcome"]
                   },
-                  "shielded"
+                  "cover"
                 ]
               }
             }
@@ -9658,7 +9904,15 @@
         {
           "type": "prose",
           "paragraphs": [
-            ["The spell breaks on Roland’s ice and runs off it like rain off a window."]
+            [
+              "The spell breaks on ",
+              {
+                "value": {
+                  "get": ["threat", "target"]
+                }
+              },
+              "’s ice and runs off it like rain off a window."
+            ]
           ]
         },
         {
@@ -9669,9 +9923,9 @@
               "when": {
                 "==": [
                   {
-                    "get": ["cast", "outcome"]
+                    "get": ["threat", "outcome"]
                   },
-                  "absorbed"
+                  "absorb"
                 ]
               }
             }
@@ -9691,9 +9945,9 @@
               "when": {
                 "==": [
                   {
-                    "get": ["cast", "outcome"]
+                    "get": ["threat", "outcome"]
                   },
-                  "interrupted"
+                  "prevent"
                 ]
               }
             }
@@ -9713,7 +9967,7 @@
               "when": {
                 "==": [
                   {
-                    "get": ["cast", "spell"]
+                    "get": ["threat", "name"]
                   },
                   "falter"
                 ]

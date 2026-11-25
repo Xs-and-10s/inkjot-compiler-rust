@@ -1220,6 +1220,46 @@ You go home. The fen fog comes in behind you. Somewhere under your feet, Thwaite
 
 Your score is {score} of 100, which makes you {rank}.
 
+:: the_warden_can_be_unmade_with_fire [test]
+start: warden:fight
+given: set warden.roused: yes
+do: "Begin"
+expect: warden.blows.next == crush
+do: "Kindle its bindings"
+expect: warden.salt == 2
+expect text: "A fist of salt the size of a bucket."
+expect: me.hp == 2
+do: "Next round"
+expect: warden.blows.next == grasp
+do: "Kindle its bindings"
+expect text: "It takes you round the middle."
+expect: me.held
+do: "Next round"
+expect no link: "Run for it"
+do: "Kindle its bindings"
+expect: warden.unmade
+expect text: "It comes apart"
+do: "Step over what is left of it"
+expect at: wardens_hall
+expect: not me.held
+
+:: a_ward_takes_one_blow [test]
+start: warden:fight
+given: set warden.roused: yes
+given: learn carving_ward
+do: "Begin"
+do: "Ward"
+expect: threat.outcome == cover
+expect text: "The blow lands on your ward"
+expect: me.hp == 3
+
+:: running_leaves_the_fight [test]
+start: warden:fight
+given: set warden.roused: yes
+do: "Begin"
+do: "Run for it"
+expect at: wardens_hall
+
 :: a_burnt_ladder_holds_three_crossings [test]
 start: ladderway
 given: set ladderway.burnt: yes

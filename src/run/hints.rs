@@ -124,6 +124,8 @@ impl Run {
         let Some((nib, i, text)) = self.next_hint()? else {
             return Err("there is no hint here to ask for".into());
         };
+        // `me.asked_hint`, until the round ends.
+        self.hinted.insert(self.pov.clone());
         let key = self.path(&Value::str("hints"))?;
         let left = self.hints_left()?;
         self.vals.insert(key, V::Num(left - 1.0));
