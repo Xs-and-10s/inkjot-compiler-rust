@@ -32,6 +32,15 @@ pub fn build(src: &str) -> Result<Value, Report> {
     Ok(Builder::new(&passages).inklink(&passages))
 }
 
+/// Lower a source to IR without checking it first: for tools and tests
+/// that look at a draft still being built. What a check would refuse may
+/// lower to nonsense.
+#[doc(hidden)]
+pub fn lower_unchecked(src: &str) -> Value {
+    let passages = twee::parse(src, &mut Vec::new());
+    Builder::new(&passages).inklink(&passages)
+}
+
 /// What an act says about the Links that use it.
 #[derive(Debug, Default, Clone)]
 struct ActDef {
@@ -153,6 +162,65 @@ pub(super) fn time_effect(effect: Option<&mut Value>, text: &str) -> bool {
         }
     }
     true
+}
+
+/// `~ along way when …` after an effect: how `nearest` measures (along the
+/// map's ways, the only measure there is), and the effect's condition.
+fn along(effect: &mut Value, text: &str) -> bool {
+    let (head, when) = split_when(text.trim());
+    let Some(how) = head.strip_prefix("along ") else {
+        return false;
+    };
+    if let Value::Obj(pairs) = effect {
+        pairs.push(("along".to_string(), Value::str(how.trim())));
+        if let Some(when) = when {
+            match pairs.iter_mut().find(|(k, _)| k == "when") {
+                Some((_, have)) if *have != Value::Null => {
+                    *have = Value::obj([("and", Value::Arr(vec![have.clone(), when]))]);
+                }
+                Some((_, have)) => *have = when,
+                None => pairs.push(("when".to_string(), when)),
+            }
+        }
+    }
+    true
+}
+
+/// `spreads 1 from ablaze to nearest(place, where: …) ~ along way ~ within 1
+/// ~ then set it.heat: 1`.
+fn spreads(s: &Stmt, rest: &str) -> Value {
+    let words: Vec<&str> = rest.splitn(2, ' ').collect();
+    let n = token(words.first().copied().unwrap_or("1"));
+    let tail = words.get(1).copied().unwrap_or("").trim();
+    let (from, to) = match tail.strip_prefix("from ") {
+        Some(t) => match after_word(t, "to") {
+            Some(i) => (Some(t[..i].trim().trim_end_matches(" to").trim()), &t[i..]),
+            None => (Some(t), ""),
+        },
+        None => (None, tail.strip_prefix("to ").unwrap_or(tail)),
+    };
+    let mut pairs = vec![
+        ("spreads".to_string(), n),
+        ("from".to_string(), from.map_or(Value::Null, expression)),
+        ("to".to_string(), expression(to.trim())),
+    ];
+    let mut then = Vec::new();
+    let mut when = Value::Null;
+    for c in &s.clauses[1..] {
+        let text = c.text.trim();
+        if let Some(e) = text.strip_prefix("then ") {
+            then.push(effect(e));
+        } else if let Some(how) = text.strip_prefix("along ") {
+            pairs.push(("along".to_string(), Value::str(how.trim())));
+        } else if let Some(d) = text.strip_prefix("within ") {
+            pairs.push(("within".to_string(), token(d.trim())));
+        } else if let Some(e) = text.strip_prefix("when ") {
+            when = expression(e);
+        }
+    }
+    pairs.push(("then".to_string(), Value::Arr(then)));
+    pairs.push(("when".to_string(), when));
+    Value::Obj(pairs)
 }
 
 /// The text inside the first pair of double quotes, if any, as written:
@@ -609,11 +677,12 @@ impl Builder {
             _ if is_effect(kw, rest) => {
                 // `set planks_out: yes ~ after 2 turns`: the timing is the effect's.
                 let mut done = effect(head);
-                let rest: Vec<Value> = s.clauses[1..]
-                    .iter()
-                    .filter(|c| !time_effect(Some(&mut done), &c.text))
-                    .map(|c| clause(&c.text))
-                    .collect();
+                let mut rest = Vec::new();
+                for c in &s.clauses[1..] {
+                    if !time_effect(Some(&mut done), &c.text) && !along(&mut done, &c.text) {
+                        rest.push(clause(&c.text));
+                    }
+                }
                 let mut pairs = vec![("effect".to_string(), done)];
                 if !rest.is_empty() {
                     pairs.push(("clauses".to_string(), Value::Arr(rest)));
@@ -705,6 +774,31 @@ impl Builder {
                 f.add(kw, Value::str(value.trim_end_matches(':').trim()));
             }
             "hint" => f.add("hint", quoted_styled(value).unwrap_or(Value::str(value))),
+            // `recipe stretcher: stave, stave, sacking ~ using hammer ~ make ~ "…"`.
+            "recipe" => {
+                let (result, parts) = rest.split_once(':').unwrap_or((rest, ""));
+                f.add("recipe", Value::str(result.trim()));
+                f.add(
+                    "parts",
+                    strings(parts.split(',').map(str::trim).filter(|p| !p.is_empty())),
+                );
+                let mut using = Vec::new();
+                for c in &s.clauses[1..] {
+                    let text = c.text.trim();
+                    if let Some(tools) = text.strip_prefix("using ") {
+                        using.extend(tools.split(',').map(str::trim).filter(|t| !t.is_empty()));
+                    } else if text.starts_with('"') {
+                        f.add("label", quoted_text(text).unwrap_or(Value::str(text)));
+                    } else if is_ident(text) {
+                        f.add("verb", Value::str(text));
+                    }
+                }
+                f.add("using", strings(using));
+                return Value::Obj(f.into_pairs());
+            }
+            // `spreads 1 from ablaze to nearest(place, where: …) ~ along way
+            // ~ within 1 ~ then set it.heat: 1`.
+            "spreads" => return spreads(s, rest),
             // `measure nights: nights` → `{"measure": "nights", "value": …}`.
             "measure" => {
                 let (name, expr) = rest.split_once(':').unwrap_or((rest, ""));
@@ -971,6 +1065,8 @@ impl Builder {
                 }
                 "predict" => analysis.push(("predict".into(), token(rest.trim_end_matches('%')))),
                 "lasting" => analysis.push(("lasting".into(), Value::Bool(true))),
+                // `~ uses pick`: a tool, which may break.
+                "uses" => extra.push(("uses".into(), list(rest))),
                 "become" | "order" | "by" | "chance" | "after" | "requires" => {
                     let mut values = words(rest);
                     let value = if values.len() == 1 {

@@ -50,6 +50,8 @@ enum Shape {
     Follows,
     /// `every 2 turns`: a number of turns.
     Turns,
+    /// `breaks 1 in 6`: a chance.
+    Chance,
     /// `oubliette for roland, chapel for eldric`, or a single word.
     PerWho,
 }
@@ -128,6 +130,11 @@ const PATTERNS: &[Pattern] = &[
     p(&["via"], "via", Shape::Token),
     p(&["pace"], "pace", Shape::Token),
     p(&["follows"], "follows", Shape::Follows),
+    // Items: `count 4`, `plural "staves"`, `breaks 1 in 6`.
+    p(&["count"], "count", Shape::Token),
+    p(&["plural"], "plural", Shape::Text),
+    p(&["breaks"], "breaks", Shape::Chance),
+    p(&["counted", "as"], "counted_as", Shape::Text),
     p(&["every"], "every", Shape::Turns),
     p(&["where:"], "where", Shape::Expr),
     // Resources.
@@ -293,8 +300,20 @@ impl<'a> Fields<'a> {
                 Some((range, row)) => {
                     let row = row.trim();
                     let then = row.strip_prefix("then ").map_or(Value::Null, effect);
-                    let entry = Value::obj([("range", expression(range)), ("then", then)]);
-                    self.add("rows", Value::Arr(vec![entry]));
+                    let mut entry = vec![
+                        ("range".to_string(), expression(range)),
+                        ("then".to_string(), then.clone()),
+                    ];
+                    // A table read as a value: `0..=19: "a lamp carrier"`.
+                    if then == Value::Null && row != "nothing" {
+                        let value = if row.starts_with('"') {
+                            quoted_text(row).unwrap_or(Value::str(row))
+                        } else {
+                            expression(row)
+                        };
+                        entry.push(("value".to_string(), value));
+                    }
+                    self.add("rows", Value::Arr(vec![Value::Obj(entry)]));
                 }
                 None => self.add("range", expression(text)),
             }
@@ -389,6 +408,10 @@ impl<'a> Fields<'a> {
                 ])
             }
             Shape::Turns => token(rest.split_whitespace().next().unwrap_or("")),
+            Shape::Chance => match rest.split_whitespace().collect::<Vec<_>>().as_slice() {
+                [n, "in", d] => Value::obj([("chance", token(n)), ("in", token(d))]),
+                _ => Value::str(rest),
+            },
         };
         self.add(pat.key, value);
     }

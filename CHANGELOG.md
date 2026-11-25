@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+### Milestone 20c: making and the rest
+
+- `default takes: take, drop`: a Link to take each item lying here and to
+  drop each held, beside the walks. `drop` is a built-in act and event.
+- Counted items: `item stave: … ~ plural "staves" ~ count 4` is four items
+  under one name; `lose stave 2`, `gain stave 2`, `me.holds.stave`; lists
+  show "two staves".
+- Recipes: `recipe stretcher: stave, stave, sacking ~ using hammer ~ make
+  ~ "…"`, offered as a Link when the parts are held and the tools at hand;
+  making fires `make`.
+- Tools: `~ uses pick` on a Link, `~ breaks 1 in 6` on the tool.
+- `gain` of a resource (`gain salt 2`), `lose` of an item; `give`,
+  `destroy` and `gain` take an expression (`give one(item, …) to x`,
+  `destroy all(item, …)`, `give target to me`).
+- Tables read as values: `table rank: score ~ 0..=19: "a lamp carrier"`,
+  then `{rank}`. A row of one number (`100: …`) now matches it.
+- `nearest(kind, where: …)` along the map, measured from who is moved, a
+  spread's source, the NPC, or the pov; `x.toward(y)`, the next place on
+  the way; `spreads N from SET to nearest(…) ~ along way ~ within D ~ then
+  …`; `move x to nearest(…)`; `~ along way when …` on an effect.
+- `count`/`one`/`all` take `in:` a list of places, and count a `let`'s
+  list; `{list x}` shows a `let`'s list.
+- A `play` of an ending sends the pov there once the action is done, with
+  no turn after it.
+- `state heat: 0 ~ belongs to place` gives every place one; places take
+  their archetype's state and `~ with` values, as items do.
+- Setting through a member: `set gleaner.place.heat: 1`.
+- Two ways from here to one place each say which: "Go to the Incline (the
+  cage)".
+- In an act kept in a lib, `here` is the pov's place. Links offered
+  everywhere, walks, takes and recipes are not offered in an ending, or in
+  a prologue that is not a place.
+- A margin's `state salt` beside a config's `resource salt` is the NPC's
+  own (`warden.salt`), not a second declaration of `salt`.
+- A sub-Nib no longer needs its parent passage: `spell:kindle` is a name.
+- The config's `let`s are in scope when the Links are offered again, as on
+  arrival.
+- Entering or playing an encounter's passage says it is not built yet.
+- `inkjot::ir::lower_unchecked`, for tests of drafts still being built.
+- Ex 9 plays: at random (`tests/ex9_play.rs`, stopping only at the
+  encounter) and won without a fight, by a stretcher made in the timber
+  yard.
+
 ### Milestone 20b: time and motion
 
 - `clock: 0.. ~ each action`: every Link taken is a turn, ended after the

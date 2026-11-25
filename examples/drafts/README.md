@@ -204,6 +204,12 @@ the stair (now: Thwaite teaches *draw* when you find her); out of salt in
 the deep (now: salt regrows in the Marrow). Undo any of the three and it
 fails.
 
+**Played by the interpreter** (milestone 20c). `tests/ex9_play.rs` plays
+the draft itself at random, short of the encounter (milestone 20d), and
+wins it without one: a stretcher made in the timber yard, Thwaite carried
+up through the winze, the shard left behind, 40 of 100, "a crust
+scraper".
+
 What it asks of v0.6, beyond the plan and the encounter milestone:
 
 | Construct | Example |
@@ -211,17 +217,17 @@ What it asks of v0.6, beyond the plan and the encounter milestone:
 | A duration on an effect | `set me.hushed: yes ~ for 4 turns`, `cover me ~ for 3 turns` |
 | A delay on an effect | `set planks_out: yes ~ after 2 turns` |
 | Spreading from a set, one way only | `spreads 1 from ablaze to nearest(place, where: …) ~ along way ~ within 1` |
-| Handlers on a kind, naming the thing | `on enter shaft when entered.burnt`, `on leave shaft when left.crossings == 0` |
+| Handlers on a kind, naming the thing | `on enter shaft by me when entered.burnt`, `on leave shaft by me when left.crossings == 0` |
 | Handlers on an NPC's move | `on move warden when warden.roused and warden.here` |
 | Taking and dropping, offered like moves | `default takes: take, drop` |
 | Links offered everywhere | the spellbook, a `[lib everywhere]` passage (built), with `~ at` Links (built in 20a) |
-| Items that come in a number | `item stave: … ~ count 4`, `count(stave, held by: me)`, `lose stave 2` |
+| Items that come in a number | `item stave: … ~ count 4`, `count(stave, where: it.held_by(me))`, `lose stave 2` |
 | A recipe with a part twice | `recipe stretcher: stave, stave, sacking` |
 | A tool used by a Link, so it may break | `[[Dig at the fall->…]] ~ uses pick` with `item pick: … ~ breaks 1 in 6` |
 | A resource counted in a noun | `resource salt: 4 ~ counted as "crystal"` |
 | A table read as a value | `table rank: score ~ 0..=19: "a lamp carrier"`, then `{rank}` |
-| A place's way toward another | `here.toward(out)`, for Dowse |
-| NPCs that follow and pursue | `~ follows me when …`, `~ moves toward me 1 every 2 turns … ~ where: it.salted` |
+| The next place toward another | `here.toward(out)`, for Dowse |
+| NPCs that follow and pursue | `~ follows me when …`; goals with `~ every 2 turns` and `~ where: it.salted` |
 | Kinds of item, for `where:` | `~ catches` (a flame takes), `~ burns` (a fire destroys) |
 
 **`define`, tested again.** `ex9-spellbook-define.twee` writes the
