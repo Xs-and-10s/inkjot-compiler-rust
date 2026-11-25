@@ -35,6 +35,7 @@ here.
 | — | Ex 6 to 9 drafted, reviewed and ready: *Seven Names* (the Library) with its public cut *Cloakroom*, *The Inquest*, *Mafia, by Lamplight*, *Saltmarrow*; pacing reaches the view | #30 to #38 |
 | 19 | The page: `narration:`, `~ selectable` (with `inkjot migrate`), names capitalised at the start of a sentence (`~ keep case`), `cue names:` and `cue directions:`, `[if c; then e]` and `[unless c; then e]`, blocks that `[end]` closes in order, blockquotes, redaction three ways (the hidden words never reach the view), `expect events:`, `expect fork:`, `take fork:`. Ex 8 runs as written | #39 |
 | 20a | Targets and filters: `where:` with `it`, `all(…)`, `~ at` (a Link per target, with `target`), acts that carry their conditions and effects to their Links, Link groups, effects on a set, the config's `let`s in every passage | #41 |
+| 20c | Making and the rest: `default takes`, counted items, recipes, tools that break, `gain` of a resource, effects on what an expression names, tables read as values, `nearest(…, where:)`, `toward`, `spreads`, an ending a `play` sends the pov to. Ex 9 plays to the encounter, and can be won without one | #43 |
 | 20b | Time and motion: `clock: … ~ each action`, `~ for N turns` and `~ after N turns` (kept in snapshots), handlers on a kind with `entered`, `left`, `crossed`, `moved`, `taken` and `by me`, `on move`, `~ follows me when …`, goals that keep to places (`~ where:`), move every so often (`~ every 2 turns`) or wander; a played passage runs its header | #42 |
 
 ## Next
@@ -60,14 +61,29 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      `~ breaks` and `~ uses`, counted items, `default takes`, dice, tables
      read as values. Done when Ex 9 and the Ex 2 duel in general words run.
      In four parts: 20a, targets and filters (#41); 20b, time and motion
-     (#42); 20c, making and the rest (recipes, `~ breaks` and `~ uses`,
-     counted items, `default takes`, tables read as values, `gain` of a
-     resource, `spreads`, `destroy all`, `give one`, `nearest(…, where:)`,
-     `toward`, a played ending that ends the reading); 20d, encounters
-     (threats and counters, the duel).
+     (#42); 20c, making and the rest (#43); 20d, encounters (threats and
+     counters, the duel).
    - 21, **the table**: decks and piles, periods and named clocks,
      `{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating, settable
-     `shown_as`, `finale when:`, text tables. Done when Ex 7 runs.
+     `shown_as`, `finale when:`, text tables, `spreads … ~ along seat`.
+     Done when Ex 7 runs. Its first step is the Doppelgänger pass agreed
+     on 25 Nov 2026:
+     1. The method follows the doer: each vote carries its own (kill or
+        replace), and the first to vote for the chosen victim does the
+        deed their way.
+     2. One successful replacement per member; one the Doctor stops does
+        not use it up. "Replace" is offered only to those who have not.
+     3. A replacement leaves no body: the morning says the replacer's old
+        name is missing and nobody died. The lynch reveal stays.
+     4. The night has a deadline: votes cast by then count; none, no kill.
+        Part of `~ consensus`.
+     And, from the designer's notes: the engine's plain lines (who died,
+     who is missing) always shown, whatever the Storyteller or MonkeyPaw
+     tells; measures for a face-wearer voted out and for the role of the
+     one replaced; for the platform briefing, presence and typing follow
+     the face, not the account, night results in one batch, irreversible
+     night choices confirmed, the replacer never sees the victim's private
+     messages, and an asynchronous day settled at its deadline.
    - 22, **Inklog**: rules, `{{ }}`, knowledge bases, `assert` and
      `retract`, quantifiers, facts at a time, `never`, `{note input}`. Done
      when Ex 6's public cut runs and Ex 5 is brought up to date.

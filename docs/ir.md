@@ -272,6 +272,7 @@ repeats, lists extend and objects merge.
 | `toward E`, `via X`, `pace X` | `toward`, `via`, `pace` |
 | `every 2 turns`, `where: E` (on a goal) | `every`: 2, `where`: expr |
 | `follows me when E` | `follows`: `{"who": "me", "when": expr}` |
+| `count 4`, `plural "staves"`, `breaks 1 in 6`, `counted as "crystal"` | `count`, `plural`, `breaks`: `{"chance": 1, "in": 6}`, `counted_as` |
 | `max n`, `per character`, `refill each chronon` / `refill on checkpoint` | `max`, `per`, `refill`: `"chronon"` / `"checkpoint"` |
 | `part of X`, `after X` | `part_of`, `after` |
 | `culprit X`, `method X`, `methods a, b` | `culprit`, `method`, `methods` |
@@ -283,7 +284,7 @@ repeats, lists extend and objects merge.
 | `unseen by X` | `unseen_by` |
 | a stat or resource and a value: `wits 4`, `hp 2` | `stats`: `{"wits": 4, "hp": 2}` |
 | a range: `0..=3` | `range` |
-| a table row: `1..=2: then kill blocker` | `rows`: `[{"range", "then"}]` |
+| a table row: `1..=2: then kill blocker`, `0..=19: "a lamp carrier"` | `rows`: `[{"range", "then", "value"?}]`; `value` for a row that is text or an expression |
 | a map row: `a | b | c` | `rows`: `[["a", "b", "c"]]` |
 | anything else | `other`: `[{"text", "words"}]` |
 
@@ -374,6 +375,13 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   carries its group's clauses. `all(…)` and `with: {"where": …}` in calls.
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
+- Milestone 20c: `recipe` statements, `{"recipe": "stretcher", "parts":
+  ["stave", "stave", "sacking"], "using": ["hammer"], "verb": "make",
+  "label": "…"}`; `spreads` statements, `{"spreads": 1, "from": expr,
+  "to": expr, "along": "way", "within": 1, "then": [effects], "when":
+  expr}`; a Link's `uses` (a list); an effect's `along` (from `~ along way
+  when E`, which also joins its `when`); item fields `count`, `plural`,
+  `breaks`, a resource's `counted_as`; table rows' `value`.
 - Milestone 20b: `lasts` and `delay` on effects; `each_action` on the clock
   setting; `follows` on declarations; `every` and `where` on goals (and
   `wanders` among a goal's tags); the event `move` for `on` handlers, whose

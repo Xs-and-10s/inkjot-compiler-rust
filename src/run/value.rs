@@ -82,7 +82,8 @@ impl V {
                 }
                 None => false,
             },
-            _ => false,
+            // A row of one number: `100: "a saltwright"`.
+            one => self.same(one),
         }
     }
 }

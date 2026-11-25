@@ -90,6 +90,10 @@ pub(crate) const SETTINGS: &[&str] = &[
     "cue",
     // A value reported when the reading ends: `measure nights: nights`.
     "measure",
+    // Making things: `recipe pawl: horseshoe ~ using hammer ~ make`.
+    "recipe",
+    // `spreads 1 from ablaze to nearest(place, where: …) ~ along way`.
+    "spreads",
     // A slot a generated fork fills: `pending: tragic ~ by monkeypaw`.
     "pending",
     // `[test]` passages.
@@ -141,7 +145,8 @@ pub(crate) const LINK_CLAUSES: &[&str] = &[
     "beat", "weighs", "arc", "stakes", "plants", "pays", "predict", "lasting", "tone", "reveals",
     "pass", "release", "requires", "once", "loud", "quiet", "choice",
     // A target chosen by the Linker: `~ at item here where: …`.
-    "at",
+    "at", // A tool the Link uses, which may break: `~ uses pick`.
+    "uses",
 ];
 
 /// The input family: `{name input for: me.name}`.
@@ -176,11 +181,11 @@ pub(crate) const CHOICES: &[&str] = &["proactive", "reactive", "inactive"];
 
 pub(crate) const EVENTS: &[&str] = &[
     "start", "enter", "leave", "cross", "take", "learn", "act", "turn", "death", "rewind", "out",
-    "loud", "raise", "lower", "set", "move",
+    "loud", "raise", "lower", "set", "move", "drop", "make",
 ];
 
 /// Acts every Inklink has, whether or not its config tunes them.
-pub(crate) const BUILTIN_ACTS: &[&str] = &["walk", "dash", "slip", "observe", "take"];
+pub(crate) const BUILTIN_ACTS: &[&str] = &["walk", "dash", "slip", "observe", "take", "drop"];
 
 /// Tags the engine gives things itself.
 pub(crate) const BUILTIN_TAGS: &[&str] = &[
@@ -206,7 +211,6 @@ pub(crate) const RESERVED_LATER: &[&str] = &[
     "assert",
     "retract",
     "period",
-    "recipe",
     "between",
 ];
 

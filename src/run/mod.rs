@@ -12,8 +12,10 @@ mod events;
 mod hints;
 mod inputs;
 mod limits;
+mod making;
 mod map;
 mod prose;
+mod reach;
 mod senses;
 pub mod test;
 mod time;
@@ -86,6 +88,8 @@ pub struct Story {
     narration: Option<String>,
     /// `cue names: …` and `cue directions: …`: `{"names": ["capital", "bold"]}`.
     cue: Value,
+    /// Every `recipe`, in source order.
+    recipes: Vec<Value>,
 }
 
 /// `you`, `me`, `i`, `myself`, `yourself`: the pov.
@@ -164,6 +168,7 @@ impl Story {
             shows_ballots: false,
             narration: None,
             cue: Value::obj([("names", Value::Arr(vec![Value::str("capital")]))]),
+            recipes: Vec::new(),
         };
         let config = ir
             .get("config")
@@ -236,12 +241,48 @@ impl Story {
                 }
             }
             if let (Some(kind), Some(id)) = (f(s, "declare").as_str(), f(s, "id").as_str()) {
+                // `state salt: 3` in the Warden's margin, beside a config's
+                // `resource salt`: the Warden's own, `warden.salt`.
+                if kind == "state" && self.decls.contains_key(id) {
+                    if let Some(home) = home {
+                        let key = format!("{}.{id}", place_of(home));
+                        let decl = Decl {
+                            kind: kind.to_string(),
+                            fields: s.clone(),
+                            home: None,
+                        };
+                        self.decls.insert(key, decl);
+                        continue;
+                    }
+                }
                 let decl = Decl {
                     kind: kind.to_string(),
                     fields: s.clone(),
                     home: home.map(str::to_string),
                 };
                 self.decls.insert(id.to_string(), decl);
+                // `item stave: … ~ count 4`: four staves, each an item of its
+                // own, `stave#1` to `stave#4`, each `of` stave.
+                let count = f(s, "count").as_u64().unwrap_or(1);
+                if kind == "item" && count > 1 {
+                    for n in 1..=count {
+                        let mut fields = s.clone();
+                        if let Value::Obj(pairs) = &mut fields {
+                            pairs.retain(|(k, _)| k != "count" && k != "id");
+                            pairs.push(("id".into(), Value::str(format!("{id}#{n}"))));
+                            pairs.push(("of".into(), Value::str(id)));
+                        }
+                        let decl = Decl {
+                            kind: kind.to_string(),
+                            fields,
+                            home: home.map(str::to_string),
+                        };
+                        self.decls.insert(format!("{id}#{n}"), decl);
+                    }
+                }
+            }
+            if s.get("recipe").is_some() {
+                self.recipes.push(s.clone());
             }
             match f(s, "setting").as_str() {
                 Some("pov") => self.povs = strs(f(s, "value")),
@@ -307,6 +348,16 @@ impl Story {
 
     fn has_tag(&self, id: &str, tag: &str) -> bool {
         strs(self.field(id, "tags")).iter().any(|t| t == tag)
+    }
+
+    /// `item stave: … ~ count 4`: the name of the four, not a thing itself.
+    fn counted(&self, id: &str) -> bool {
+        self.field(id, "count").as_u64().unwrap_or(1) > 1 && self.field(id, "of") == &Value::Null
+    }
+
+    /// What a counted thing is one of: `stave#2` is a `stave`.
+    fn of(&self, id: &str) -> Option<&str> {
+        self.field(id, "of").as_str()
     }
 
     /// A passage's tags: `[act]`, `[finale]`. None for a passage that is
@@ -482,6 +533,13 @@ pub struct Run {
     timers: Vec<time::Timer>,
     /// While an NPC finds its way: the places it keeps to (`~ where:`).
     keep_to: Option<Value>,
+    /// Who `nearest` measures from, while a statement says (`reach.rs`).
+    near: Option<String>,
+    /// An ending a `play` sent the pov to, entered when the action is done.
+    go_to: Option<String>,
+    /// While the pov does an act kept away from any place (a spellbook's,
+    /// `spell:kindle`): the place they are doing it in.
+    acting_in: Option<String>,
     /// What the action in hand has done so far, against the step limit.
     work: Work,
     /// The passages the action in hand entered, in order.
@@ -558,6 +616,9 @@ impl Run {
             sightings: BTreeMap::new(),
             timers: Vec::new(),
             keep_to: None,
+            near: None,
+            go_to: None,
+            acting_in: None,
             history: Vec::new(),
             saved: BTreeMap::new(),
             reached: Vec::new(),
@@ -609,6 +670,18 @@ impl Run {
                         self.place.insert(id.clone(), place.to_string());
                     }
                 }
+                "item" if story.counted(id) => {}
+                // A place's facts: its archetype's, its own, then `with`.
+                "place" => {
+                    let like = field("like").as_str().unwrap_or("");
+                    for source in [story.field(like, "state"), field("state"), field("with")] {
+                        if let Value::Obj(facts) = source {
+                            for (name, v) in facts {
+                                self.vals.insert(format!("{id}.{name}"), self.constant(v));
+                            }
+                        }
+                    }
+                }
                 "item" => {
                     let home = field("in")
                         .as_str()
@@ -637,6 +710,15 @@ impl Run {
                         Some("character") => {
                             for c in &characters {
                                 self.vals.insert(format!("{c}.{id}"), v.clone());
+                            }
+                        }
+                        // `state heat: 0 ~ belongs to place`: every place has
+                        // one, unless it says otherwise (`~ with heat: 1`).
+                        Some(kind @ ("place" | "item" | "npc")) => {
+                            for each in story.ids_of(kind) {
+                                self.vals
+                                    .entry(format!("{each}.{id}"))
+                                    .or_insert_with(|| v.clone());
                             }
                         }
                         Some(owner) => {
@@ -910,6 +992,24 @@ impl Run {
     /// Where the pov is.
     pub fn here(&self) -> &str {
         self.at.get(&self.pov).map_or("", String::as_str)
+    }
+
+    /// The place someone at `passage` stands in: the passage's own, or,
+    /// for an act kept away from any place, where the act is done.
+    fn stands(&self, passage: &str) -> String {
+        match &self.acting_in {
+            Some(place)
+                if self.story.kind(place_of(passage)) != Some("place")
+                    && self
+                        .story
+                        .passages
+                        .get(passage)
+                        .is_some_and(|p| p.tags.iter().any(|t| t == "act")) =>
+            {
+                place.clone()
+            }
+            _ => place_of(passage).to_string(),
+        }
     }
 
     /// The Links the pov can take now, as `(id, label)`.
@@ -1314,6 +1414,10 @@ impl Run {
             return self.claim(link);
         }
         self.perform(link, false)?;
+        // `play burned`: an ending, once the action is done. No turn passes.
+        if let Some(ending) = self.go_to.take() {
+            return self.enter(&ending, BTreeMap::new());
+        }
         // `clock: 0.. ~ each action`: whatever the Linker does is a turn.
         // Not a hint or a switch of pov, which are not done in the story,
         // nor a `pass`, which ended the turn itself; and not once the story
@@ -1329,6 +1433,9 @@ impl Run {
             && !self.links.is_empty()
         {
             self.end_turn()?;
+            if let Some(ending) = self.go_to.take() {
+                return self.enter(&ending, BTreeMap::new());
+            }
             self.relist()?;
         }
         Ok(())
@@ -1391,6 +1498,28 @@ impl Run {
         };
         self.vals.insert("attempt.success".into(), V::Bool(success));
         self.vals.insert("attempt.clashed".into(), V::Bool(clashed));
+        if success && f(link, "act").as_str() == Some("drop") {
+            if let Some(item) = f(link, "arg").as_str() {
+                self.drop_item(item);
+                self.fire(Event {
+                    on: "drop",
+                    what: item,
+                    actor: &actor,
+                    before: false,
+                })?;
+            }
+        }
+        if success && f(link, "kind").as_str() == Some("make") {
+            if let Some(made) = f(link, "arg").as_str() {
+                self.make(made)?;
+                self.fire(Event {
+                    on: "make",
+                    what: made,
+                    actor: &actor,
+                    before: false,
+                })?;
+            }
+        }
         if success && f(link, "act").as_str() == Some("take") {
             if let Some(item) = f(link, "arg").as_str() {
                 if self.fire(Event {
@@ -1499,6 +1628,10 @@ impl Run {
                 self.relist()?; // the woken change what is on offer
             }
         }
+        // The tools it used, once it is done: one may break.
+        if success && self.use_tools(link)? {
+            self.relist()?;
+        }
         Ok(())
     }
 
@@ -1571,6 +1704,7 @@ impl Run {
             .passages
             .get(passage)
             .ok_or_else(|| format!("there is no passage `{passage}`"))?;
+        not_yet(passage, p)?;
         self.work.entered += 1;
         if self.work.entered > MAX_ENTERED {
             return Err(format!(
@@ -1586,10 +1720,14 @@ impl Run {
         // An act is done where the pov is, wherever its passage is kept: a
         // spellbook's act does not take them to the spellbook.
         let to = if p.tags.iter().any(|t| t == "act") && !from.is_empty() {
-            place_of(&from).to_string()
+            self.stands(&from)
         } else {
             place_of(passage).to_string()
         };
+        // An act kept in a lib, not a place: `here` is still where they are.
+        self.acting_in = (story.kind(place_of(passage)) != Some("place")
+            && p.tags.iter().any(|t| t == "act"))
+        .then(|| to.clone());
         if place_of(&from) != to {
             if !from.is_empty() {
                 self.fire(Event {
@@ -1724,6 +1862,10 @@ impl Run {
         let at = self.here().to_string();
         self.asking.clear();
         self.locals.clear();
+        // The config's `let`s and `get`s, as on arrival.
+        for stmt in self.story.config_lets.clone() {
+            self.statement(&stmt)?;
+        }
         self.parent_lets(&at)?;
         self.lets_of(&at)?;
         self.links = self.render(&at, true)?;
@@ -1766,11 +1908,17 @@ impl Run {
     fn standing_links(&mut self) -> R<Vec<Value>> {
         let story = Arc::clone(&self.story);
         let mut links = Vec::new();
-        // In a lobby, before play begins, nothing stands everywhere.
-        let in_lobby = story
-            .passages
-            .get(self.here())
-            .is_some_and(|p| p.tags.iter().any(|t| t == "lobby"));
+        // In a lobby, before play begins, and in an ending, after it,
+        // nothing stands everywhere; nor in a prologue that is not a place
+        // (Ex 1's is the lounge at stop 0, Ex 9's is the town above).
+        let here_is_place = story.kind(place_of(self.here())) == Some("place");
+        let in_lobby = story.passages.get(self.here()).is_some_and(|p| {
+            p.tags.iter().any(|t| match t.as_str() {
+                "lobby" | "ending" | "finale" | "epilogue" => true,
+                "prologue" => !here_is_place,
+                _ => false,
+            })
+        });
         if self.pov.is_empty() || in_lobby {
             return Ok(links);
         }
@@ -1815,10 +1963,34 @@ impl Run {
             if self.arrival(&to).is_none() {
                 continue;
             }
-            let label = format!("Go to {}", self.label(&to));
+            // Two ways to the same place (the cage, and the cage rope): each
+            // says which it is.
+            let twin = story
+                .ways
+                .iter()
+                .filter(|(w, a, b)| *a == here && *b == to && !w.is_empty())
+                .count()
+                > 1;
+            let (label, id) = if twin {
+                let by = match story.field(&way, "shown_as") {
+                    Value::Null => way.clone(),
+                    shown => self.text_now(shown).unwrap_or_else(|| way.clone()),
+                };
+                let taken = links
+                    .iter()
+                    .any(|l| f(l, "id").as_str() == Some(&format!("walk:{to}")));
+                let id = if taken {
+                    format!("walk:{to}#{way}")
+                } else {
+                    format!("walk:{to}")
+                };
+                (format!("Go to {} ({by})", self.label(&to)), id)
+            } else {
+                (format!("Go to {}", self.label(&to)), format!("walk:{to}"))
+            };
             links.push(Value::obj([
                 ("type", Value::str("link")),
-                ("id", Value::str(format!("walk:{to}"))),
+                ("id", Value::str(id)),
                 ("way", Value::str(way.clone())),
                 ("label", Value::str(label)),
                 ("target", Value::str(to)),
@@ -1827,11 +1999,17 @@ impl Run {
                 ("cost", walk_cost.clone()),
             ]));
         }
+        links.extend(self.take_links()?);
+        links.extend(self.make_links()?);
         Ok(links)
     }
 
     /// Run one header statement. Returns the passage named by `next:`.
     fn statement(&mut self, s: &Value) -> R<Option<String>> {
+        if s.get("spreads").is_some() {
+            self.spread(s)?;
+            return Ok(None);
+        }
         if let Some(name) = f(s, "let").as_str() {
             let when = f(s, "when");
             if *when == Value::Null || self.eval(when)?.truthy() {
@@ -2288,7 +2466,23 @@ impl Run {
                 }
                 "list" => {
                     let name = f(part, "list").as_str().unwrap_or("");
-                    let entries = self.lists.get(name).cloned().unwrap_or_default();
+                    // `{list burning_near}`: a `let` that holds a list.
+                    let entries = match self.lists.get(name).cloned() {
+                        Some(entries) => entries,
+                        None => match self.name(name)? {
+                            V::List(items) => items
+                                .iter()
+                                .filter_map(|i| i.name())
+                                .map(|id| Entry {
+                                    id: id.to_string(),
+                                    label: None,
+                                    mark: None,
+                                    struck: false,
+                                })
+                                .collect(),
+                            _ => Vec::new(),
+                        },
+                    };
                     let mut lines: Vec<Para> = Vec::new();
                     for e in entries {
                         let mut label = match &e.label {
@@ -2332,7 +2526,28 @@ impl Run {
         match v {
             V::Id(id) => self.label(id),
             V::List(items) => {
-                let shown: Vec<String> = items.iter().map(|i| self.show(i)).collect();
+                // Several of a counted item read as one: "two staves".
+                let mut shown: Vec<String> = Vec::new();
+                let mut done: Vec<&str> = Vec::new();
+                for i in items {
+                    let of = i.name().and_then(|id| self.story.of(id));
+                    match of {
+                        Some(of) if done.contains(&of) => continue,
+                        Some(of) => {
+                            done.push(of);
+                            let n = items
+                                .iter()
+                                .filter(|j| j.name().and_then(|id| self.story.of(id)) == Some(of))
+                                .count();
+                            shown.push(if n == 1 {
+                                self.show(i)
+                            } else {
+                                self.several(of, n)
+                            });
+                        }
+                        None => shown.push(self.show(i)),
+                    }
+                }
                 match shown.split_last() {
                     None => String::new(),
                     Some((last, [])) => last.clone(),
@@ -2462,11 +2677,45 @@ impl Run {
                 let who = self.who(&args[0])?;
                 self.knows.entry(who).or_default().insert(word(1));
             }
-            "gain" => self.hold(&word(0), &pov),
+            // `gain salt 2`: a resource. `gain stave 2`: that many of a
+            // counted item. `gain tally`: an item.
+            "gain" if matches!(self.story.kind(&word(0)), Some("resource" | "stat")) => {
+                let key = format!("{pov}.{}", word(0));
+                self.change_one("raise", key, &args)?;
+            }
+            "gain" if self.story.counted(&word(0)) => {
+                let n = match args.get(1) {
+                    Some(n) => self.eval(n)?.num().unwrap_or(1.0) as usize,
+                    None => 1,
+                };
+                for item in self.spare_of(&word(0), n) {
+                    self.hold(&item, &pov);
+                }
+            }
+            "gain" => {
+                for item in self.items_named(args.first().unwrap_or(&Value::Null))? {
+                    self.hold(&item, &pov);
+                }
+            }
+            // `give one(item, in: here) to gleaner`, `give target to me`.
             "give" => {
                 let who = self.who(args.last().unwrap_or(&Value::Null))?;
-                self.hold(&word(0), &who);
+                for item in self.items_named(args.first().unwrap_or(&Value::Null))? {
+                    self.hold(&item, &who);
+                }
             }
+            // `lose stave 2`: that many of a counted item the pov holds.
+            "lose" if self.story.counted(&word(0)) => {
+                let n = match args.get(1) {
+                    Some(n) => self.eval(n)?.num().unwrap_or(1.0) as usize,
+                    None => 1,
+                };
+                for item in self.held_of(&word(0), n) {
+                    self.destroy_item(&item);
+                }
+            }
+            // `lose pawl`: an item is used up.
+            "lose" if self.story.kind(&word(0)) == Some("item") => self.destroy_item(&word(0)),
             "lose" => {
                 let key = format!("{pov}.{}", word(0));
                 let left = match args.get(1) {
@@ -2521,7 +2770,10 @@ impl Run {
             }
             "move" => {
                 let who = self.who(&args[0])?;
-                let to = word(args.len() - 1);
+                // `move thwaite to nearest(…)`: measured from thwaite.
+                let Some(to) = self.move_target(&who, args.last().unwrap_or(&Value::Null))? else {
+                    return Ok(()); // nowhere to go
+                };
                 if self.story.kind(&who) == Some("character") {
                     self.at.insert(who, to);
                 } else {
@@ -2541,10 +2793,11 @@ impl Run {
                     .unwrap_or(1.0);
                 self.burn(&word(0), n)?;
             }
+            // `destroy all(item, in: ablaze, where: it.burns)`: each of them.
             "destroy" => {
-                self.holder.remove(&word(0));
-                self.vals
-                    .insert(format!("{}.destroyed", word(0)), V::Bool(true));
+                for item in self.items_named(args.first().unwrap_or(&Value::Null))? {
+                    self.destroy_item(&item);
+                }
             }
             "kill" | "detain" | "wake" | "wound" => {
                 let fact = match f(e, "do").as_str() {
@@ -2577,6 +2830,17 @@ impl Run {
             // the names of whatever played it.
             "play" => {
                 let passage = word(0);
+                // An ending is not shown in passing: the pov goes there,
+                // once the action is done.
+                let ending = self.story.passages.get(&passage).is_some_and(|p| {
+                    p.tags
+                        .iter()
+                        .any(|t| matches!(t.as_str(), "ending" | "finale" | "epilogue"))
+                });
+                if ending {
+                    self.go_to.get_or_insert(passage);
+                    return Ok(());
+                }
                 let saved = self.locals.clone();
                 let header = self
                     .story
@@ -2584,6 +2848,9 @@ impl Run {
                     .get(&passage)
                     .map(|p| p.header.clone())
                     .unwrap_or_default();
+                if let Some(p) = self.story.passages.get(&passage) {
+                    not_yet(&passage, p)?;
+                }
                 let result = header
                     .iter()
                     .filter(|s| !inputs::is_input(s))
@@ -2867,6 +3134,16 @@ impl Run {
                     None => return Err("cannot set an empty path".into()),
                 };
                 let rest: Vec<&str> = parts[1..].iter().filter_map(Value::as_str).collect();
+                // `gleaner.place.heat`: through a member that names a thing.
+                if rest.len() > 1 {
+                    let mut owner = V::Id(root.clone());
+                    for m in &rest[..rest.len() - 1] {
+                        owner = self.member(&owner, m)?;
+                    }
+                    if let Some(id) = owner.name().filter(|id| self.story.kind(id).is_some()) {
+                        return Ok(format!("{id}.{}", rest[rest.len() - 1]));
+                    }
+                }
                 Ok(format!("{root}.{}", rest.join(".")))
             }
         }
@@ -2980,6 +3257,10 @@ impl Run {
                 let check = |run: &Self, who: &str| {
                     if op == "knows" {
                         run.knows.get(who).is_some_and(|k| k.contains(thing))
+                    } else if run.story.counted(thing) {
+                        run.holder
+                            .iter()
+                            .any(|(i, h)| h == who && run.story.of(i) == Some(thing))
                     } else {
                         run.holder.get(thing).is_some_and(|h| h == who)
                     }
@@ -3061,16 +3342,34 @@ impl Run {
                     .and_then(Value::as_str)
                     .unwrap_or("")
                     .to_string();
-                let place = match named("in") {
+                // `in: here`, or `in: ablaze`, a list of places.
+                let places: Option<Vec<String>> = match named("in") {
                     Value::Null => None,
-                    p => Some(
-                        self.eval(p)?
+                    p => Some(match self.eval(p)? {
+                        V::List(items) => items
+                            .iter()
+                            .filter_map(|i| i.name().map(|p| place_of(p).to_string()))
+                            .collect(),
+                        v => v
                             .name()
-                            .map(|p| place_of(p).to_string())
+                            .map(|p| vec![place_of(p).to_string()])
                             .unwrap_or_default(),
-                    ),
+                    }),
                 };
-                let mut found = self.things(&tag, place.as_deref());
+                // `count(burning)`: a `let` that holds a list is counted itself.
+                let mut found = match self.locals.contains_key(&tag) {
+                    true => match self.name(&tag)? {
+                        V::List(items) => items
+                            .iter()
+                            .filter_map(|i| i.name().map(str::to_string))
+                            .collect(),
+                        v => v.name().map(|id| vec![id.to_string()]).unwrap_or_default(),
+                    },
+                    false => self.things(&tag, None),
+                };
+                if let Some(places) = places {
+                    found.retain(|id| places.contains(&self.location(id)));
+                }
                 // `where: it.alive and it != me`: `it` is each in turn.
                 let cond = named("where").clone();
                 if cond != Value::Null {
@@ -3113,9 +3412,28 @@ impl Run {
                 let b = self.who(&items[1])?;
                 V::Bool(self.holder.get(&a) == Some(&b))
             }
+            // `nearest(place, where: it.way_out)`: along the map (reach.rs).
+            "nearest" if *named("where") != Value::Null => {
+                let kind = items
+                    .first()
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let cond = named("where").clone();
+                let near = self.nearest_where(&kind, &cond, None)?;
+                near.first().map_or(V::Null, |id| V::Id(id.clone()))
+            }
             "nearest" => {
                 let tag = items.first().and_then(Value::as_str).unwrap_or("");
                 self.nearest(tag)?
+            }
+            // `here.toward(out)`: the next place on the way there.
+            "toward" => {
+                let a = self.who(&items[0])?;
+                match self.eval(&items[1])?.name() {
+                    Some(b) => self.toward(&a, b),
+                    None => V::Null,
+                }
             }
             "alone_with" => {
                 let a = self.who(&items[0])?;
@@ -3179,6 +3497,12 @@ impl Run {
             }
             None => {}
         }
+        // `table rank: score ~ 0..=19: "a lamp carrier"`: read as a value.
+        if self.story.kind(n) == Some("table") {
+            if let Some(v) = self.table_value(n)? {
+                return Ok(v);
+            }
+        }
         // `d6`, `d20`: a die, rolled each time it is read.
         if let Some(sides) = n.strip_prefix('d').and_then(|s| s.parse().ok()) {
             if self.story.kind(n).is_none() {
@@ -3192,6 +3516,7 @@ impl Run {
     fn global(&self, n: &str) -> V {
         match n {
             "me" => return V::Id(self.pov.clone()),
+            "here" if self.acting_in.is_some() => return V::Id(self.stands(self.here())),
             "here" => return V::Id(self.here().to_string()),
             "nothing" | "nobody" => return V::Null,
             _ => {}
@@ -3372,7 +3697,7 @@ impl Run {
             }
         }
         if let Some(at) = self.at.get(id) {
-            return place_of(at).to_string();
+            return self.stands(at);
         }
         // A place, or a passage that is not someone's margin, is where it
         // is: `here.in(prison)`.
@@ -3426,7 +3751,8 @@ impl Run {
                             && !self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)
                             && !self.tagged(id, "lifeless")
                     }
-                    _ => d.kind == tag || self.tagged(id, tag),
+                    _ if self.story.counted(id) => false,
+                    _ => d.kind == tag || self.tagged(id, tag) || self.story.of(id) == Some(tag),
                 };
                 tagged && place.is_none_or(|p| self.location(id) == p)
             })
@@ -3448,6 +3774,21 @@ impl Run {
         self.rng ^= self.rng >> 7;
         self.rng ^= self.rng << 17;
         1 + self.rng % sides.max(1)
+    }
+}
+
+/// An encounter's passages (`[encounter]`, `[round]`, `[resolve]`) are
+/// v0.6 work not built yet: say so, rather than show what they hold.
+fn not_yet(name: &str, p: &Passage) -> R<()> {
+    match p
+        .tags
+        .iter()
+        .find(|t| matches!(t.as_str(), "encounter" | "round" | "resolve"))
+    {
+        Some(tag) => Err(format!(
+            "`{name}` is an `[{tag}]` passage, and encounters are not built yet (milestone 20d)"
+        )),
+        None => Ok(()),
     }
 }
 

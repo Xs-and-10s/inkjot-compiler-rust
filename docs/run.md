@@ -443,6 +443,74 @@ spellbook's act is done where they stand.
 
 `x.place` is where a person or thing is: `{gleaner.place}`.
 
+## Things in the hand
+
+**Taking and dropping.** `default takes: take, drop` offers, beside the
+walks, a Link to take each item lying here (not `fixed`, not `hidden
+until` something not yet so) and to drop each item held: "Take a pick",
+"Drop a pick". The acts named must be declared or built in (`take` and
+`drop` are). Taking fires `take`, dropping `drop`.
+
+**Counted items.** `item stave: "a pit prop" ~ plural "staves" ~ count 4`
+is four items, `stave#1` to `stave#4`, each held, dropped and burnt on its
+own. The name stands for all of them: `count(stave, where: it.held_by(me))`,
+`me.holds.stave` (any), `lose stave 2`, `gain stave 2` (from those nowhere
+yet). One Link takes or drops one of them, and a list shows them together:
+"two staves", by `plural`, or the label made plural.
+
+**Recipes.** `recipe stretcher: stave, stave, sacking ~ make ~ "…"` is
+offered as a Link named by its verb ("Make a stretcher") when the pov holds
+every part (a part named twice, twice), every tool `~ using` is held or
+lying here, and the thing made is not already in the world. Making uses up
+the parts, gives the pov the thing, shows the recipe's text, and fires
+`make`.
+
+**Tools.** A Link `~ uses pick`, or a recipe `~ using hammer`, uses the
+tool when it succeeds. `~ breaks 1 in 6` on the tool: one time in six it
+breaks, `pick.broken` is set, and the pov reads "The pick breaks." Tools
+do not break unless they say so.
+
+**Effects on what an expression names.** `give one(item, in: here, where:
+…) to gleaner`, `give target to me`, `destroy all(item, in: ablaze, where:
+it.burns)`: the effect is done to each, and to nothing if there is none.
+`gain salt 2` raises a resource, up to its `max`. `lose pawl` uses an item
+up.
+
+**Tables read as values.** `table rank: score` with rows `~ 0..=19: "a lamp
+carrier"` reads, wherever `{rank}` is named, as the first row the value
+falls in. A table whose rows are effects is rolled with `roll`, as before.
+
+## Near and far
+
+`nearest(place, where: it.way_out)` is the nearest thing of that kind for
+which `where:` holds, counted in ways along the map, open or not, one-way
+ways in their direction only. It measures from the thing being moved
+(`move thwaite to nearest(…)`), each place a `spreads` starts from, the NPC
+whose agenda it is, or else the pov. Its own place counts; ties go to the
+first by name. A statement's `~ along way` says how it measures (the only
+measure built), and may carry the statement's `when`.
+
+`here.toward(out)` is the place next to `here` on a shortest way to `out`:
+Dowse's "by the Long Gallery".
+
+```text
+spreads 1 from ablaze to nearest(place, where: it.timbered and it.heat == 0)
+~ along way ~ within 1 ~ then set it.heat: 1
+```
+
+From each of the set, to the nearest that fit, no further than `within`
+ways; each reached once, as `it` in the effects. `along seat` (Ex 7's
+whispers) is milestone 21.
+
+`count`, `one` and `all` take `in:` a list of places too (`in: ablaze`),
+and count a `let` that holds a list (`count(burning)`).
+
+**Where the pov stands.** In an act kept in a lib, not a place (a
+spellbook's `spell:kindle`), `here` is still the place the pov is in. Links
+offered everywhere, walks, takes and recipes are not offered in an
+ending, or in a prologue that is not a place: those have only their own
+Links.
+
 ## What an act asks first
 
 An act's own clauses are checked before its Link is offered:
@@ -694,4 +762,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.
-- Anything marked v0.6: the duel, `retell`.
+- Anything marked v0.6: the duel, `retell`. Entering or playing an
+  `[encounter]`, `[round]` or `[resolve]` passage says encounters are not
+  built yet (milestone 20d).

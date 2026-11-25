@@ -484,18 +484,6 @@ impl Checker {
             "StoryData" => return self.story_data(p),
             _ => {}
         }
-        if let Some((parent, _)) = p.name.rsplit_once(':') {
-            if !self.passages.contains(parent) {
-                self.err(
-                    p.line,
-                    p.col,
-                    format!(
-                        "`{}` is a sub-Nib of `{parent}`, but there is no passage `{parent}`",
-                        p.name
-                    ),
-                );
-            }
-        }
         for t in &p.tags {
             if STRETCH_TAGS.contains(&t.as_str()) {
                 *self.stretch.entry(format!("[{t}]")).or_default() += 1;
@@ -814,7 +802,12 @@ impl Checker {
             if text.starts_with("cost ") {
                 self.cost_seen(c.line, c.col);
             }
+            // `spreads … ~ then set it.heat: 1`: `it` is each place reached.
+            let it = i > 0 && kw == "spreads" && self.locals.insert("it".to_string());
             self.clause_common(c, i > 0);
+            if it {
+                self.locals.remove("it");
+            }
             if i > 0 && matches!(kw, "item" | "npc" | "character") {
                 self.actor_clause(c);
             }
@@ -883,12 +876,11 @@ impl Checker {
                 let col = c.col + cols(&c.text[..c.text.len() - row.len()]);
                 if let Some(e) = row.strip_prefix("then ") {
                     self.effect(e, c.line, col + 5);
+                } else if row.starts_with('"') {
+                    // A table read as a value: `0..=19: "a lamp carrier"`.
+                    self.strings(row, c.line, col);
                 } else if row != "nothing" {
-                    self.err(
-                        c.line,
-                        col,
-                        "a table row is `range: then effect` or `range: nothing`",
-                    );
+                    self.expr(row, c.line, col);
                 }
             }
         }
@@ -1202,6 +1194,47 @@ impl Checker {
                     );
                 }
             }
+            // `recipe stretcher: stave, stave, sacking ~ using hammer ~ make`.
+            "recipe" => {
+                let (result, parts) = rest.split_once(':').unwrap_or((rest, ""));
+                self.need(result.trim(), &["item"], "item", line, rest_col);
+                for part in parts.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+                    self.need(part, &["item"], "item", line, vcol);
+                }
+                if parts.trim().is_empty() {
+                    self.err(
+                        line,
+                        rest_col,
+                        "a recipe names what it takes: `recipe pawl: horseshoe`",
+                    );
+                }
+                for c in &s.clauses[1..] {
+                    if let Some(tools) = c.text.strip_prefix("using ") {
+                        for tool in tools.split(',').map(str::trim) {
+                            self.need(tool, &["item"], "item", c.line, c.col + 6);
+                        }
+                    }
+                }
+            }
+            // `spreads 1 from ablaze to nearest(place, where: …)`.
+            "spreads" => {
+                let tail = rest.split_once(' ').map_or("", |(_, t)| t).trim();
+                let (from, to) = match tail.strip_prefix("from ") {
+                    Some(t) => match t.find(" to ") {
+                        Some(i) => (Some(&t[..i]), &t[i + 4..]),
+                        None => (Some(t), ""),
+                    },
+                    None => (None, tail.strip_prefix("to ").unwrap_or(tail)),
+                };
+                if let Some(from) = from {
+                    self.expr(from, line, rest_col);
+                }
+                if to.trim().is_empty() {
+                    self.err(line, rest_col, "`spreads` says where to: `spreads 1 from fires to nearest(place, where: …)`");
+                } else {
+                    self.expr(to, line, rest_col);
+                }
+            }
             // `measure nights: nights`: reported when the reading ends.
             "measure" => {
                 let name = first_word(rest);
@@ -1499,7 +1532,25 @@ impl Checker {
                     self.need(arg(2), &["fact"], "fact", line, word_col(2));
                 }
             }
-            "gain" | "give" => self.need(arg(1), &["item"], "item", line, col + 5),
+            // `gain salt 2`, `gain tally`, `give one(item, …) to gleaner`,
+            // `give target to me`, `destroy all(item, …)`, `lose stave 2`.
+            "gain" | "give" | "lose" | "destroy" => {
+                let thing = core[verb.len()..].trim();
+                let thing = match verb {
+                    "give" => thing.rfind(" to ").map_or(thing, |i| thing[..i].trim()),
+                    "gain" | "lose" => thing.split_whitespace().next().unwrap_or(""),
+                    _ => thing,
+                };
+                let kinds: &[&str] = match verb {
+                    "gain" | "lose" => &["item", "resource", "stat"],
+                    _ => &["item"],
+                };
+                if is_ident(thing) && !self.is_known_local(thing) {
+                    self.need(thing, kinds, kinds[0], line, col + cols(verb) + 1);
+                } else if !is_ident(thing) && !thing.is_empty() {
+                    self.expr(thing, line, col + cols(verb) + 1);
+                }
+            }
             "reveal" => self.need(
                 arg(1),
                 &["npc", "character", "item", "place", "fact"],
@@ -1694,6 +1745,11 @@ impl Checker {
         let arg_col = c.col + cols(word) + 1;
         match word {
             "at" => self.target_clause(c),
+            "uses" => {
+                for tool in c.text[word.len()..].split(',').map(str::trim) {
+                    self.need(tool, &["item"], "item", c.line, arg_col);
+                }
+            }
             "cost" => self.cost_seen(c.line, c.col),
             "choice" => self.choice(arg, c.line, arg_col),
             "inquest" => self.inquest_clause(c),
@@ -1925,6 +1981,8 @@ impl Checker {
                     ),
                 }
             }
+            // `{list burning_near}`: a declared list, or a `let` that holds one.
+            "list" if self.locals.contains(second) || self.globals.contains(second) => {}
             "list" => self.need(second, &["list"], "list", line, col + 5),
             "all" if !second.is_empty() => {
                 let rest = &content[content.find("all").unwrap_or(0) + 3..];
@@ -2167,6 +2225,13 @@ impl Checker {
                 _ => self.err(line, pcol, format!("unknown modifier `[{part}]`")),
             }
         }
+    }
+}
+
+impl Checker {
+    /// A builtin (`target`, `it`) or a `let` in scope: not a declared id.
+    fn is_known_local(&self, name: &str) -> bool {
+        resolve::BUILTINS.contains(&name) || self.locals.contains(name) || name == "it"
     }
 }
 
