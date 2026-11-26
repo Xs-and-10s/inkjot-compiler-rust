@@ -33,7 +33,7 @@
 
 use std::sync::Arc;
 
-use super::{f, place_of, strs, Run, R, V};
+use super::{f, strs, Run, R, V};
 use crate::json::Value;
 
 impl Run {
@@ -44,8 +44,8 @@ impl Run {
             Some(list) => list.split(',').map(|a| a.trim().to_string()).collect(),
             None => return Ok(Vec::new()),
         };
-        let here = place_of(self.here()).to_string();
         let pov = self.pov.clone();
+        let here = self.location(&pov);
         let mut links = Vec::new();
         let mut seen = Vec::new();
         for (item, holder) in self.holder.clone() {
@@ -90,7 +90,7 @@ impl Run {
 
     /// Drop an item where the pov stands.
     pub(super) fn drop_item(&mut self, item: &str) {
-        let here = place_of(self.here()).to_string();
+        let here = self.location(&self.pov.clone());
         self.holder.insert(item.to_string(), here);
     }
 
@@ -145,10 +145,10 @@ impl Run {
 
     /// Is a tool held by the pov, or lying here?
     fn at_hand(&self, tool: &str) -> bool {
-        let here = place_of(self.here());
+        let here = self.location(&self.pov);
         self.holder
             .get(tool)
-            .is_some_and(|h| *h == self.pov || h == here)
+            .is_some_and(|h| *h == self.pov || *h == here)
     }
 
     /// Make what a recipe makes: use up the parts, hold the thing, and say

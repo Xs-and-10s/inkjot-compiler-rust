@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Milestone 20d: encounters
+
+- `[encounter]` passages with `encounter x ~ round by round ~ acts last ~
+  until …`; `[round]` and `[resolve]` passages. Rounds are turns: when one
+  ends, the opponent's threat comes and the `[resolve]` passage is shown.
+- `pattern name: a, b, c ~ repeat ~ one per round`, with `x first when …`
+  and `x instead of y when …`; `npc.pattern.next`.
+- `threat x: tag ~ at who ~ answered by prevent, block, cover, absorb ~
+  fails when … ~ on fail: … ~ then …`; `threat.name`, `threat.target`,
+  `threat.outcome`.
+- Counters: `prevent x`, `block for x`, `cover x` (until used, or `~ for N
+  turns`), `absorb with item`; items that `~ deflects fire` or `~ absorbs
+  any`; `on absorb with item`. And `pin x`, `skip x this round`, `end
+  encounter`.
+- `set x: yes next round`; `wound x 1` costs `hp` when there is one, and
+  none left is death; `x.down`, `x.up`, `me.asked_hint`; `take x` by
+  whoever acts.
+- A death that sends the pov to an ending stands.
+- `holds.any(sword)` finds things `like sword`.
+- `spell`, `shield`, `interrupt`, `guard`, `parry` and `freeze` as
+  statements are errors that say what replaces each.
+- **Ex 2's duel is in general words** (from `ex2-duel-general.twee`), with
+  nine tests; `get holder` moved to the config, where the duel's pattern
+  can see it. Its IR fixture is regenerated.
+- **Ex 9 checks clean and runs whole**: its Warden can be fought, warded
+  and run from (three new `[test]` passages, run by `cargo test`), and
+  random play goes through the fight.
+
 ### Milestone 20c: making and the rest
 
 - `default takes: take, drop`: a Link to take each item lying here and to

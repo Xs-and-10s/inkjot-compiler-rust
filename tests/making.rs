@@ -423,6 +423,9 @@ proptest! {
             let links = s.view().links.clone();
             let id = links[m % links.len()].id.clone();
             s = s.take_link(&id).unwrap();
+            if s.view().links.is_empty() {
+                break; // the well
+            }
             let held: usize = status(&s)[3].parse().unwrap();
             prop_assert!(held <= 3);
         }

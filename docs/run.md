@@ -511,6 +511,86 @@ offered everywhere, walks, takes and recipes are not offered in an
 ending, or in a prologue that is not a place: those have only their own
 Links.
 
+## Encounters
+
+An encounter is a fight, a chase, a standoff: an opponent who does
+something each round, and Linkers who answer it.
+
+```text
+:: hask_duel [npc]
+stat wards: 3
+stat wards: 2 when heart.cracked
+pattern rhyme: flame, frost, blink, sunfall ~ repeat ~ one per round
+~ recall first when hask.saw_heart and holder != nobody
+~ falter instead of sunfall when holder != nobody
+threat flame: fire ~ at roland ~ answered by prevent, block, cover, absorb
+~ then wound target 1
+threat blink ~ fails when count(mirror, in: here, where: it.open) == 0
+~ then set hask.grounded: yes next round
+~ on fail: set hask.grounded: yes
+
+:: sanctum [encounter]
+encounter hask ~ round by round ~ acts last ~ until hask.wards == 0 or pov.all.down
+```
+
+**Beginning.** Entering an `[encounter]` passage, or a `play` of one (it
+sends the pov there, like an ending), begins it. The opponent's `stat`s in
+its own passage (one named for it, `hask_duel`) are set, the last whose
+`when` holds winning. The encounter's passages are its family: the
+passage's sub-Nibs (`sanctum:round`), or its siblings (`warden:round`
+beside `warden:fight`). While the pov is in them, `here` is the place the
+encounter began in, and only the round's Links, and Links offered
+everywhere, are offered: no walks, takes or recipes.
+
+**Rounds are turns.** The Linkers act as the story lets them; when the
+turn ends (a `~ pass ~ ends turn`, or each action under `clock: … ~ each
+action`), the opponent acts, and the pov is shown the encounter's
+`[resolve]` passage. A Link to the `[round]` or `[encounter]` passage only
+reads the next round: it is not an action.
+
+**The pattern** gives one threat a round, in order; `~ repeat` starts it
+again. `x first when …` comes before the next step, while it holds,
+without using it up; `x instead of y when …` takes y's place.
+`hask.rhyme.next` is what comes next.
+
+**A threat** is `at` someone (`pov.all` for everyone), and `answered by`
+the counters that may stop it. Its `then` effects run with `target` whom
+it reached and `actor` the opponent (`take heart` is the opponent taking
+it); `next round` on one waits a turn. In order:
+
+1. `~ fails when …`: `fail`, and its `~ on fail:` effects.
+2. `prevent hask` this round: `prevent`.
+3. `absorb with lumen` this round: the item takes it (`absorb`), and `on
+   absorb with lumen` fires.
+4. For each target: someone did `block for` them: if the blocker holds an
+   item that `~ deflects` the threat's tag, `deflect`; one that `~ absorbs
+   any`, `absorb`; otherwise the blocker takes it, `block`. Else, a `cover`
+   on the target is used up: `cover`. Else `hit`.
+
+In the `[resolve]` passage, `threat.name`, `threat.target` and
+`threat.outcome` say what came of it; `hit` if it landed on anyone. What
+the threat's effects said (a death handler) comes after the passage.
+`skip hask this round`: the opponent does nothing (`skip`). `pin hask`
+sets `hask.pinned` for the round.
+
+**Counters last the round**, except `cover`, which lasts until a threat
+uses it, or `~ for N turns`.
+
+**Ending.** When `until` holds after a round, or after `end encounter`,
+the encounter is over: its `[resolve]` passage is still shown, and the
+next Link to `here` returns the pov to the place. Leaving the family any
+other way ends it too.
+
+**Words for people:** `x.down` (dead, or no `hp` left) and `x.up`;
+`me.asked_hint` (a hint this round). `wound x 1` costs `hp` when the story
+has it, and none left is death. A death that sends the pov to an ending
+(`on death ~ then play crushed`) stands: no checkpoint or charge brings
+them back from it; the ending offers what comes next, an Undo for one.
+
+The real-time clauses (`countdown 3s per act`, `plus 2s when …`, `timeout
+stay`) are kept in the IR for the platform; the interpreter does not run
+a clock.
+
 ## What an act asks first
 
 An act's own clauses are checked before its Link is offered:
@@ -762,6 +842,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.
-- Anything marked v0.6: the duel, `retell`. Entering or playing an
-  `[encounter]`, `[round]` or `[resolve]` passage says encounters are not
-  built yet (milestone 20d).
+- `retell`.
+- `turn ends when …` (Ex 2's): a turn ends on a `pass` or `ends turn`
+  Link, or each action under `~ each action`.

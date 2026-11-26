@@ -97,7 +97,7 @@ threat flame: fire ~ at roland ~ answered by prevent, block, cover, absorb
 threat frost: frost ~ at eldric ~ answered by prevent, cover, absorb
 ~ then kill target when target.frozen
 ~ then set target.frozen: yes
-threat blink ~ fails when count(mirror, in: here, open: yes) == 0 or hask.pinned
+threat blink ~ fails when count(mirror, in: here, where: it.open) == 0 or hask.pinned
 ~ then set hask.dodging: yes
 ~ then set hask.grounded: yes next round
 ~ on fail: set hask.grounded: yes

@@ -1,6 +1,5 @@
-//! Ex 9, *Saltmarrow*, played by the interpreter. The encounter with the
-//! Warden is milestone 20d, so the draft does not check clean yet: it is
-//! lowered without its check, and play stops at the encounter.
+//! Ex 9, *Saltmarrow*, played by the interpreter: at random, Warden and
+//! all, and won two ways.
 
 use inkjot::engine::{Inklink, Para, Start, State};
 use proptest::prelude::*;
@@ -10,26 +9,17 @@ fn draft() -> String {
 }
 
 fn start(seed: u64) -> State {
-    let ir = inkjot::ir::lower_unchecked(&draft());
+    let ir = inkjot::build(&draft()).unwrap_or_else(|r| panic!("{:#?}", r.diags));
     Inklink::from_ir(&ir)
         .unwrap()
         .start(seed, &Start::default())
         .unwrap()
 }
 
-/// What play may run into before 20d: the encounter and its words (the
-/// ward's `cover`), and nothing else.
-fn not_yet(message: &str) -> bool {
-    message.contains("encounter")
-        || message.contains("not supported")
-        || message.contains("`cover`")
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
-    /// Ex 9 at random, up to 120 Links: every Link it offers can be taken,
-    /// short of the encounter.
+    /// Ex 9 at random, up to 120 Links: every Link it offers can be taken.
     #[test]
     fn ex9_plays_at_random(seed in 1u64..10_000, moves in prop::collection::vec(0usize..64, 1..120)) {
         let mut s = start(seed);
@@ -41,7 +31,6 @@ proptest! {
             let id = links[m % links.len()].id.clone();
             match s.take_link(&id) {
                 Ok(next) => s = next,
-                Err(e) if not_yet(&e.message) => break,
                 Err(e) => prop_assert!(false, "taking `{}` at `{}`: {}", id, s.view().nib, e.message),
             }
         }
@@ -143,4 +132,23 @@ fn ex9_can_be_won_without_a_fight() {
         text.contains(&"Your score is 40 of 100, which makes you a crust scraper.".to_string()),
         "{text:?}"
     );
+}
+
+/// The draft's own `[test]` passages: the Warden unmade with fire, a ward
+/// taking one blow, running from the fight, and the rest.
+#[test]
+fn ex9s_own_tests_pass() {
+    let src = draft();
+    let ir = inkjot::build(&src).unwrap();
+    let outcomes = inkjot::run::test::run_all(&src, &ir).unwrap();
+    assert!(outcomes.len() >= 7);
+    for o in outcomes {
+        assert!(
+            o.passed(),
+            "`{}`: {:#?}\n{}",
+            o.name,
+            o.failures,
+            o.transcript.join("\n")
+        );
+    }
 }

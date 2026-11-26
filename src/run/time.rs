@@ -68,6 +68,7 @@ pub(super) struct Snapshot {
     handler_counts: Vec<u32>,
     sightings: BTreeMap<String, Vec<Sighting>>,
     timers: Vec<Timer>,
+    encounter: Option<super::encounter::Encounter>,
 }
 
 /// Something waiting on the clock: an effect `after N turns`, or a value
@@ -118,6 +119,7 @@ impl Run {
             handler_counts: self.handler_counts.clone(),
             sightings: self.sightings.clone(),
             timers: self.timers.clone(),
+            encounter: self.encounter.clone(),
         }
     }
 
@@ -137,6 +139,7 @@ impl Run {
         self.handler_counts = s.handler_counts;
         self.sightings = s.sightings;
         self.timers = s.timers;
+        self.encounter = s.encounter;
     }
 
     /// The first snapshot, and every declared checkpoint set to it.
@@ -188,6 +191,19 @@ impl Run {
                 "died",
                 Value::obj([("who", Value::str(&who)), ("at", Value::str(&place))]),
             );
+            // A death that sent the pov to an ending (`on death ~ then play
+            // crushed`) stands: no checkpoint or charge brings them back;
+            // the ending offers what comes next.
+            let ended = who == self.pov
+                && self.story.passages.get(self.here()).is_some_and(|p| {
+                    p.tags
+                        .iter()
+                        .any(|t| matches!(t.as_str(), "ending" | "finale" | "epilogue"))
+                });
+            if ended {
+                self.drop_everything(&who, &place);
+                continue;
+            }
             let caught = self.story.checkpoints.iter().find(|cp| {
                 f(cp, "on_death_in")
                     .as_str()

@@ -204,9 +204,9 @@ the stair (now: Thwaite teaches *draw* when you find her); out of salt in
 the deep (now: salt regrows in the Marrow). Undo any of the three and it
 fails.
 
-**Played by the interpreter** (milestone 20c). `tests/ex9_play.rs` plays
-the draft itself at random, short of the encounter (milestone 20d), and
-wins it without one: a stretcher made in the timber yard, Thwaite carried
+**Played by the interpreter** (milestones 20c and 20d). It checks clean. `tests/ex9_play.rs` plays
+the draft itself at random, the Warden's fight included, and wins it
+without a fight: a stretcher made in the timber yard, Thwaite carried
 up through the winze, the shard left behind, 40 of 100, "a crust
 scraper".
 
@@ -267,7 +267,8 @@ The duel of Ex 2 rewritten for the encounter milestone: once in general
 words (`ex2-duel-general.twee`), then once for each step of the `define`
 proposal (`-step1-like`, `-step2-fields`, `-step3-define`), each holding
 only what differs from the step before. What they showed is in
-`docs/define.md`: the general draft is the one to build.
+`docs/define.md`: the general draft is the one to build. Built in
+milestone 20d: the general draft is now Ex 2's own duel, run by its tests.
 
 ## Rummy at Ashby (`rummy-at-ashby.twee`)
 

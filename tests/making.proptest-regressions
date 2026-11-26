@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 0857a5c6df0ef659b6245b9996352e11f68eba774698704dbf7204ac870ebaa6 # shrinks to moves = [0]
+cc e83c6b0a9696b12267529fade9b12fe3ebab45a979db3fc27e2011ce70154b40 # shrinks to moves = [11, 2, 12, 18, 25, 17, 3, 16, 9, 8, 3, 25, 22]

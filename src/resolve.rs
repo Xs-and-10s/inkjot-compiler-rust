@@ -66,6 +66,8 @@ pub const BUILTINS: &[&str] = &[
     "crossed",
     "moved",
     "taken",
+    // In a `[resolve]` passage: `threat.name`, `threat.target`, `threat.outcome`.
+    "threat",
     "yes",
     "no",
     "nobody",

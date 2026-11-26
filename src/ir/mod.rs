@@ -186,6 +186,43 @@ fn along(effect: &mut Value, text: &str) -> bool {
     true
 }
 
+/// `pattern rhyme: flame, frost, blink ~ repeat ~ one per round ~ recall
+/// first when … ~ falter instead of sunfall when …`.
+fn pattern(s: &Stmt, rest: &str) -> Value {
+    let (name, steps) = rest.split_once(':').unwrap_or((rest, ""));
+    let mut repeat = false;
+    let mut first = Vec::new();
+    let mut instead = Vec::new();
+    for c in &s.clauses[1..] {
+        let (head, when) = split_when(c.text.trim());
+        let words: Vec<&str> = head.split_whitespace().collect();
+        let when = when.unwrap_or(Value::Null);
+        match words.as_slice() {
+            ["repeat"] => repeat = true,
+            [threat, "first"] => first.push(Value::obj([
+                ("threat", Value::str(*threat)),
+                ("when", when),
+            ])),
+            [threat, "instead", "of", of] => instead.push(Value::obj([
+                ("threat", Value::str(*threat)),
+                ("of", Value::str(*of)),
+                ("when", when),
+            ])),
+            _ => {} // `one per round`: a pattern always gives one a round
+        }
+    }
+    Value::obj([
+        ("pattern", Value::str(name.trim())),
+        (
+            "steps",
+            strings(steps.split(',').map(str::trim).filter(|t| !t.is_empty())),
+        ),
+        ("repeat", Value::Bool(repeat)),
+        ("first", Value::Arr(first)),
+        ("instead", Value::Arr(instead)),
+    ])
+}
+
 /// `spreads 1 from ablaze to nearest(place, where: …) ~ along way ~ within 1
 /// ~ then set it.heat: 1`.
 fn spreads(s: &Stmt, rest: &str) -> Value {
@@ -744,6 +781,16 @@ impl Builder {
             f.phrase(&c.text);
         }
         let mut pairs = f.into_pairs();
+        // `threat sunfall: at pov.all`: whom it is at, worked out when it comes.
+        if kw == "threat" {
+            for (k, v) in pairs.iter_mut() {
+                if k == "at" {
+                    if let Value::Str(who) = v {
+                        *v = expression(&who.clone());
+                    }
+                }
+            }
+        }
         // A fact's text and a description are read, so they take emphasis;
         // a name does not.
         let texts: Vec<&str> = std::iter::once(value)
@@ -799,6 +846,17 @@ impl Builder {
             // `spreads 1 from ablaze to nearest(place, where: …) ~ along way
             // ~ within 1 ~ then set it.heat: 1`.
             "spreads" => return spreads(s, rest),
+            // `pattern rhyme: flame, frost ~ repeat ~ one per round ~ recall
+            // first when … ~ falter instead of sunfall when …`.
+            "pattern" => return pattern(s, rest),
+            // `encounter hask ~ round by round ~ acts last ~ until …`.
+            "encounter" => {
+                f.add("encounter", Value::str(value.trim()));
+                for c in &s.clauses[1..] {
+                    f.phrase(&c.text);
+                }
+                return Value::Obj(f.into_pairs());
+            }
             // `measure nights: nights` → `{"measure": "nights", "value": …}`.
             "measure" => {
                 let (name, expr) = rest.split_once(':').unwrap_or((rest, ""));
@@ -1285,6 +1343,14 @@ fn parameters(text: &str) -> Value {
 ///
 /// `set` and `say` get named fields, because their arguments are not plain tokens.
 pub(crate) fn effect(text: &str) -> Value {
+    // `set hask.grounded: yes next round`: a round is a turn.
+    if let Some(now) = text.trim().strip_suffix(" next round") {
+        let mut e = effect(now);
+        if let Value::Obj(pairs) = &mut e {
+            pairs.push(("delay".to_string(), Value::Num("1".to_string())));
+        }
+        return e;
+    }
     let (core, when) = split_when(text.trim());
     let verb = first_word(core);
     if STRETCH.contains(&verb) {
@@ -1382,6 +1448,10 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
     };
     // `on turn ends`: the turn has nothing it happens to.
     if event == "turn" && words.first() == Some(&"ends") {
+        words.remove(0);
+    }
+    // `on absorb with lumen`: what took it.
+    if event == "absorb" && words.first() == Some(&"with") {
         words.remove(0);
     }
     let by = words.iter().position(|w| *w == "by").map(|i| {

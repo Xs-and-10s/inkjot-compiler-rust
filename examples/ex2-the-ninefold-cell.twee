@@ -129,8 +129,11 @@ item chain: "fifteen feet of broken manacle chain" ~ rope ~ anchor
 item bone_pick: "a finger bone, filed to a point" ~ lockpick
 item lamp_oil: "a brass lamp, half full of oil" ~ in scriptorium
 item rustblade: "a notched arming sword" ~ like sword ~ in armory ~ hidden until armory.searched
-item abelard_sword: "Abelard’s longsword" ~ like sword ~ parries flame ~ in well
-item lumen: "Lumen, the holy sword of the Dawn" ~ like sword ~ holy ~ absorbs spells ~ in orrery ~ fixed until orrery.aligned
+item abelard_sword: "Abelard’s longsword" ~ like sword ~ deflects fire ~ in well
+item lumen: "Lumen, the holy sword of the Dawn" ~ like sword ~ holy ~ absorbs any ~ in orrery ~ fixed until orrery.aligned
+
+on absorb with lumen
+~ then set lumen.charged: yes
 item heart: "a brass sun that beats" ~ phylactery ~ in orrery ~ fixed until lumen.taken
 state charged: no ~ belongs to lumen
 state cracked: no ~ belongs to heart
@@ -166,6 +169,10 @@ npc jester: "the Jester" ~ like statue ~ weight light ~ moves 2 per chronon ~ in
 
 objective escape: "Get out of the Ninefold Cell" ~ done when pov.all.in(threshold)
 objective host: "Put the Hollow Host down" ~ after escape ~ done when hask.wards == 0
+(((
+Who holds the Host's heart, if anyone: the duel's pattern asks.
+)))
+get holder: one(character, where: it.holds.heart)
 
 :: roland [character]
 state rewound: no
@@ -177,18 +184,25 @@ act mend: cost 10 ~ cantrip ~ "knits a small break: a torn page, a cracked pin, 
 act tug: cost 10 ~ cantrip ~ "an unseen pull on something lighter than a book, within sight"
 act hush: cost 10 ~ cantrip ~ quiet ~ "swallows one sound for a moment"
 
-combo ember_lance: spark, gust, spark ~ spell ~ "flame, fanned, then lit into a lance"
-~ thaws ice ~ cracks glass
-combo rime_shield: chill, mend, chill ~ spell ~ "a shell of ice that heals its own cracks"
-~ shields target from the next spell
-combo frostglass: chill, gust ~ spell ~ "rimes a mirror over until it shows nothing"
-combo thunderclap: hush, gust, spark ~ spell ~ "a swallowed sound, carried, then let go at once"
-~ interrupts flame, frost
+combo ember_lance: spark, gust, spark ~ spell ~ fire ~ "flame, fanned, then lit into a lance"
+~ at character here ~ when target.frozen
+~ then set target.frozen: no
+combo rime_shield: chill, mend, chill ~ spell ~ frost ~ "a shell of ice that heals its own cracks"
+~ at character here
+~ then cover target
+combo frostglass: chill, gust ~ spell ~ frost ~ "rimes a mirror over until it shows nothing"
+~ at mirror here ~ when target.open
+~ then set target.open: no
+combo thunderclap: hush, gust, spark ~ spell ~ loud ~ "a swallowed sound, carried, then let go at once"
+~ then prevent hask when hask.rhyme.next in [flame, frost]
 combo backward_knot: mend, hush, tug, mend ~ spell ~ "ties the hour back on itself"
 ~ rewind ~ once per turn ~ requires pov.all alive
 
 act lodestone: cost 30 ~ spell ~ learned from lodestone
 ~ "makes one thing very, very heavy, for one breath"
+~ at npc here
+~ then set target.grounded: yes
+~ then pin target
 
 :: eldric [character]
 state chained: yes
@@ -207,7 +221,6 @@ state shown_heart: no
 state grounded: no
 state dodging: no
 state mortal: no
-get holder: one(character, holding: heart)
 --
 starts: sanctum
 
@@ -1101,28 +1114,28 @@ pattern rhyme: flame, frost, blink, sunfall ~ repeat ~ one per round
 ~ recall first when hask.saw_heart and holder != nobody and not heart.cracked
 ~ falter instead of sunfall when holder != nobody and not heart.cracked
 
-spell flame: at roland ~ then wound target 1
-~ blocked by shield, absorb, parry, interrupt ~ redirected by guard
-spell frost: at eldric ~ then freeze target
-~ kill target when target.frozen
-~ blocked by shield, absorb, interrupt
-spell blink: through mirror ~ then set hask.dodging: yes
+threat flame: fire ~ at roland ~ answered by prevent, block, cover, absorb
+~ then wound target 1
+threat frost: frost ~ at eldric ~ answered by prevent, cover, absorb
+~ then kill target when target.frozen
+~ then set target.frozen: yes
+threat blink ~ fails when count(mirror, in: here, where: it.open) == 0 or hask.pinned
+~ then set hask.dodging: yes
 ~ then set hask.grounded: yes next round
-~ fails when count(mirror, in: here, open: yes) == 0 or hask.pinned
 ~ on fail: set hask.grounded: yes
-spell sunfall: at pov.all ~ then kill target
-~ blocked by shield, absorb
-spell recall: at holder ~ then take heart
-~ blocked by shield, absorb, guard
-spell falter ~ then nothing
+threat sunfall: at pov.all ~ answered by cover, absorb
+~ then kill target
+threat recall: at holder ~ answered by block, cover, absorb
+~ then take heart
+threat falter
 
 :: sanctum [encounter]
 encounter hask
 ~ round by round
 ~ countdown 3s per act
-~ plus 2s when hinted
+~ plus 2s when me.asked_hint
 ~ timeout stay
-~ hask casts last
+~ acts last
 ~ until hask.wards == 0 or pov.all.down
 item east_mirror: "the east mirror" ~ like mirror
 item west_mirror: "the west mirror" ~ like mirror
@@ -1182,22 +1195,22 @@ He is on the floor, on his own two feet, within reach of a sword.
 Eldric is cased in ice to the shoulders.
 
 [end]
-> [[Ember Lance at Eldric’s ice->sanctum:lance]] ~ ember_lance ~ for roland ~ when eldric.frozen
-> [[Rime Shield on yourself->sanctum:shield]] ~ rime_shield ~ for roland ~ with {target: roland}
-> [[Rime Shield on Eldric->sanctum:shield]] ~ rime_shield ~ for roland ~ with {target: eldric}
-> [[Frostglass the east mirror->sanctum:frostglass]] ~ frostglass ~ for roland ~ with {mirror: east_mirror}
-> [[Frostglass the west mirror->sanctum:frostglass]] ~ frostglass ~ for roland ~ with {mirror: west_mirror}
-> [[Thunderclap->sanctum:thunderclap]] ~ thunderclap ~ for roland
-> [[Lodestone->sanctum:lodestone]] ~ lodestone ~ for roland ~ when roland.knows.lodestone
+> ~ for roland
+> [[Ember Lance at {target}’s ice->sanctum:lance]] ~ ember_lance
+> [[Rime Shield on {target}->sanctum:shield]] ~ rime_shield
+> [[Frostglass {target}->sanctum:frostglass]] ~ frostglass
+> [[Thunderclap->sanctum:thunderclap]] ~ thunderclap
+> [[Lodestone->sanctum:lodestone]] ~ lodestone ~ when roland.knows.lodestone
+> [[Hand him the heart->sanctum:hand_over]] ~ cost 0 ~ when me.holds.heart
+
+> ~ for eldric ~ when not eldric.frozen
+> [[Strike->sanctum:strike]] ~ strike ~ when hask.grounded and me.holds.any(sword)
+> [[Guard Roland->sanctum:guard]] ~ guard
+> [[Raise Lumen->sanctum:absorb]] ~ guard ~ when me.holds.lumen
+> [[Shatter {target}->sanctum:shatter]] ~ force ~ cost 20 ~ at mirror here ~ when target.open
+> [[Smash his heart->sanctum:smash]] ~ force ~ cost 20 ~ when me.holds.heart
+
 > [[Hold up his heart->sanctum:show_heart]] ~ cost 10 ~ when me.holds.heart and not hask.shown_heart
-
-> [[Strike->sanctum:strike]] ~ strike ~ for eldric ~ when hask.grounded and me.holds.any(sword) and not eldric.frozen
-> [[Guard Roland->sanctum:guard]] ~ guard ~ for eldric ~ when not eldric.frozen
-> [[Raise Lumen->sanctum:absorb]] ~ guard ~ for eldric ~ when me.holds.lumen and not eldric.frozen
-> [[Shatter a mirror->sanctum:shatter]] ~ force ~ cost 20 ~ for eldric ~ when not eldric.frozen
-> [[Smash his heart->sanctum:smash]] ~ force ~ cost 20 ~ for eldric ~ when me.holds.heart and not eldric.frozen
-> [[Hand him the heart->sanctum:hand_over]] ~ cost 0 ~ for roland ~ when me.holds.heart
-
 > [[As one->sanctum:as_one]]
 ~ cost 30 from roland
 ~ cost 20 from eldric
@@ -1206,23 +1219,19 @@ Eldric is cased in ice to the shoulders.
 > [[Let him cast->sanctum:spell]] ~ pass ~ ends turn
 
 :: sanctum:lance [act]
-set eldric.frozen: no
 --
 Spark, gust, spark: a lance of fire, aimed with great care at your only friend. The ice goes to steam. “Warn me next time.” “I just did.”
 
 :: sanctum:shield [act]
-shield target
 --
 Chill, mend, chill. Ice grows over {target.name} in a clear shell, sealing its own cracks as fast as they come.
 
 :: sanctum:frostglass [act]
-set mirror.open: no
 --
-Chill and gust: frost runs across {mirror.name} until it shows nothing at all.
+Chill and gust: frost runs across {target.name} until it shows nothing at all.
 
 :: sanctum:thunderclap [act]
 let next: hask.rhyme.next
-interrupt hask when next in [flame, frost]
 --
 Hush, gust, spark: you gather a silence, throw it, and let it go all at once. The crack slaps every candle flat.
 
@@ -1233,8 +1242,6 @@ The Host flinches, and whatever he was weaving comes apart in his fingers.
 He winces, but whatever he’s building is too big to drop.
 
 :: sanctum:lodestone [act]
-set hask.grounded: yes
-pin hask
 --
 Three words of weight. The Host drops out of the air like a dropped cloak and hits the flagstones on his knees, very surprised, and very, very heavy.
 
@@ -1266,20 +1273,17 @@ Lumen lets go of everything it has drunk, all at once, down the length of one st
 Steel meets a ward, and the ward rings, and cracks, and falls away like a pane of glass.
 
 :: sanctum:guard [act]
-guard roland
-~ parry with abelard_sword
-~ absorb with lumen
+block for roland
 --
 You step in front of Roland. Whatever comes for him will have to come through you.
 
 :: sanctum:absorb [act]
 absorb with lumen
-set lumen.charged: yes when absorbed
 --
 You raise Lumen like a lamp in a dark room.
 
 :: sanctum:shatter [act]
-set mirror.open: no
+set target.open: no
 --
 You put a fist, or a sword, through the nearest mirror. Glass rains. The Host makes a small hurt noise, as if you’d trodden on his foot.
 
@@ -1306,40 +1310,40 @@ Roland doesn’t aim at the lich. He aims at Eldric’s sword: spark, gust, spar
 
 :: sanctum:spell [resolve]
 --
-[if cast.spell == flame and cast.outcome == hit]
+[if threat.name == flame and threat.outcome == hit]
 Fire takes Roland full in the chest.
 
-[if cast.spell == flame and cast.outcome == guarded]
+[if threat.name == flame and threat.outcome == block]
 Eldric takes the fire meant for Roland on his own chest, and staggers, and stays up.
 
-[if cast.spell == flame and cast.outcome == parried]
+[if threat.name == flame and threat.outcome == deflect]
 Eldric turns the flame aside on Abelard’s blade, and it splashes harmless across the floor.
 
-[if cast.spell == frost and cast.outcome == hit]
+[if threat.name == frost and threat.outcome == hit]
 Ice climbs Eldric to the shoulders and holds him fast.
 
-[if cast.spell == blink and cast.outcome == hit]
+[if threat.name == blink and threat.outcome == hit]
 He steps into a mirror and out of the other, and lands on his feet, laughing.
 
-[if cast.spell == blink and cast.outcome == failed]
+[if threat.name == blink and threat.outcome == fail]
 He throws himself at the glass and hits frost, hard. He lands on the flagstones in a heap of robes.
 
-[if cast.spell == sunfall and cast.outcome == hit]
+[if threat.name == sunfall and threat.outcome == hit]
 Light, all of it, everywhere at once.
 
-[if cast.spell == recall and cast.outcome == hit]
+[if threat.name == recall and threat.outcome == hit]
 The heart leaps from your hand to his, like a dog called home.
 
-[if cast.outcome == shielded]
-The spell breaks on Roland’s ice and runs off it like rain off a window.
+[if threat.outcome == cover]
+The spell breaks on {threat.target}’s ice and runs off it like rain off a window.
 
-[if cast.outcome == absorbed]
+[if threat.outcome == absorb]
 Lumen drinks the spell whole and begins to glow.
 
-[if cast.outcome == interrupted]
+[if threat.outcome == prevent]
 Nothing comes. The spell died in his hands.
 
-[if cast.spell == falter]
+[if threat.name == falter]
 Nothing. He will not burn his own heart, and he knows you know it.
 
 [end]
