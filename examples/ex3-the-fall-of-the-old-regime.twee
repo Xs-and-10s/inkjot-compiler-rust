@@ -262,7 +262,7 @@ Jojo is holding something small and sharp in his teeth. He sets it down between 
 
 :: testament [scene]
 move lenny to under_table
-strike roomba on the_list
+strikethrough roomba on the_list
 --
 The cat flap bangs. Under the tablecloth comes an old grey cat with one and a half ears, smelling of forty bins.
 

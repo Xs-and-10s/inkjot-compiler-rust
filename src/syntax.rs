@@ -111,11 +111,45 @@ pub(crate) const SETTINGS: &[&str] = &[
 
 /// Effects: what a header line or a `then` clause can do.
 pub(crate) const EFFECTS: &[&str] = &[
-    "learn", "teach", "gain", "lose", "give", "set", "raise", "lower", "toggle", "burn", "light",
-    "wake", "move", "kill", "wound", "destroy", "detain", "add", "remove", "strike", "roll",
-    "play", "say", "stop", "fix", "take", "dash", "feign", "nothing", "wait", "reveal",
+    "learn",
+    "teach",
+    "gain",
+    "lose",
+    "give",
+    "set",
+    "raise",
+    "lower",
+    "toggle",
+    "burn",
+    "light",
+    "wake",
+    "move",
+    "kill",
+    "wound",
+    "destroy",
+    "detain",
+    "add",
+    "remove",
+    "strikethrough",
+    "roll",
+    "play",
+    "say",
+    "stop",
+    "fix",
+    "take",
+    "dash",
+    "feign",
+    "nothing",
+    "wait",
+    "reveal",
     // Encounters: counters, and what an Inker can do to the opponent.
-    "prevent", "block", "cover", "absorb", "pin", "skip", "end",
+    "prevent",
+    "block",
+    "cover",
+    "absorb",
+    "pin",
+    "skip",
+    "end",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -140,6 +174,7 @@ pub(crate) const RETIRED: &[(&str, &str)] = &[
     ("guard", "`guard x` is now `block for x`"),
     ("parry", "parrying is now a tag on the item: `~ deflects fire`"),
     ("freeze", "`freeze x` is now `set x.frozen: yes`"),
+    ("strike", "`strike x on list` is now `strikethrough x on list`; `inkjot migrate` rewrites it"),
 ];
 
 /// Words that may start a Link clause, besides the name of a declared act or combo.

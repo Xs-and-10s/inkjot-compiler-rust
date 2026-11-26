@@ -2542,7 +2542,7 @@ impl Run {
                         for span in label.runs {
                             let mut style = span.style.clone();
                             if e.struck {
-                                style.push("struck");
+                                style.push("strikethrough");
                             }
                             line.push(&span.text, &style);
                         }
@@ -2793,7 +2793,7 @@ impl Run {
                 self.change(f(e, "do").as_str().unwrap_or(""), &args)?
             }
             "add" => self.add(&args, clauses)?,
-            "remove" | "strike" => {
+            "remove" | "strikethrough" => {
                 let (item, list) = (word(0), word(2));
                 let entries = self
                     .lists

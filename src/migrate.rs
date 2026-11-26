@@ -190,10 +190,21 @@ fn renames(lines: &mut [String], passages: &[twee::Passage]) -> bool {
                 *raw = replace_word_at(raw, head.col, "told", "narration");
                 changed = true;
             }
+            // `strike x on list` → `strikethrough x on list` (v0.6, 26 Nov).
+            if s.kw == "strike" {
+                let raw = &mut lines[head.line - 1];
+                *raw = replace_word_at(raw, head.col, "strike", "strikethrough");
+                changed = true;
+            }
             for c in &s.clauses[1..] {
                 if c.text == "playable" {
                     let raw = &mut lines[c.line - 1];
                     *raw = replace_word_at(raw, c.col, "playable", "selectable");
+                    changed = true;
+                }
+                if c.text.starts_with("then strike ") {
+                    let raw = &mut lines[c.line - 1];
+                    *raw = replace_word_at(raw, c.col + 5, "strike", "strikethrough");
                     changed = true;
                 }
             }
@@ -323,6 +334,13 @@ fact is, this line is prose.
             .replace(":: hall\n", ":: hall\ntold: first person\n");
         let m = migrate(&src);
         assert!(m.source.contains("~ selectable"), "{}", m.source);
+        let struck = migrate(
+            ":: hall\nstrike ada on suspects\non take ring\n~ then strike ada on suspects\n--\nx\n",
+        );
+        assert_eq!(
+            struck.source,
+            ":: hall\nstrikethrough ada on suspects\non take ring\n~ then strikethrough ada on suspects\n--\nx\n"
+        );
         assert!(m.source.contains("narration: first person"), "{}", m.source);
         assert!(m.notes.is_empty(), "{:?}", m.notes);
         let report = crate::check(&m.source);

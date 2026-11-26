@@ -1486,7 +1486,7 @@
         },
         {
           "effect": {
-            "do": "strike",
+            "do": "strikethrough",
             "args": ["roomba", "on", "the_list"],
             "when": null
           }

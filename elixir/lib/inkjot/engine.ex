@@ -61,7 +61,7 @@ defmodule Inkjot.Engine do
   """
   @type pause :: %{ms: non_neg_integer(), kind: String.t()} | nil
   @typedoc """
-  A stretch of text in one style: `italic`, `bold`, `struck`, `redacted`.
+  A stretch of text in one style: `italic`, `bold`, `strikethrough`, `redacted`.
   A `redacted` run's text is `█`, one for each character hidden: the words
   never reach the page, only their length. Its pause is set only on a run
   appended after a wait (`[after 2s; append]`).

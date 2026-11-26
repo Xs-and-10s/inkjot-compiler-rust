@@ -200,7 +200,7 @@ fn the_new_words_are_checked() {
         .iter()
         .any(|e| e.contains("`absorb with item`")));
     let bad = CAVE.replace("~ then cover me", "~ then shield me");
-    assert!(errors(&bad).iter().any(|e| e.contains("is not an effect")));
+    assert!(errors(&bad).iter().any(|e| e.contains("is now `cover x`")));
     let old = CAVE.replace("threat roar ~ at me", "spell roar ~ at me");
     assert!(errors(&old).iter().any(|e| e.contains("now `threat`")));
 }

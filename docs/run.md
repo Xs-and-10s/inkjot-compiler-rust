@@ -136,8 +136,9 @@ backslash, and `\*` an asterisk that is not emphasis.
   more asterisks is plain text) is kept as styles, in
   prose, Link labels, and quoted text that is read: a `say` line, a hint, a
   fact's text, a description, a list entry. A name (`label`, `shown as`) and
-  a value (`set motto: "…"`) keep their asterisks. The terminal and `expect text:` see plain text; struck
-  list entries read `~~like this~~`.
+  a value (`set motto: "…"`) keep their asterisks. The terminal and `expect text:` see plain text; list
+  entries struck through (`strikethrough x on list`, style `strikethrough`)
+  read `~~like this~~`.
 
 **Names, as the reader knows them.** `{marge}` and `@marge` show what she is
 `shown as` until `reveal marge`, then her name. `{marge.name}` is always her
