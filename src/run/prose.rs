@@ -2,8 +2,8 @@
 //!
 //! The IR lowers emphasis to styled parts (`{"style": ["italic"], "parts":
 //! […]}`); the interpreter keeps the styles as it renders, so a runtime
-//! shows *italic* and **bold** without parsing anything. A struck list
-//! entry is a run styled `struck`.
+//! shows *italic* and **bold** without parsing anything. A struck-through
+//! list entry is a run styled `strikethrough`.
 //!
 //! `plain()` flattens a paragraph for the terminal and for `expect text:`:
 //! styles drop away, except that struck text is written `~~like this~~`.
@@ -30,7 +30,7 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Span {
     pub text: String,
-    /// `italic`, `bold`, `struck`, `redacted`, in that order; empty for
+    /// `italic`, `bold`, `strikethrough`, `redacted`, in that order; empty for
     /// plain text. A `redacted` run's text is `█`, one for each character
     /// hidden.
     pub style: Vec<&'static str>,
@@ -107,7 +107,7 @@ impl Para {
         }
         let mut style: Vec<&'static str> = style.to_vec();
         style.sort_by_key(|s| {
-            ["italic", "bold", "struck", "redacted"]
+            ["italic", "bold", "strikethrough", "redacted"]
                 .iter()
                 .position(|k| k == s)
         });
@@ -207,7 +207,7 @@ impl Para {
         self.runs
             .iter()
             .map(|r| {
-                if r.style.contains(&"struck") {
+                if r.style.contains(&"strikethrough") {
                     format!("~~{}~~", r.text)
                 } else {
                     r.text.clone()
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn struck_text_reads_struck() {
         let mut p = Para::default();
-        p.push("the vet", &["struck"]);
+        p.push("the vet", &["strikethrough"]);
         assert_eq!(p.plain(), "~~the vet~~");
     }
 }

@@ -88,7 +88,7 @@ decides who sees them.
 | `tags` | Its tags: `finale`, `ending`, `epilogue`, `act`. |
 | `pov` | Who the Linker looks through. |
 | `now` | The clock's stop. |
-| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `struck`, `redacted`. A `redacted` span's text is `█`, one for each character hidden: redacted words never reach the view, only their length. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`), `verse`, and `quote` (a `Quote { kind, by, first }` for a paragraph in a `[quote …]` block, `first` on the one that begins it); a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Text. |
+| `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `strikethrough`, `redacted`. A `redacted` span's text is `█`, one for each character hidden: redacted words never reach the view, only their length. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`), `verse`, and `quote` (a `Quote { kind, by, first }` for a paragraph in a `[quote …]` block, `first` on the one that begins it); a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Text. |
 | `links` | The Links offered: `{ id, label }`, the label a `Para`. |
 | `asks` | The open inputs: `{ kind, prompt, options, methods, length, voted }`. |
 | `over` | Nothing offered, nothing asked: the reading has ended. |

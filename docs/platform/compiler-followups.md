@@ -149,3 +149,22 @@ prose:
   cycle's position lives in state.
 
 **Meanwhile:** the stub keeps today's `shuffle`.
+
+## 11. Ex 7's Doppelgänger, on the platform (decided 25 Nov)
+
+The compiler's side is in the draft (milestone 21a). The platform's:
+
+- Presence, typing indicators and read receipts follow the face a seat
+  shows, not the account behind it, so a swap is not given away by who is
+  online.
+- Night results are shown in one batch, at the morning.
+- An irreversible night choice (a kill, a replacement) asks for
+  confirmation.
+- The replacer never sees the victim's private messages, history or
+  credentials: a swap is of fictional characters, never of people.
+- An asynchronous day is settled at its deadline (or when every ballot is
+  locked), not the moment someone reaches a majority; a short extension
+  when the lead changes near the deadline is allowed.
+- The engine's plain lines ("Gone in the night: …", "Missing in the night:
+  …") are shown whoever tells the morning.
+

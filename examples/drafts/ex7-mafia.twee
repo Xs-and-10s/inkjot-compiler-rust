@@ -70,6 +70,8 @@ character guest: "a guest" ~ selectable ~ custom ~ one per linker ~ pronouns cho
 ~ state marked_since: 0
 ~ state heard: no
 ~ state saved_last: nobody
+~ state method: kill
+~ state swapped: no
 character storyteller: "the Storyteller" ~ selectable ~ custom ~ sees all
 ~ when moderator == storyteller
 relation seat: each guest ~ ring ~ in order joined
@@ -123,7 +125,6 @@ state second: nobody ~ of guest
 Nights gone by, for the Long Night's calendar.
 )))
 state nights: 0
-state replacing: no
 state foreclosed: nothing
 state rumour_about: nobody ~ of guest
 state saved: nobody ~ of guest
@@ -223,6 +224,9 @@ state lynched_town: 0
 state draws: 0
 state takings: 0
 state faces: 0
+state disguised_lynched: 0
+state replaced_doctor: 0
+state replaced_detective: 0
 state debts_paid: 0
 state foreclosures: 0
 state returned: 0
@@ -244,6 +248,9 @@ measure doctor_lived: some guest where: it.alive and it.role == doctor
 measure detective_lived: some guest where: it.alive and it.role == detective
 measure takings: takings
 measure faces: faces
+measure disguised_lynched: disguised_lynched
+measure replaced_doctor: replaced_doctor
+measure replaced_detective: replaced_detective
 measure debts_paid: debts_paid
 measure foreclosures: foreclosures
 measure haul: count(haul)
@@ -292,7 +299,7 @@ tied. "Surprise us" draws among all four.
 @lamplighter Among you, tonight, {if members == 1 then "is one" else "are {members}"} of {syndicate.name}. By day they are {syndicate.townsfolk} like the rest of you. By night they are {syndicate.mafia}s, and people are {syndicate.kills}.
 
 [if syndicate.special == doppelganger]
-@lamplighter And when one of them kills, they may *become* the one they killed. Mind whom you think you are talking to.
+@lamplighter And when one of them kills, they may *become* the one they killed: once each, no more. A face taken leaves no body, only someone missing. Mind whom you think you are talking to.
 
 [if syndicate.special == collectors]
 @lamplighter The Collectors don’t kill. They call in debts, two a night. A marked name dies at the next nightfall, unless somebody pays, and the price is a vote.
@@ -393,9 +400,15 @@ The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it tur
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == none ~ consensus
 > [[{capital(syndicate.kills)}: {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target
 
+(((
+The Doppelgänger Clan. Each vote carries its voter's way of doing it:
+`me.method`. The one who does the deed (the first to vote for the victim
+chosen) does it their way. Each member may take a face once: a
+replacement the Doctor stops does not use it up.
+)))
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == doppelganger ~ consensus
-> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: yes
-> [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set replacing: no
+> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ when not me.swapped ~ then set victim: target ~ then set me.method: replace
+> [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set me.method: kill
 
 > ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus 2
 > [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: first(targets) ~ then set second: last(targets)
@@ -439,6 +452,9 @@ Is {target} one of them? You find out, by ways of your own.
 :: night:done
 (((
 Waits for everyone. When the last player has chosen, the night is over.
+The night has a deadline too (milestone 21's `~ consensus`): when it
+comes, the votes cast count, and a syndicate that has cast none kills
+nobody.
 )))
 --
 You wait for the others.
@@ -459,6 +475,7 @@ Who does the deed for the syndicate: the first member who placed their
 vote on the target chosen.
 )))
 let first_voter: first(victim.chosen_by)
+let replacing: syndicate.special == doppelganger and first_voter.method == replace
 let taken: top of victim.keepsake
 set taken.owner: victim when syndicate.special == heist and victim != nobody
 set report: "A quiet night. Too quiet, somebody says, and is told to shut up."
@@ -475,31 +492,47 @@ set victim.team: cult when victim != nobody and syndicate.special == cult
 teach victim cult_secret when victim != nobody and syndicate.special == cult
 teach victim cult_calendar when victim != nobody and syndicate.special == cult
 (((
-The Doppelgänger's swap happens before the report is written, so the
-report names the face on the body: the killer's old one. The killer is
-the first who voted for the victim.
+The Doppelgänger's swap happens before the report is written. The killer
+(the first who voted for the victim, by their own method) wears the
+victim's face from now on; the victim's seat, out of the game, carries the
+killer's old name, and the report calls that name missing: there is no
+body. One face each.
 )))
-set first_voter.shown_as: victim.name when syndicate.special == doppelganger and replacing and victim != nobody
-set victim.shown_as: first_voter.name when syndicate.special == doppelganger and replacing and victim != nobody
+set first_voter.shown_as: victim.name when replacing and victim != nobody
+set victim.shown_as: first_voter.name when replacing and victim != nobody
+set first_voter.swapped: yes when replacing and victim != nobody
+raise replaced_doctor 1 when replacing and victim != nobody and victim.role == doctor
+raise replaced_detective 1 when replacing and victim != nobody and victim.role == detective
 move taken to first_voter.loot when syndicate.special == heist and victim != nobody
 raise saves 1 when foiled
 raise takings 1 when victim != nobody and syndicate.special == cult
-raise faces 1 when victim != nobody and syndicate.special == doppelganger and replacing
+raise faces 1 when victim != nobody and replacing
 (((
 The taking is secret, and a mark is read from the slate, so only deaths
 and thefts make the report.
 )))
-set report: "{victim} {flourish}." when victim != nobody and syndicate.special in [none, doppelganger, heist]
+set report: "{victim} {flourish}." when victim != nobody and syndicate.special in [none, doppelganger, heist] and not replacing
+set report: "{victim} is missing. There is no body, and nobody died." when victim != nobody and replacing
 set report: "Nobody died. Someone at this table will never know how close it came." when foiled and syndicate.special in [none, doppelganger]
 set report: "The Collector knocked at a lodging house last night. {capital(syndicate.doctor)} said there was nobody of that name living there." when foiled and syndicate.special == collectors
 set report: "Somebody sat up all night with their back to the window, and somebody who used to love the lamp talked to them until dawn." when foiled and syndicate.special == cult
 --
-[if syndicate.special == doppelganger and replacing and victim != nobody; then play morning:replaced]
+[if replacing and victim != nobody; then play morning:replaced]
 [if syndicate.special == collectors; then play morning:debts]
 [if syndicate.special == heist and victim != nobody; then play morning:missing]
 
 [if me.heard and rumour_about != nobody]
 Somebody leaned over at breakfast and told you something about {rumour_about}. You are not sure it is true. You are not sure it isn’t.
+
+(((
+What happened, plainly, whoever tells it: a MonkeyPaw or a Storyteller may
+tell the night their way, but never instead of the facts.
+)))
+[if moderator != engine and victim != nobody and syndicate.special in [none, doppelganger] and not replacing]
+@lamplighter Gone in the night: {victim}.
+
+[if moderator != engine and victim != nobody and replacing]
+@lamplighter Missing in the night: {victim}. Nobody died.
 
 [if moderator == engine]
 @lamplighter {report}
@@ -533,17 +566,15 @@ pending: by monkeypaw ~ brief morning ~ timeout 10s
 (((
 The Doppelgänger. The clan member who killed wears the victim's face from
 now on: the platform shows the killer's seat under the victim's name, and
-the morning reports the killer's old name as the dead. Names are swapped
-(in the morning's header); roles are not.
+the morning reports the killer's old name missing. Names are swapped (in
+the morning's header); roles are not. A swap is a clue the town is meant
+to have: one of the living is not who they seem.
 )))
 --
-At first light, under a dusting of snow on the terrace: {victim}. The face is {possessive(victim)} face. Everyone says so. Everyone is very sure.
+At first light, a bed not slept in: {possessive(victim)}. The sanatorium is searched from the boiler room to the bell. There is no one to find.
 
 (((
-Fiction for the swap: the clan member leaves their old face on the body
-and walks away in the victim's. So the town finds the killer's face on
-the dead, and reports the killer dead. No pronouns here: the body's
-pronouns would be the victim's, and would give the swap away.
+No pronouns here: they would be the victim's, and give the swap away.
 )))
 
 :: morning:debts
@@ -601,6 +632,7 @@ set lynched: accusation.who
 set lynched.alive: no
 raise lynched_syndicate 1 when lynched.team != town
 raise lynched_town 1 when lynched.team == town
+raise disguised_lynched 1 when lynched.shown_as != lynched.name
 raise draws 1 when accusation.drawn
 set each guest.voteless: no
 (((

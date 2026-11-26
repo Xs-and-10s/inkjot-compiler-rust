@@ -67,8 +67,9 @@ the place and year, the roles' titles, how people die, and a list of
 flourishes for each death, so the theme builds as the bodies fall. Four
 special syndicates change the rules:
 
-- **the Doppelgänger Clan**: a killer takes the victim's face, so the
-  morning reports the wrong death;
+- **the Doppelgänger Clan**: a killer may take the victim's face, once
+  each; the morning finds no body, only the killer's old name missing
+  (revised 25 Nov 2026, from a game designer's notes);
 - **the Debt Collectors**: they mark two names a night instead of
   killing, and a marked name dies at the next nightfall unless someone
   pays with their vote;
@@ -125,7 +126,7 @@ the questions they answer are the ones the tuning asked:
 | Do games run too long or too short? | `nights`, by `players` and `special` |
 | Does the town read the table, or vote at random? | `lynched_syndicate` against `lynched_town`, `draws`, `finds` |
 | Are the Doctor and the Detective too strong or too weak? | `saves`, `finds`, `doctor_lived`, `detective_lived` |
-| Does each special's rule do what it was tuned to? | `takings` (Cult), `faces` (Doppelgänger), `debts_paid` and `foreclosures` (Collectors), `haul`, `haul_needed` and `returned` (Heist) |
+| Does each special's rule do what it was tuned to? | `takings` (Cult), `faces`, `disguised_lynched`, `replaced_doctor` and `replaced_detective` (Doppelgänger), `debts_paid` and `foreclosures` (Collectors), `haul`, `haul_needed` and `returned` (Heist) |
 | Do tables ask for specials, and does the moderator change the game? | `asked_for_special`, `moderator` |
 
 The first number to watch: the town's win rate per special and size, set

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Milestone 21a: the Doppelgänger pass, and `strikethrough`
+
+- Ex 7's Doppelgänger Clan, as agreed on 25 Nov 2026: each vote carries
+  its voter's method (`me.method`), and the one who does the deed does it
+  their way; one face each (`me.swapped`), a stopped replacement not
+  counting; a replacement leaves no body, and the morning says the old
+  name is missing; the engine's plain lines ("Gone in the night", "Missing
+  in the night") are shown whoever tells the morning; new measures
+  `disguised_lynched`, `replaced_doctor`, `replaced_detective`; the
+  night's deadline noted for `~ consensus`. The platform's side is in
+  `docs/platform/compiler-followups.md`, 11.
+- `strike x on list` is now `strikethrough x on list`, and the style
+  `struck` is `strikethrough` (a change the platform sees in a run's
+  `style`). `inkjot migrate` rewrites `strike`; `strike` as a statement or
+  effect is an error that says so. Ex 3's IR fixture changed with it.
+- The plan, decided 26 Nov 2026, in `docs/status.md`: milestone 23,
+  encounters generalized (Ex 11 and Ex 13); 24, closing v0.6; Ex 10, Ex
+  12 and groups in v0.7.
+
 ### Milestone 20d: encounters
 
 - `[encounter]` passages with `encounter x ~ round by round ~ acts last ~

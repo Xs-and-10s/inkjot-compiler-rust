@@ -1585,6 +1585,9 @@ impl Checker {
             *self.stretch.entry(verb.to_string()).or_default() += 1;
             return;
         }
+        if let Some((_, now)) = RETIRED.iter().find(|(w, _)| *w == verb) {
+            return self.err(line, col, now.to_string());
+        }
         if !EFFECTS.contains(&verb) {
             let shown = if verb.is_empty() { text } else { verb };
             return self.err(line, col, format!("`{shown}` is not an effect"));
@@ -1663,10 +1666,10 @@ impl Checker {
                     self.err(line, col, "`set` is written `set name: value`");
                 }
             }
-            "add" | "strike" | "remove" => {
+            "add" | "strikethrough" | "remove" => {
                 let marker = match verb {
                     "add" => "to",
-                    "strike" => "on",
+                    "strikethrough" => "on",
                     _ => "from",
                 };
                 match words.iter().rposition(|w| *w == marker) {

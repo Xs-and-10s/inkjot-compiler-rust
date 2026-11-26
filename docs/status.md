@@ -84,13 +84,51 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      the face, not the account, night results in one batch, irreversible
      night choices confirmed, the replacer never sees the victim's private
      messages, and an asynchronous day settled at its deadline.
+     21a (#45) did the Doppelgänger pass, and renamed the list effect
+     `strike` (and the style `struck`) to `strikethrough`, decided 26 Nov
+     2026. 21 also builds `turn ends when` (Ex 2 declares it).
    - 22, **Inklog**: rules, `{{ }}`, knowledge bases, `assert` and
      `retract`, quantifiers, facts at a time, `never`, `{note input}`. Done
      when Ex 6's public cut runs and Ex 5 is brought up to date.
-   - 23, **close v0.6**: `define` step 2 if it still earns its place, the
-     IR frozen, release v0.6.0.
+   - 23, **encounters, generalized** (decided 26 Nov 2026): `encounter`
+     stays and is documented as any exchange in rounds, not only a fight;
+     `~ as fight | negotiation | seduction | discovery | other`, settable
+     mid-scene, a label for conditions, the platform and the Inker's
+     reports, not separate rules; `unleash x` (from the world) and `unleash
+     x ~ by y` (from someone), a threat outside a round; the outcome `hit`
+     renamed `landed`; an opponent's moves chosen by condition or weight,
+     not only a fixed pattern; and what Ex 11 asks for (several opponents,
+     pattern phases, resistances and weaknesses, cooldowns, one command per
+     ally a round). Drafts first, as with Ex 6 to 9. Done when Ex 11 and
+     Ex 13 run.
+   - 24, **close v0.6**: `retell`, `define` step 2 if it still earns its
+     place, the IR frozen, release v0.6.0. **Then the platform**, with
+     v0.7 alongside.
    - To v0.7: engine timers for effect chains that wait on the clock;
-     `define` steps 1 and 3; facets and `~ conflict`.
+     `define` steps 1 and 3; facets and `~ conflict`; Ex 10 and Ex 12;
+     groups (below).
+
+**Groups** (proposed 26 Nov 2026, for v0.7, with Ex 12): one declaration
+for any body of people, named or faceless or both: an army, a party, the
+CIA, a visiting team, a religion and its sects. `group fleet: "the Fifth
+Fleet" ~ size 3000 ~ members vance, okafor ~ part of navy`: `size` counts
+everyone, the named among them; `part of` nests (a sect in a religion, a
+command in an army); `x.in_group(fleet)`, `count(person, where:
+it.in_group(cia))`; a group may be a threat's target, have goals like an
+NPC, stand in a relation (`trust` with a faction), and lose `size` in a
+battle without anyone being named. Ex 7's `team` is a group in all but
+name. The word is `group`: `faction` and `side` assume a quarrel, `party`
+and `company` have other meanings, `cohort` is taken by the Linkers, and
+`host` by Ex 2's lich.
+
+## Ex 10 to 13 (decided 26 Nov 2026)
+
+| Ex | What | When | Lives | Tests most |
+|---|---|---|---|---|
+| 10 | A period social `story-game` after *Pride and Prejudice* (public domain), a small section of it played | v0.7 | here, unless decided otherwise | encounters `~ as seduction` and `~ as negotiation`, reputation as a value, gossip that spreads among acquaintances, several people in one scene |
+| 11 | A JRPG-style fantasy and science-fiction `game`, one level and its boss: a party of four rebel scouts of different classes, hunted by an empire, getting something in and out. One leader, commands to the other three; the leader may be switched | v0.6, milestone 23 | here, an original setting | several allies and opponents, one command each a round, classes as archetypes, resistances, pattern phases, cooldowns |
+| 12 | A military-science-fiction `story`: a commander wins before the battle, by reading the enemy and baiting a chain of small mistakes, in the vein of Gordon R. Dickson's *Tactics of Mistake* without borrowing from it | v0.7 | to be decided | groups, NPC goals at army scale, Inklog on the enemy's intent |
+| 13 | A debate `game`: an amicable argument with a Protestant relative on eternal security ("once saved, always saved"), from traditional Catholic teaching (Trent's decree on justification; Aquinas; Cornelius à Lapide), with logic, scripture and analogy. Win (defend the position), convince, both, tie or lose. No Inquests, no rewinds; hints as recollections of what he said before. His side argued at its strongest, so that a win means something | v0.6, milestone 23 | here (decided: an acceptance test, not a Library piece) | a verbal encounter: objections as threats, answers as counters, conviction and understanding as values, outcome tiers |
 
 ## Ex 6 to 9
 
