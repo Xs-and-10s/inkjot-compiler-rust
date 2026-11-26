@@ -739,6 +739,9 @@ impl Builder {
 
     /// `item cufflink: "a scorched cufflink" ~ evidence ~ in dining`
     fn declaration(&self, s: &Stmt, kw: &str, rest: &str) -> Value {
+        if kw == "period" {
+            return period(s);
+        }
         let (id, value) = rest.split_once(':').unwrap_or((rest, ""));
         let (value, when) = split_when(value.trim());
         let mut f = Fields::new(&self.stats);
@@ -1380,6 +1383,10 @@ pub(crate) fn effect(text: &str) -> Value {
                 pairs.push(("until".into(), Value::str(until.trim())));
             }
         }
+        // `wait until night`, `wait until new_years_eve.nine`.
+        "wait" if rest.starts_with("until ") => {
+            pairs.push(("until".into(), Value::str(rest["until ".len()..].trim())));
+        }
         "say" => {
             pairs.push(("who".into(), Value::str(first_word(rest))));
             pairs.push(("text".into(), quoted_styled(rest).unwrap_or(Value::Null)));
@@ -1435,6 +1442,41 @@ fn clause(text: &str) -> Value {
     Value::Obj(pairs)
 }
 
+/// `period phase: night 1, day 1`, `period season: spring, summer ~ 3
+/// each`, `period day: monday, tuesday ~ of watch`: its names, and how
+/// long each lasts (`lengths`, one each; `each`, the same for all; `of`,
+/// one round of another period). A period the checker refused is lowered
+/// as far as it reads.
+fn period(s: &Stmt) -> Value {
+    let text = s
+        .clauses
+        .iter()
+        .map(|c| c.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ~ ");
+    let mut pairs = vec![("declare".to_string(), Value::str("period"))];
+    match crate::period::Period::parse(&text) {
+        Ok(p) => {
+            pairs.push(("id".into(), Value::str(&p.name)));
+            pairs.push(("names".into(), strings(p.names.iter().map(String::as_str))));
+            match p.each {
+                crate::period::Each::Own(lens) => pairs.push((
+                    "lengths".into(),
+                    Value::Arr(lens.into_iter().map(num).collect()),
+                )),
+                crate::period::Each::Turns(n) => pairs.push(("each".into(), num(n))),
+                crate::period::Each::Of(unit) => pairs.push(("of".into(), Value::str(unit))),
+            }
+        }
+        Err(_) => {
+            let rest = text.trim_start_matches("period").trim();
+            let id = rest.split(':').next().unwrap_or("").trim();
+            pairs.push(("id".into(), Value::str(id)));
+        }
+    }
+    Value::Obj(pairs)
+}
+
 /// `on [before|after] event [what] [by who] [when …]` and its clauses.
 fn handler(rest: &str, clauses: &[Clause]) -> Value {
     let (head, when) = split_when(rest);
@@ -1447,7 +1489,7 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
         }
         _ => "after",
     };
-    let event = if words.is_empty() {
+    let mut event = if words.is_empty() {
         ""
     } else {
         words.remove(0)
@@ -1455,6 +1497,13 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
     // `on turn ends`: the turn has nothing it happens to.
     if event == "turn" && words.first() == Some(&"ends") {
         words.remove(0);
+    }
+    // `on turn begins`, `on phase begins night`, `on hour ends eleven`:
+    // the event is the beginning or end; the period is said apart.
+    let mut period = None;
+    if matches!(words.first(), Some(&("begins" | "ends"))) {
+        period = Some(event);
+        event = words.remove(0);
     }
     // `on absorb with lumen`: what took it.
     if event == "absorb" && words.first() == Some(&"with") {
@@ -1484,7 +1533,7 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
             tags.push(text);
         }
     }
-    Value::obj([
+    let mut pairs = vec![
         ("on", Value::str(event)),
         ("timing", Value::str(timing)),
         ("what", strings(words)),
@@ -1494,7 +1543,11 @@ fn handler(rest: &str, clauses: &[Clause]) -> Value {
         ("once", Value::Bool(once)),
         ("at_most", at_most),
         ("tags", strings(tags)),
-    ])
+    ];
+    if let Some(period) = period {
+        pairs.insert(1, ("period", Value::str(period)));
+    }
+    Value::obj(pairs)
 }
 
 /// `item here where: not it.lit` → `{"kind": "item", "here": true, "where": …}`.

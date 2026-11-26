@@ -53,6 +53,12 @@ impl Run {
             if before != event.before {
                 continue;
             }
+            // `on phase begins night`: the period must be the event's too.
+            if let Some(period) = f(handler, "period").as_str() {
+                if event.what.split('.').next() != Some(period) {
+                    continue;
+                }
+            }
             // `what`: the handler's first word after the event must name the thing.
             // A kind, a tag or an archetype names every thing of it:
             // `on enter place`, `on enter shaft`.

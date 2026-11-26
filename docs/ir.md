@@ -382,6 +382,15 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 21c: `period` declarations, `{"declare": "period", "id":
+  "phase", "names": ["night", "day"]}` with one of `"lengths": [1, 1]`,
+  `"each": 3` or `"of": "watch"`; handlers `{"on": "begins", "period":
+  "phase", "what": ["night"]}` (and `"ends"`; `"period": "turn"` for `on
+  turn begins`; `on turn ends` is still `{"on": "turn"}`); the effect
+  `{"do": "wait", "until": "night"}` (or `"tuesday.dusk"`); a clock's
+  range may hold paths of period names (`{"get": ["new_years_eve",
+  "eight"]}`), which the engine reads in turns. A Link's `after` (`"5m"`)
+  was already in the IR; it now means a Link taken by itself in real time.
 - Milestone 20d: `threat` declarations (`at` an expression, `answered_by`,
   `fails_when`, `on_fail`, `then`, the tag among `tags`); `pattern`
   statements, `{"pattern": "rhyme", "steps": […], "repeat": true,

@@ -29,6 +29,7 @@ mod atoms {
         error,
         take_link,
         take_fork,
+        wait,
         answer,
         vote,
         nib,
@@ -167,6 +168,7 @@ fn view_term<'a>(env: Env<'a>, v: &View) -> Term<'a> {
                     ("id", l.id.encode(env)),
                     ("label", l.label.plain().encode(env)),
                     ("runs", runs_term(env, &l.label)),
+                    ("due_in", l.due_in.encode(env)),
                 ],
             )
         })
@@ -220,6 +222,7 @@ fn action_term<'a>(env: Env<'a>, a: &Action) -> Term<'a> {
         Action::Answer(words) => (atoms::answer(), words).encode(env),
         Action::Vote { who, how, proof } => (atoms::vote(), who, how, proof).encode(env),
         Action::TakeFork { fork, from } => (atoms::take_fork(), fork, from).encode(env),
+        Action::Wait(ms) => (atoms::wait(), ms).encode(env),
     }
 }
 
@@ -241,13 +244,15 @@ fn decode_start(t: Term) -> NifResult<Start> {
     Ok(start)
 }
 
-/// `{:take_link, id}`, `{:answer, [words]}`, `{:vote, who, how, [proof]}`.
+/// `{:take_link, id}`, `{:answer, [words]}`, `{:vote, who, how, [proof]}`,
+/// `{:take_fork, fork, from}`, `{:wait, ms}`.
 fn decode_action(t: Term) -> NifResult<Action> {
     let parts = rustler::types::tuple::get_tuple(t)?;
     let tag: Atom = parts.first().ok_or(rustler::Error::BadArg)?.decode()?;
     match (parts.len(), tag) {
         (2, a) if a == atoms::take_link() => Ok(Action::TakeLink(parts[1].decode()?)),
         (2, a) if a == atoms::answer() => Ok(Action::Answer(parts[1].decode()?)),
+        (2, a) if a == atoms::wait() => Ok(Action::Wait(parts[1].decode()?)),
         (2, a) if a == atoms::take_fork() => Ok(Action::TakeFork {
             fork: parts[1].decode()?,
             from: None,

@@ -39,6 +39,7 @@ expect text: "I told you it was good."
 | `given: effect` | Change the state directly: `given: learn two_hands` |
 | `do: "label"` | Take the available Link with this label |
 | `do: hall#2` | Take a Link by its id |
+| `do: wait 5m` | Real time passes: a Link timed `~ after 5m` is taken by itself |
 | `expect: expression` | The expression holds now |
 | `expect text: "…"` | The text shown since the last `do` contains this |
 | `expect no text: "…"` | …does not contain this |
@@ -305,7 +306,9 @@ on enter shaft by me when entered.burnt
 ```
 
 `by me` keeps a handler to what the pov does; without it, an NPC walking
-into a shaft would count too. `on turn ends` is `on turn`.
+into a shaft would count too. `on turn ends` is `on turn`; `on turn
+begins`, `on phase begins night` and `on hour ends eleven` are in "The
+clock's names", below.
 
 | Event | When | `what` |
 |---|---|---|
@@ -318,6 +321,7 @@ into a shaft would count too. `on turn ends` is `on turn`.
 | `raise`, `lower`, `set` | a value changes | the value, `cleverness` or `glyph.broken` |
 | `move` | anyone changes place, after `leave` and `enter` | who moved |
 | `turn` | a turn ends | — |
+| `begins`, `ends` | a turn, or a period's name: `on turn begins`, `on phase begins night` | the name, or nothing for any of them |
 | `death` | anyone dies | — (`actor` is who died) |
 | `loud` | a pov does a `loud` act, or takes a Link marked `~ loud` | the act |
 | `out` | a fuse burns down | the fuse |
@@ -410,7 +414,8 @@ the Links are offered again for the world as it is now. Not a turn: a hint,
 switching pov, going back (`[[Undo->rewind]]` and the menu it opens), a
 `pass` (which ends the turn itself), or a Link that leads to an ending.
 Without `each action`, turns end as before: on a `pass`, or on a walk in a
-world of stops.
+world of stops, or when `turn ends when` says (below). Under `each action`,
+what a Link shows is told before its turn ends.
 
 **Effects on the clock.** A timing clause belongs to the effect before it,
 on a header line, after a Link's or an act's `~ then`, or in a handler:
@@ -443,6 +448,63 @@ handlers. An act does not move the pov, wherever its passage is kept: a
 spellbook's act is done where they stand.
 
 `x.place` is where a person or thing is: `{gleaner.place}`.
+
+## The clock's names
+
+```text
+period phase: night 1, day 1
+period watch: dawn 1, day 2, dusk 1
+period weekday: monday, tuesday ~ of watch
+clock: monday.dawn ..= tuesday.dusk
+
+on phase begins day
+~ then say lamplighter "Morning."
+> [[Night falls->night]] ~ for cohort ~ then wait until night
+> [[To the vote->vote]] ~ for cohort ~ after 5m
+```
+
+**Periods.** A `period` names stretches of the clock: its names, and how
+many turns each lasts (`dawn 1, day 2`), the same for all (`~ 3 each`), or
+one round of another period (`~ of watch`). A time is a name, `night`, or a
+path from an outer period in, `tuesday.dusk`. The clock's range may be
+written in them: `clock: monday.dawn ..= tuesday.dusk` is `0..=7`, and the
+clock starts at its first stop.
+
+**Reading it.** `clock.weekday` and `clock.watch` are the names it is now;
+`clock.now` is still the turn. Names of one period compare in its order:
+`clock.watch >= day`, `clock.hour in [eight, midnight]`. `once per hour`
+is once in each hour.
+
+**Beginnings and ends.** When a turn ends, each name that ends with it fires
+`on watch ends day`, innermost first; the clock moves on; then each name
+that begins fires `on weekday begins tuesday` and `on watch begins dawn`,
+outermost first, then `on turn begins`. A name with no name after it (`on
+watch begins`) fires for each. The first turn is the start, not a
+beginning: `on start` is for it. A clock at its last stop does not move,
+and nothing ends or begins.
+
+**`wait until night`** ends turns, each as usual, until a night begins. If
+one begins on this turn, there is nothing to wait for. A clock with a last
+stop stops there, whatever is still to come. Under `each action`, the turns
+waited are the action's: it does not end one more.
+
+**`turn ends when`.** `clock: 0.. ~ turn ends when pov.all.spent or
+pov.all.passed` ends a turn when its condition holds after an action,
+rather than on each `pass`. A `pass` says the pov is done for the turn
+(`me.passed`, until the turn ends); `x.spent` says x has none left of what
+Links cost (`default cost: vults`). In Ex 2, the turn ends when both heroes
+have passed, or both have spent their vults. A Link `~ ends turn` still
+ends it at once.
+
+**Real time.** A Link `~ after 5m` (or `30s`, `400ms`, `2h`) is timed: it
+is offered, with the time it has left, but cannot be taken; when its time
+has passed, it is taken by itself, by whoever it is offered to (a `~ for
+cohort` Link once, for the whole table). Its time runs from when it was
+first offered in this turn, by its id, and starts again when the turn ends.
+The interpreter has no clock of its own: the platform says how much time
+has passed (`Action::Wait`, `docs/engine.md`), and a test says `do: wait
+5m`. Ex 7's day lasts five minutes this way, and its night has a deadline:
+Dawn, on the night's first page, is taken two minutes after nightfall.
 
 ## Things in the hand
 
@@ -879,5 +941,4 @@ It says so, by name, if a story needs one of these. It never guesses.
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
   `target`, `secret`, `roll`, `note`, `act`.
 - `retell`.
-- `turn ends when …` (Ex 2's): a turn ends on a `pass` or `ends turn`
-  Link, or each action under `~ each action`.
+

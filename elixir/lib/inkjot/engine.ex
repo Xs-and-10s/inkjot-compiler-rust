@@ -41,6 +41,7 @@ defmodule Inkjot.Engine do
           | {:answer, [String.t()]}
           | {:vote, who :: String.t(), how :: String.t(), proof :: [String.t()]}
           | {:take_fork, fork :: String.t(), from :: String.t() | nil}
+          | {:wait, ms :: non_neg_integer()}
 
   @type code ::
           :bad_ir
@@ -84,7 +85,17 @@ defmodule Inkjot.Engine do
           verse: boolean(),
           quote: quote_block()
         }
-  @type link :: %{id: String.t(), label: String.t(), runs: [run()]}
+  @typedoc """
+  A Link offered. `due_in` is set on a Link timed in real time (`~ after
+  5m`): it cannot be taken, and is taken by itself that many milliseconds
+  from now, once `act(state, {:wait, ms})` says the time has passed.
+  """
+  @type link :: %{
+          id: String.t(),
+          label: String.t(),
+          runs: [run()],
+          due_in: non_neg_integer() | nil
+        }
   @type ask :: %{
           kind: String.t(),
           prompt: String.t(),

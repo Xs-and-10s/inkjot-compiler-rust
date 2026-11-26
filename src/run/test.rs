@@ -159,6 +159,22 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                 let effect = crate::ir::effect(value);
                 run.apply(&effect, &[]).and_then(|()| run.settle_deaths())
             }
+            // `do: wait 5m`: real time passes, and timed Links are taken.
+            "do" if value.starts_with("wait ") => {
+                collect(&mut run, &mut shown);
+                let tag = seat_tag(&run);
+                let mine = shown.remove(&run.pov).unwrap_or_default();
+                out.transcript
+                    .extend(mine.into_iter().map(|l| format!("{tag}{l}")));
+                events.clear();
+                let ms = super::clock::millis(&value["wait ".len()..])
+                    .ok_or_else(|| format!("`do: {value}`: a time such as `5m` or `30s`"));
+                let waited = ms.and_then(|ms| run.wait(ms));
+                note_events(&mut run, &mut events);
+                out.transcript.push(format!("{tag}> ({value})"));
+                collect(&mut run, &mut shown);
+                waited
+            }
             "do" => {
                 if !started {
                     started = true;

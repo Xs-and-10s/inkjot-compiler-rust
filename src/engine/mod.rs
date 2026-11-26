@@ -390,6 +390,9 @@ pub enum Action {
     /// from, when it is a later one (`~ inquest from`); the state taken from
     /// is then the earlier visit's.
     TakeFork { fork: String, from: Option<String> },
+    /// Real time passes, in milliseconds, as the platform counts it: a
+    /// Link timed `~ after 5m` is taken by itself when its time comes.
+    Wait(u64),
 }
 
 /// A Link as the Linker sees it.
@@ -398,6 +401,10 @@ pub struct Link {
     pub id: String,
     /// The label, with its styles: `Para::plain()` reads it as text.
     pub label: Para,
+    /// A Link timed `~ after 5m` cannot be taken; it is taken by itself
+    /// this many milliseconds from now, when the platform says that much
+    /// time has passed (`Action::Wait`). `None` for every other Link.
+    pub due_in: Option<u64>,
 }
 
 /// What the Linker sees now.
@@ -484,6 +491,11 @@ impl State {
         &self.inklink
     }
 
+    /// Let real time pass: `ms` milliseconds.
+    pub fn wait(&self, ms: u64) -> Result<State, Refused> {
+        self.act(&Action::Wait(ms))
+    }
+
     /// Take an offered Link.
     pub fn take_link(&self, id: &str) -> Result<State, Refused> {
         self.act(&Action::TakeLink(id.to_string()))
@@ -510,7 +522,11 @@ impl State {
                 .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
             Ok(found
                 .into_iter()
-                .map(|(id, label)| Link { id, label })
+                .map(|(id, label)| Link {
+                    id,
+                    label,
+                    due_in: None,
+                })
                 .collect())
         })
     }
@@ -547,6 +563,7 @@ impl State {
                     let from = from.as_deref().filter(|f| *f != self.view.nib);
                     (run.choose_fork(fork, from), RefusedKind::StoryError)
                 }
+                Action::Wait(ms) => (run.wait(*ms), RefusedKind::StoryError),
             };
             if let Err(why) = done {
                 return Err(classify(&run, why, otherwise));
@@ -581,6 +598,18 @@ impl State {
                 RefusedKind::NotOffered,
                 format!("no Link `{id}` is offered here"),
             )),
+            Action::TakeLink(id)
+                if self
+                    .view
+                    .links
+                    .iter()
+                    .any(|l| l.id == *id && l.due_in.is_some()) =>
+            {
+                Err(refused(
+                    RefusedKind::NotOffered,
+                    format!("the Link `{id}` is taken by itself, when its time comes"),
+                ))
+            }
             Action::Answer(_) if !asks(false) => Err(refused(
                 RefusedKind::NotAsking,
                 "nothing here is asking for an answer",
@@ -619,7 +648,10 @@ fn see(run: &mut Run) -> Result<View, String> {
     let links: Vec<Link> = run
         .offers()?
         .into_iter()
-        .map(|(id, label)| Link { id, label })
+        .map(|(id, label)| {
+            let due_in = run.due_in_id(&id);
+            Link { id, label, due_in }
+        })
         .collect();
     let asks = run.asks()?;
     let nib = run.here().to_string();
@@ -679,7 +711,11 @@ fn forks_of(run: &mut Run, view: &View) -> Result<BTreeMap<String, Vec<Link>>, S
         let found: Vec<Link> = run
             .forks(&link.id, None)?
             .into_iter()
-            .map(|(id, label)| Link { id, label })
+            .map(|(id, label)| Link {
+                id,
+                label,
+                due_in: None,
+            })
             .collect();
         if !found.is_empty() {
             out.insert(link.id.clone(), found);
