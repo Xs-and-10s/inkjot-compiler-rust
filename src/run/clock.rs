@@ -208,7 +208,7 @@ impl Run {
             }
         }
         self.seat(&served)?;
-        self.to_finale()
+        self.enter_finale()
     }
 
     /// Serve this Linker: sit at their seat at a table, or, alone, be them.

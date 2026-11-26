@@ -1473,7 +1473,7 @@ impl Run {
             .ok_or_else(|| format!("there is no fork `{id}` here"))?;
         self.take(&link)?;
         self.settle_deaths()?;
-        self.to_finale()
+        self.enter_finale()
     }
 
     /// Take the available Link with this id.
@@ -1504,7 +1504,7 @@ impl Run {
         }
         self.take(&link)?;
         self.settle_deaths()?;
-        self.to_finale()
+        self.enter_finale()
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
@@ -1752,7 +1752,7 @@ impl Run {
     }
 
     /// A finale due: every Linker seated goes there (alone, the pov).
-    pub(super) fn to_finale(&mut self) -> R<()> {
+    pub(super) fn enter_finale(&mut self) -> R<()> {
         let Some(finale) = self.finale_now.take() else {
             return Ok(());
         };
