@@ -617,6 +617,41 @@ impl Run {
         Ok(())
     }
 
+    /// `roll syndicate`, for a table with named columns: draw a row, the
+    /// table's way (`shuffled`: every row once before any again; `random`;
+    /// `cycle`: in order), among those `where:` holds for (`it` the row),
+    /// and set the value of the table's name to it. A table `~ one per
+    /// game` is drawn once: rolled again, it keeps its row.
+    pub(super) fn draw_row(&mut self, table: &str, cond: &Value) -> R<()> {
+        let story = Arc::clone(&self.story);
+        if story.field(table, "once") == &Value::Bool(true)
+            && self.vals.get(table).is_some_and(|v| v.name().is_some())
+        {
+            return Ok(());
+        }
+        let rows: Vec<String> = story
+            .field(table, "rows")
+            .as_arr()
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(|r| f(r, "row").as_str().map(str::to_string))
+            .collect();
+        let rows = if *cond == Value::Null {
+            rows
+        } else {
+            self.where_filter(rows, cond)?
+        };
+        if rows.is_empty() {
+            return Err(format!("no row of the table `{table}` fits its `where:`"));
+        }
+        let order = story.field(table, "pick").as_str().unwrap_or("shuffled");
+        // The bag is per set of rows, so a narrower draw keeps its own.
+        let key = format!("{table}:{}", rows.join(","));
+        let i = self.pick_index(&key, rows.len(), order);
+        self.vals.insert(table.to_string(), V::Id(rows[i].clone()));
+        Ok(())
+    }
+
     /// `x.offstage`: in a place marked `offstage`, or `offstage until`
     /// something that has not happened yet.
     pub(super) fn offstage(&mut self, id: &str) -> R<bool> {

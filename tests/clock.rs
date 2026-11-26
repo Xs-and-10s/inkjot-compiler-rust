@@ -160,8 +160,10 @@ expect: ann.breath == 2 and bo.breath == 2
 
 :: ends_turn_ends_it_at_once [test]
 start: yard ~ as ann
+do: "Done"
 do: "Give up"
 expect: clock.now == 1
+expect: not ann.passed
 "#;
 
 fn run(src: &str) -> Vec<inkjot::run::test::Outcome> {

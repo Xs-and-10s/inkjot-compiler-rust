@@ -96,11 +96,29 @@ pub struct Story {
     recipes: Vec<Value>,
     /// Every `period`: `clock.phase`, `on phase begins night`.
     calendar: Calendar,
+    /// The rows of tables with named columns, by row: its table and values.
+    rows: BTreeMap<String, (String, Vec<Value>)>,
 }
 
 /// `5m`, `30s`, `400ms`: a real time, in milliseconds.
 pub(crate) fn clock_millis(text: &str) -> Option<u64> {
     clock::millis(text)
+}
+
+/// One of a set of pronouns, by its `they` form: `pronoun("she", "their")`
+/// is "her".
+fn pronoun(set: &str, form: &str) -> &'static str {
+    let forms: [&'static str; 5] = match set {
+        "she" => ["she", "her", "her", "hers", "herself"],
+        "he" => ["he", "him", "his", "his", "himself"],
+        "it" => ["it", "it", "its", "its", "itself"],
+        _ => ["they", "them", "their", "theirs", "themself"],
+    };
+    let i = ["they", "them", "their", "theirs", "themself"]
+        .iter()
+        .position(|f| *f == form)
+        .unwrap_or(0);
+    forms[i]
 }
 
 /// The calendar the config's `period`s make.
@@ -211,6 +229,7 @@ impl Story {
             cue: Value::obj([("names", Value::Arr(vec![Value::str("capital")]))]),
             recipes: Vec::new(),
             calendar: Calendar::default(),
+            rows: BTreeMap::new(),
         };
         let config = ir
             .get("config")
@@ -238,6 +257,15 @@ impl Story {
             );
         }
         story.calendar = calendar(config)?;
+        for t in config.iter().filter(|s| s.get("columns").is_some()) {
+            let table = f(t, "id").as_str().unwrap_or("").to_string();
+            for row in f(t, "rows").as_arr().unwrap_or(&[]) {
+                if let Some(id) = f(row, "row").as_str() {
+                    let values = f(row, "values").as_arr().unwrap_or(&[]).to_vec();
+                    story.rows.insert(id.to_string(), (table.clone(), values));
+                }
+            }
+        }
         story.clock_in_turns();
         story.shows_ballots = ir.to_string().contains("\"insert\": \"ballots\"");
         story.seat_characters(config);
@@ -247,6 +275,16 @@ impl Story {
             .cloned()
             .collect();
         Ok(story)
+    }
+
+    /// `syndicate.mafia`, where `syndicate` is a row of a table with named
+    /// columns: that row's value in that column.
+    fn column(&self, row: &str, column: &str) -> Option<&Value> {
+        let (table, values) = self.rows.get(row)?;
+        let i = strs(self.field(table, "columns"))
+            .iter()
+            .position(|c| c == column)?;
+        values.get(i)
     }
 
     /// Two names of one period, as where they come in it: `ten` and
@@ -508,8 +546,14 @@ impl Story {
     }
 
     /// What a counted thing is one of: `stave#2` is a `stave`.
+    /// What a thing is one of: `guest_2` of `guest`, `stave#3` of `stave`.
+    /// A value's `~ of guest` (`state victim: nobody ~ of guest`) says what
+    /// it may hold, and is not one.
     fn of(&self, id: &str) -> Option<&str> {
-        self.field(id, "of").as_str()
+        match self.kind(id) {
+            Some("character" | "npc" | "item") => self.field(id, "of").as_str(),
+            _ => None,
+        }
     }
 
     /// A passage's tags: `[act]`, `[finale]`. None for a passage that is
@@ -689,6 +733,13 @@ pub struct Run {
     near: Option<String>,
     /// An ending a `play` sent the pov to, entered when the action is done.
     go_to: Option<String>,
+    /// A `finale when:` that has come to hold: everyone goes there once the
+    /// action is done.
+    finale_now: Option<String>,
+    /// A Link `~ for cohort` brings the table to a passage whose header has
+    /// run once, for the one who took it: the others arrive with its `let`s
+    /// as they were, and its effects are not done again.
+    table_arrival: Option<BTreeMap<String, Local>>,
     /// While the pov does an act kept away from any place (a spellbook's,
     /// `spell:kindle`): the place they are doing it in.
     acting_in: Option<String>,
@@ -783,6 +834,8 @@ impl Run {
             keep_to: None,
             near: None,
             go_to: None,
+            finale_now: None,
+            table_arrival: None,
             acting_in: None,
             encounter: None,
             hinted: BTreeSet::new(),
@@ -938,7 +991,15 @@ impl Run {
                         .as_arr()
                         .unwrap_or(&[])
                         .iter()
-                        .map(entry)
+                        .enumerate()
+                        .map(|(i, e)| {
+                            let mut e = entry(e);
+                            // Text alone: `vampire_deaths#1`.
+                            if e.id.is_empty() {
+                                e.id = format!("{id}#{}", i + 1);
+                            }
+                            e
+                        })
                         .collect();
                     self.lists.insert(id.clone(), entries);
                 }
@@ -1125,6 +1186,18 @@ impl Run {
         }
     }
 
+    /// `she`, `he`, `they` or `it`: set (`set x.pronouns: she`), given
+    /// (`~ pronouns she`), or `they`. `~ pronouns chosen` is the Linker's
+    /// to set, and `they` until they do.
+    fn pronouns(&self, id: &str) -> String {
+        let set = self.vals.get(&format!("{id}.pronouns")).and_then(V::name);
+        let given = self.story.field(id, "pronouns").as_str();
+        match set.or(given) {
+            Some(p @ ("she" | "he" | "it")) => p.to_string(),
+            _ => "they".to_string(),
+        }
+    }
+
     /// The clock's last stop, if it has one: 5 for `clock: 0..=5`.
     fn last_stop(&self) -> Option<u32> {
         match self.constant(self.story.defaults.get("clock")?) {
@@ -1278,7 +1351,7 @@ impl Run {
     }
 
     /// The things that pass a `where:` condition, `it` each in turn.
-    fn where_filter(&mut self, ids: Vec<String>, cond: &Value) -> R<Vec<String>> {
+    pub(super) fn where_filter(&mut self, ids: Vec<String>, cond: &Value) -> R<Vec<String>> {
         let saved = self.locals.get("it").cloned();
         let mut out = Vec::new();
         for id in ids {
@@ -1399,7 +1472,8 @@ impl Run {
             .cloned()
             .ok_or_else(|| format!("there is no fork `{id}` here"))?;
         self.take(&link)?;
-        self.settle_deaths()
+        self.settle_deaths()?;
+        self.to_finale()
     }
 
     /// Take the available Link with this id.
@@ -1429,7 +1503,8 @@ impl Run {
             ));
         }
         self.take(&link)?;
-        self.settle_deaths()
+        self.settle_deaths()?;
+        self.to_finale()
     }
 
     fn available(&mut self, link: &Value) -> R<bool> {
@@ -1653,6 +1728,45 @@ impl Run {
         self.story.defaults.get("clock_each_action") == Some(&Value::Bool(true))
     }
 
+    /// `finale when: no guest where: it.alive and it.team != town`: at the
+    /// start of each turn, the first `[finale]` (in source order) whose
+    /// condition holds is due.
+    fn check_finales(&mut self) -> R<()> {
+        if self.finale_now.is_some() {
+            return Ok(());
+        }
+        let story = Arc::clone(&self.story);
+        for name in &story.order {
+            let Some(p) = story.passages.get(name) else {
+                continue;
+            };
+            let cond = p.header.iter().find_map(|s| s.get("finale_when"));
+            if let Some(cond) = cond {
+                if self.eval(cond)?.truthy() {
+                    self.finale_now = Some(name.clone());
+                    return Ok(());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// A finale due: every Linker seated goes there (alone, the pov).
+    pub(super) fn to_finale(&mut self) -> R<()> {
+        let Some(finale) = self.finale_now.take() else {
+            return Ok(());
+        };
+        if self.order.is_empty() {
+            return self.enter(&finale, BTreeMap::new());
+        }
+        let served = self.pov.clone();
+        for who in self.order.clone() {
+            self.sit(&who)?;
+            self.enter(&finale, BTreeMap::new())?;
+        }
+        self.sit(&served)
+    }
+
     /// Pay what a Link costs, from whoever acts.
     fn pay(&mut self, link: &Value) -> R<()> {
         if self.in_past() {
@@ -1831,7 +1945,15 @@ impl Run {
             }
             self.pov = who.to_string();
         }
+        // A finale came due on the way (`finale when:`): the game is over,
+        // and nobody goes where the Link led.
+        let target = if self.finale_now.is_some() {
+            "here".to_string()
+        } else {
+            target
+        };
         match target.as_str() {
+            "here" if self.finale_now.is_some() => {}
             "here" if self.leave_encounter().is_some() => {
                 let place = self.leave_encounter().unwrap_or_default();
                 self.encounter = None;
@@ -1912,10 +2034,18 @@ impl Run {
         // A new turn: a timed Link's time starts again, and nobody has
         // passed in it yet.
         self.offered_at.clear();
-        self.vals.retain(|k, _| !k.ends_with(".passed"));
-        // `on phase begins night`, `on turn begins`.
+        // Only the people's: an Inker's own `gate.passed` is left alone.
+        for who in story
+            .ids_of("character")
+            .into_iter()
+            .chain(story.ids_of("npc"))
+        {
+            self.vals.remove(&format!("{who}.passed"));
+        }
+        // `on phase begins night`, `on turn begins`; then, is the game over?
         if moved {
             self.periods_begin()?;
+            self.check_finales()?;
         }
         // What was waiting on the clock.
         self.run_timers()?;
@@ -2044,7 +2174,19 @@ impl Run {
         let story = Arc::clone(&self.story);
         let p = &story.passages[passage];
         let from = from.to_string();
+        let joining = self.table_arrival.take();
+        if let Some(shared) = &joining {
+            self.locals = shared.clone();
+        }
         for (i, stmt) in p.header.iter().enumerate().skip(start) {
+            // Joining the table: what was done is done; only a `next:` and
+            // an input are the Linker's own.
+            if joining.is_some()
+                && !inputs::is_input(stmt)
+                && f(stmt, "setting").as_str() != Some("next")
+            {
+                continue;
+            }
             if inputs::is_input(stmt) {
                 self.asking.clear();
                 let prompt = self.meet_input(stmt)?;
@@ -2848,6 +2990,13 @@ impl Run {
     /// A thing's name as the reader knows it: what it is `shown as` until a
     /// `reveal`, then its name. `{marge}` and `@marge` read this.
     fn label(&self, id: &str) -> String {
+        // `set first_voter.shown_as: victim.name`: a face worn.
+        match self.vals.get(&format!("{id}.shown_as")) {
+            // Someone else's face is their own name, never theirs in turn.
+            Some(V::Id(other)) => return self.real_name(other),
+            Some(V::Null) | None => {}
+            Some(face) => return self.show(face),
+        }
         let shown_as = self.story.field(id, "shown_as");
         let revealed = self
             .vals
@@ -3200,7 +3349,19 @@ impl Run {
                 result?;
             }
             // `roll standoff`: roll on a table.
+            "roll" if self.story.field(&word(0), "columns") != &Value::Null => {
+                self.draw_row(&word(0), f(e, "where"))?
+            }
             "roll" => self.roll_table(&word(0))?,
+            // `draw syndicate vampires`: that row, as if it had been drawn.
+            "draw" => {
+                let table = f(e, "table").as_str().unwrap_or("").to_string();
+                let row = f(e, "row").as_str().unwrap_or("").to_string();
+                if self.story.rows.get(&row).is_none_or(|(t, _)| *t != table) {
+                    return Err(format!("`{row}` is not a row of the table `{table}`"));
+                }
+                self.vals.insert(table, V::Id(row));
+            }
             // `fix actor`: it stays where it is from now on.
             "fix" => {
                 let who = match args.first() {
@@ -3528,6 +3689,33 @@ impl Run {
                 V::List(items) => items.first().cloned().unwrap_or(V::Null),
                 one => one,
             },
+            // `first(victim.chosen_by)`, `last(targets)`.
+            "first" | "last" => match self.eval(&items[0])? {
+                V::List(l) if op == "first" => l.first().cloned().unwrap_or(V::Null),
+                V::List(l) => l.last().cloned().unwrap_or(V::Null),
+                one => one,
+            },
+            // `possessive(victim)`: "Ada’s", by the name the reader knows.
+            "possessive" => {
+                let v = self.eval(&items[0])?;
+                let shown = self.show(&v);
+                V::Str(if shown.is_empty() {
+                    shown
+                } else {
+                    format!("{shown}’s")
+                })
+            }
+            // `one(syndicate.deaths)`: one entry of a list, picked its way.
+            "one" if items.first().is_some_and(|i| i.as_str().is_none()) => {
+                match self.eval(&items[0])? {
+                    V::Id(list) if self.lists.contains_key(&list) => self.pick_from(&list),
+                    V::List(l) if !l.is_empty() => {
+                        let i = self.roll(l.len() as u64) as usize - 1;
+                        l[i].clone()
+                    }
+                    _ => V::Null,
+                }
+            }
             "max" => self.extreme(items, true)?,
             "min" => self.extreme(items, false)?,
             "plural" => {
@@ -3960,6 +4148,14 @@ impl Run {
         Ok(match (id.as_str(), m) {
             ("threat", _) if self.encounter.is_some() => self.threat_member(m),
             ("clock", "now") => V::Num(f64::from(self.when())),
+            // `syndicate.mafia`: a column of the row drawn.
+            (_, _) if story.column(&id, m).is_some() => {
+                let v = story.column(&id, m).cloned().unwrap_or(Value::Null);
+                match v {
+                    t @ Value::Obj(_) if t.get("text").is_some() => V::Str(self.text_of(&t)?),
+                    other => self.eval(&other)?,
+                }
+            }
             // `clock.phase`: the name of the period it is now, `night`.
             ("clock", p) if story.calendar.get(p).is_some() => story
                 .calendar
@@ -3978,7 +4174,16 @@ impl Run {
                 None if story.has_tag(&id, "custom") => V::Str(String::new()),
                 None => V::Str(self.real_name(&id)),
             },
-            // What the reader is told it is: `{marge.shown_as}`.
+            // What the reader is told it is: `{marge.shown_as}`, or a face
+            // it was given, `set x.shown_as: …`.
+            (_, "shown_as")
+                if self
+                    .vals
+                    .get(&format!("{id}.shown_as"))
+                    .is_some_and(|v| *v != V::Null) =>
+            {
+                V::Str(self.label(&id))
+            }
             (_, "shown_as") => match self.story.field(&id, "shown_as").clone() {
                 Value::Null => V::Str(self.real_name(&id)),
                 text => V::Str(self.text_of(&text)?),
@@ -3987,6 +4192,16 @@ impl Run {
             ("cohort", "size") => V::Num(self.voters_count(false)),
             ("cohort", "alive") => V::Num(self.voters_count(true)),
             (_, "aka") => self.aka(&id),
+            // `x.pronouns`, `x.they`, `x.them`, `x.their`, `x.theirs`,
+            // `x.themself`: by the pronouns set, given, or `they`.
+            (_, "pronouns") if matches!(story.kind(&id), Some("character" | "npc")) => {
+                V::Id(self.pronouns(&id))
+            }
+            (_, "they" | "them" | "their" | "theirs" | "themself")
+                if matches!(story.kind(&id), Some("character" | "npc")) =>
+            {
+                V::Str(pronoun(&self.pronouns(&id), m).to_string())
+            }
             (_, "visits") => V::Num(f64::from(
                 self.visits.get(self.here()).copied().unwrap_or(0),
             )),
@@ -4009,7 +4224,11 @@ impl Run {
                     V::Bool(self.eval(&cond)?.truthy())
                 }
             },
-            (_, "alive") => V::Bool(!self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)),
+            // Alive: not dead, and not `set x.alive: no` by the story.
+            (_, "alive") => V::Bool(
+                !self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)
+                    && self.vals.get(&format!("{id}.alive")).is_none_or(V::truthy),
+            ),
             // `me.past`: re-living an earlier stop, as an echo.
             (_, "past") => V::Bool(self.past.contains_key(&id)),
             // `me.passed`: took a `pass` this turn. `x.spent`: has none left
@@ -4086,38 +4305,58 @@ impl Run {
             .as_str()
             .unwrap_or("shuffled")
             .to_string();
-        let n = names.len();
-        match order.as_str() {
-            "first" => return V::Str(names[0].clone()),
-            "random" => {
-                let i = self.roll(n as u64) as usize - 1;
-                return V::Str(names[i].clone());
-            }
+        let i = self.pick_index(id, names.len(), &order);
+        V::Str(names[i].clone())
+    }
+
+    /// `one(vampire_deaths)`: an entry of a list, picked by its `~ pick`
+    /// (shuffled unless it says otherwise): its text, or its name.
+    fn pick_from(&mut self, list: &str) -> V {
+        let entries = self.lists.get(list).cloned().unwrap_or_default();
+        if entries.is_empty() {
+            return V::Null;
+        }
+        let order = self
+            .story
+            .field(list, "aka_pick")
+            .as_str()
+            .unwrap_or("shuffled")
+            .to_string();
+        let e = &entries[self.pick_index(list, entries.len(), &order)];
+        match &e.label {
+            Some(label) => V::Str(self.text_of(label).unwrap_or_default()),
+            None => V::Id(e.id.clone()),
+        }
+    }
+
+    /// Which of `n` to pick, by `first`, `random`, `cycle` or `shuffled`:
+    /// a cycle goes round in order, a shuffle through every one, in an
+    /// order of its own, before any comes again.
+    pub(super) fn pick_index(&mut self, key: &str, n: usize, order: &str) -> usize {
+        match order {
+            "first" => return 0,
+            "random" => return self.roll(n as u64) as usize - 1,
             _ => {}
         }
-        let (bag, used) = self
+        let (mut bag, mut used) = self
             .aka
-            .entry(id.to_string())
+            .entry(key.to_string())
             .or_insert_with(|| (Vec::new(), 0))
             .clone();
-        let (mut bag, mut used) = (bag, used);
-        if bag.is_empty() || used == n {
+        if bag.len() != n || used == n {
             bag = (0..n).collect();
-            match order.as_str() {
-                "cycle" => {}
-                _ => {
-                    // Fisher–Yates, from the run's seed.
-                    for i in (1..n).rev() {
-                        let j = self.roll(i as u64 + 1) as usize - 1;
-                        bag.swap(i, j);
-                    }
+            if order != "cycle" {
+                // Fisher–Yates, from the run's seed.
+                for i in (1..n).rev() {
+                    let j = self.roll(i as u64 + 1) as usize - 1;
+                    bag.swap(i, j);
                 }
             }
             used = 0;
         }
         let pick = bag[used];
-        self.aka.insert(id.to_string(), (bag, used + 1));
-        V::Str(names[pick].clone())
+        self.aka.insert(key.to_string(), (bag, used + 1));
+        pick
     }
 
     /// Where something is: a character's place, an NPC's, or an item's holder's.

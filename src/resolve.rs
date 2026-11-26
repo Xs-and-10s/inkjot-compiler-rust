@@ -44,9 +44,14 @@ pub const FUNCTIONS: &[&str] = &[
     // `max(1, players / 4)`.
     "max",
     "min",
+    // `first(victim.chosen_by)`, `last(targets)`: the ends of a list.
+    "first",
+    "last",
     // Helpers for text.
     "plural",
     "capital",
+    // `possessive(victim)`: "Ada’s".
+    "possessive",
 ];
 
 /// Names every Inklink can use without declaring them.

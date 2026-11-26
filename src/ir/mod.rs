@@ -763,6 +763,10 @@ impl Builder {
             }
             "combo" => f.add("acts", strings(value.split(',').map(str::trim))),
             "relation" => f.add("between", strings(value.split(',').map(str::trim))),
+            // `table syndicate: shuffled`: rows drawn, not rolled for.
+            "table" if matches!(value.trim(), "shuffled" | "random" | "cycle") => {
+                f.add("pick", Value::str(value.trim()))
+            }
             "table" => f.add(
                 "roll",
                 expression(value.strip_prefix("roll ").unwrap_or(value)),
@@ -867,6 +871,12 @@ impl Builder {
                 return Value::Obj(f.into_pairs());
             }
             // `measure nights: nights` → `{"measure": "nights", "value": …}`.
+            // `finale when: no guest where: …`: the game ends here when it holds.
+            "finale" => {
+                let cond = rest.trim().strip_prefix("when:").unwrap_or(rest).trim();
+                f.add("finale_when", expression(cond));
+                return Value::Obj(f.into_pairs());
+            }
             "measure" => {
                 let (name, expr) = rest.split_once(':').unwrap_or((rest, ""));
                 f.add("measure", Value::str(name.trim()));
@@ -1382,6 +1392,19 @@ pub(crate) fn effect(text: &str) -> Value {
             if !until.is_empty() {
                 pairs.push(("until".into(), Value::str(until.trim())));
             }
+        }
+        // `roll syndicate where: it.special == chosen_special`: only rows
+        // the condition holds for.
+        "roll" if rest.contains(" where:") => {
+            let (table, cond) = rest.split_once(" where:").unwrap_or((rest, ""));
+            pairs.push(("args".into(), Value::Arr(vec![Value::str(table.trim())])));
+            pairs.push(("where".into(), expression(cond.trim())));
+        }
+        // `draw syndicate vampires`: a table's row, chosen (in tests).
+        "draw" => {
+            let mut w = rest.split_whitespace();
+            pairs.push(("table".into(), Value::str(w.next().unwrap_or(""))));
+            pairs.push(("row".into(), Value::str(w.next().unwrap_or(""))));
         }
         // `wait until night`, `wait until new_years_eve.nine`.
         "wait" if rest.starts_with("until ") => {

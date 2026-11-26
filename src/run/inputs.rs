@@ -128,6 +128,10 @@ impl Run {
                 Some(max) => format!("(Type a name, up to {max} letters.)"),
                 None => String::from("(Type a name.)"),
             },
+            "text input" => match f(&args, "max").as_u64() {
+                Some(max) => format!("(Write it, up to {max} characters.)"),
+                None => String::from("(Write it.)"),
+            },
             "choose input" => {
                 let options = self.options(&args)?;
                 match f(&args, "length").as_u64() {
@@ -160,9 +164,17 @@ impl Run {
         })
     }
 
-    /// What a `{choose input}` chooses from: everything of its kind.
+    /// What a `{choose input}` chooses from: the entries of a list
+    /// (`from: moderators`), or everything of a kind (`from: cantrip`).
     fn options(&self, args: &Value) -> R<Vec<String>> {
         let kind = f(args, "from").as_str().unwrap_or("");
+        if self.story.kind(kind) == Some("list") {
+            return Ok(self
+                .lists
+                .get(kind)
+                .map(|l| l.iter().map(|e| e.id.clone()).collect())
+                .unwrap_or_default());
+        }
         let mut ids: Vec<String> = self
             .story
             .decls
@@ -227,6 +239,16 @@ impl Run {
                 }
                 V::Str(name.to_string())
             }
+            // `{text input for: report, max: 600}`: anything, within the limit.
+            "text input" => {
+                let text = words.join(" ");
+                if let Some(max) = f(&args, "max").as_u64() {
+                    if text.chars().count() > max as usize {
+                        return Err(format!("this is at most {max} characters"));
+                    }
+                }
+                V::Str(text)
+            }
             "choose input" => {
                 let options = self.options(&args)?;
                 if let Some(bad) = words.iter().find(|w| !options.contains(w)) {
@@ -240,7 +262,12 @@ impl Run {
                         return Err(format!("choose exactly {n}"));
                     }
                 }
-                V::List(words.iter().map(|w| V::Id(w.clone())).collect())
+                // `length: 1` into a single value: `moderator`, not a list.
+                if f(&args, "length").as_u64() == Some(1) {
+                    V::Id(words[0].clone())
+                } else {
+                    V::List(words.iter().map(|w| V::Id(w.clone())).collect())
+                }
             }
             other => {
                 return Err(format!(

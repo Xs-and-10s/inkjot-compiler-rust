@@ -475,7 +475,7 @@ its Link, so the save can stop any of them: a death, a theft, a mark, a
 taking. `report` holds the table's version; MonkeyPaw or
 the Storyteller may tell it differently.
 )))
-let flourish: one syndicate.deaths
+let flourish: one(syndicate.deaths)
 (((
 Who does the deed for the syndicate: the first member who placed their
 vote on the target chosen.

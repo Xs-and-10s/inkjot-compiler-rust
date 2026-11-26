@@ -116,6 +116,8 @@ struct Checker {
     link_ids: HashSet<String>,
     /// The passage being checked, and its Links so far, for forks.
     here: String,
+    /// Its tags.
+    here_tags: Vec<String>,
     links_here: Vec<LinkSeen>,
     /// Where the first fork is, if the Inklink has any.
     first_fork: Option<(usize, usize)>,
@@ -390,6 +392,19 @@ impl Checker {
                 }
                 self.stats.declarations += 1;
                 self.decls.entry(name.to_string()).or_default().insert(kind);
+                // A table's rows are names: `syndicate.special == vampires`.
+                if kind == "table" {
+                    for c in &s.clauses[1..] {
+                        if let Some((row, _)) =
+                            c.text.strip_prefix("row ").and_then(|r| r.split_once(':'))
+                        {
+                            self.decls
+                                .entry(row.trim().to_string())
+                                .or_default()
+                                .insert("row");
+                        }
+                    }
+                }
                 // A period's names are times: `night`, `clock.phase == day`.
                 if kind == "period" {
                     if let Ok(period) = crate::period::Period::parse(&period_text(&s)) {
@@ -527,6 +542,7 @@ impl Checker {
         self.locals = self.scope_of(&p.name);
         self.link_ids.clear();
         self.here = p.name.clone();
+        self.here_tags = p.tags.clone();
         self.links_here.clear();
         let mut diags = std::mem::take(&mut self.diags);
         let (stmts, body) = gather(p, &mut diags);
@@ -1011,6 +1027,15 @@ impl Checker {
                     "`~ playable` is now `~ selectable`: every character can be played, and this one is offered at the start; `inkjot migrate` rewrites it",
                 );
             }
+            if let Some(set) = text.strip_prefix("pronouns ") {
+                if !["she", "he", "they", "it", "chosen"].contains(&set.trim()) {
+                    self.err(
+                        c.line,
+                        c.col + 9,
+                        "`pronouns` is one of: she, he, they, it, chosen",
+                    );
+                }
+            }
             // `~ pick cycle`: how `{x.aka}` picks from the names.
             if let Some(how) = text.strip_prefix("pick ") {
                 if !AKA_PICKS.contains(&how.trim()) {
@@ -1373,6 +1398,25 @@ impl Checker {
                     self.err(line, rest_col, "`spreads` says where to: `spreads 1 from fires to nearest(place, where: …)`");
                 } else {
                     self.expr(to, line, rest_col);
+                }
+            }
+            // `finale when: …`: in a `[finale]` passage, when the game ends there.
+            "finale" => {
+                if !rest.trim_start().starts_with("when:") || value.is_empty() {
+                    self.err(
+                        line,
+                        rest_col,
+                        "`finale` is written `finale when: condition`",
+                    );
+                } else {
+                    self.expr(value, line, vcol);
+                }
+                if !self.here_tags.iter().any(|t| t == "finale") {
+                    self.err(
+                        line,
+                        head.col,
+                        "`finale when:` belongs in a `[finale]` passage",
+                    );
                 }
             }
             // `measure nights: nights`: reported when the reading ends.
@@ -1799,7 +1843,19 @@ impl Checker {
                 col + 7,
             ),
             "burn" | "light" => self.need(arg(1), &["fuse"], "fuse", line, col + cols(verb) + 1),
-            "roll" => self.need(arg(1), &["table"], "table", line, col + 5),
+            "roll" => {
+                self.need(arg(1), &["table"], "table", line, col + 5);
+                if let Some((_, cond)) = core.split_once(" where:") {
+                    self.where_expr(cond, line, col + cols(core) - cols(cond));
+                }
+            }
+            "draw" => match words.as_slice() {
+                [_, table, row] => {
+                    self.need(table, &["table"], "table", line, word_col(1));
+                    self.need(row, &["row"], "row of a table", line, word_col(2));
+                }
+                _ => self.err(line, col, "`draw` is written `draw table row`, such as `draw syndicate vampires`"),
+            },
             "wake" => self.need(arg(1), &["npc", "character"], "NPC", line, col + 5),
             "play" => match arg(1) {
                 "" => self.err(line, col, "`play` needs a passage name"),
@@ -2332,11 +2388,13 @@ impl Checker {
             match key {
                 "for" => has_for = true,
                 "from" => {
-                    if !self.is_kind_word(value) {
+                    if !self.is_kind_word(value) && !self.has(value, &["list"]) {
                         self.err(
                             line,
                             col,
-                            format!("`from: {value}` should name a kind, a tag or an archetype"),
+                            format!(
+                                "`from: {value}` should name a kind, a tag, an archetype or a list"
+                            ),
                         );
                     }
                 }

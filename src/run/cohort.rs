@@ -158,14 +158,19 @@ impl Run {
 
     /// A Link `~ for cohort` was taken: every other seated Linker goes to
     /// its passage too, and sees it.
+    /// The passage's header was run once, for the one who took it; the
+    /// others arrive with its `let`s, and see what it shows.
     pub(super) fn everyone_to(&mut self, target: &str) -> R<()> {
         let served = self.pov.clone();
+        let shared = self.locals.clone();
         for who in self.order.clone() {
             if who == served {
                 continue;
             }
             self.sit(&who)?;
+            self.table_arrival = Some(shared.clone());
             let result = self.enter(target, BTreeMap::new());
+            self.table_arrival = None;
             self.sit(&served)?;
             result?;
         }
@@ -538,7 +543,11 @@ impl Run {
         }
 
         // Each Linker arrives at their cell for the new stop.
-        let finale = if ending { self.finale() } else { None };
+        // A `finale when:` that came to hold, or the clock run out.
+        let finale = self
+            .finale_now
+            .take()
+            .or(if ending { self.finale() } else { None });
         for (who, _, to, _, passage) in moves {
             self.sit(&who)?;
             // The clock has run out: everyone goes to the finale.

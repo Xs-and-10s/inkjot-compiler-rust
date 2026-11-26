@@ -96,6 +96,8 @@ pub(crate) const SETTINGS: &[&str] = &[
     "cue",
     // A value reported when the reading ends: `measure nights: nights`.
     "measure",
+    // `finale when: …`, in a `[finale]` passage.
+    "finale",
     // Making things: `recipe pawl: horseshoe ~ using hammer ~ make`.
     "recipe",
     // `spreads 1 from ablaze to nearest(place, where: …) ~ along way`.
@@ -158,6 +160,8 @@ pub(crate) const EFFECTS: &[&str] = &[
     // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
     "shuffle",
     "deal",
+    // `draw syndicate vampires`: a table's row, chosen.
+    "draw",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -201,8 +205,8 @@ pub(crate) const LINK_CLAUSES: &[&str] = &[
 
 /// The input family: `{name input for: me.name}`.
 pub(crate) const INPUTS: &[&str] = &[
-    "name", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret", "roll",
-    "note",
+    "name", "text", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret",
+    "roll", "note",
 ];
 
 /// Who may write a fork: the Inker, or a role the platform fills. Roles
