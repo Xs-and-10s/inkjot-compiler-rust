@@ -118,6 +118,12 @@ impl Calendar {
                 periods.push(p);
             }
         }
+        Calendar::new(periods)
+    }
+
+    /// A calendar of these periods, if they make one: every `of` names a
+    /// period, and none is made of itself.
+    pub fn new(periods: Vec<Period>) -> Result<Calendar, String> {
         let cal = Calendar { periods };
         for p in &cal.periods {
             if let Each::Of(unit) = &p.each {
@@ -215,6 +221,26 @@ impl Calendar {
     /// five-turn days is `[("day", "tuesday"), ("watch", "afternoon")]`.
     /// A clock longer than one round goes round again.
     pub fn at(&self, turn: u32) -> Vec<(String, String)> {
+        self.walk(turn)
+            .into_iter()
+            .map(|(p, n, _)| (p, n))
+            .collect()
+    }
+
+    /// The names that begin on a turn, outermost first: on turn 5 of a
+    /// week of five-turn days, `[("day", "tuesday"), ("watch", "morning")]`;
+    /// on turn 6, the afternoon only. Turn 0 begins everything.
+    pub fn begins(&self, turn: u32) -> Vec<(String, String)> {
+        self.walk(turn)
+            .into_iter()
+            .filter(|(_, _, offset)| *offset == 0)
+            .map(|(p, n, _)| (p, n))
+            .collect()
+    }
+
+    /// Each period a turn falls in, outermost first, with the name and how
+    /// many turns into it the turn is.
+    fn walk(&self, turn: u32) -> Vec<(String, String, u32)> {
         let mut out = Vec::new();
         let Some(mut period) = self.outermost() else {
             return out;
@@ -236,7 +262,7 @@ impl Calendar {
             let Some(name) = found else {
                 return out;
             };
-            out.push((period.name.clone(), name));
+            out.push((period.name.clone(), name, t));
             match &period.each {
                 Each::Of(unit) => match self.get(unit) {
                     Some(p) => period = p,
@@ -245,6 +271,61 @@ impl Calendar {
                 _ => return out,
             }
         }
+    }
+
+    /// The period a name belongs to: `night` is the `phase`'s.
+    pub fn period_of(&self, name: &str) -> Option<&Period> {
+        self.periods
+            .iter()
+            .find(|p| p.names.iter().any(|n| n == name))
+    }
+
+    /// Where a name comes in its period, from 0: `day` is 1 in `night, day`.
+    pub fn index(&self, name: &str) -> Option<usize> {
+        self.period_of(name)?.names.iter().position(|n| n == name)
+    }
+
+    /// Is `time` a time of this calendar: a name (`night`), or a path of
+    /// names, each inside the one before (`new_years_eve.nine`)?
+    pub fn is_time(&self, time: &str) -> bool {
+        let mut names = time.split('.');
+        let Some(mut period) = names.next().and_then(|n| self.period_of(n)) else {
+            return false;
+        };
+        for name in names {
+            let Each::Of(unit) = &period.each else {
+                return false;
+            };
+            match self.get(unit) {
+                Some(p) if p.names.iter().any(|n| n == name) => period = p,
+                _ => return false,
+            }
+        }
+        true
+    }
+
+    /// Does `time` begin on this turn? `night` when a night does;
+    /// `new_years_eve.nine` when nine does, on New Year's Eve.
+    pub fn begins_on(&self, time: &str, turn: u32) -> bool {
+        let path: Vec<&str> = time.split('.').collect();
+        let Some(first) = self.period_of(path[0]) else {
+            return false;
+        };
+        let levels = self.walk(turn);
+        let Some(i) = levels.iter().position(|(p, _, _)| *p == first.name) else {
+            return false;
+        };
+        let inside = &levels[i..];
+        inside.len() >= path.len()
+            && path.iter().zip(inside).all(|(n, (_, m, _))| n == m)
+            && inside[path.len() - 1].2 == 0
+    }
+
+    /// The first turn, at or after `from`, on which `time` begins, within
+    /// one round of the outermost period; `None` if it never does.
+    pub fn next_start(&self, time: &str, from: u32) -> Option<u32> {
+        let round = self.round(&self.outermost()?.name)?;
+        (from..=from + round).find(|t| self.begins_on(time, *t))
     }
 
     /// `monday.morning ..= saturday.night`: the turns a clock runs over.

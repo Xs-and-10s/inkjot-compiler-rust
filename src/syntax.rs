@@ -12,6 +12,8 @@ pub(crate) const MARGIN_TAGS: &[&str] =
 
 /// Statements that declare an id.
 pub(crate) const DECLS: &[&str] = &[
+    // `period phase: night 1, day 1`: named stretches of the clock.
+    "period",
     "threat",
     "deck",
     "pile",
@@ -42,6 +44,7 @@ pub(crate) const DECLS: &[&str] = &[
 
 /// Declarations that may appear only once per id.
 pub(crate) const UNIQUE: &[&str] = &[
+    "period",
     "place",
     "way",
     "item",
@@ -251,15 +254,8 @@ pub(crate) const POV_NAMES: &[&str] = &["i", "me", "you", "myself", "yourself"];
 
 /// Words reserved now for v0.6 features built later, so that no id written
 /// today collides with them.
-pub(crate) const RESERVED_LATER: &[&str] = &[
-    "knowledge",
-    "rule",
-    "never",
-    "assert",
-    "retract",
-    "period",
-    "between",
-];
+pub(crate) const RESERVED_LATER: &[&str] =
+    &["knowledge", "rule", "never", "assert", "retract", "between"];
 
 /// Words that can never be declared as an id.
 pub(crate) const RESERVED: &[&str] = &[

@@ -215,6 +215,46 @@ defmodule Inkjot.EngineTest do
     assert message =~ "error"
   end
 
+  @a_bell """
+  :: StoryTitle
+  A Bell
+
+  :: StoryData
+  {"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "hall"}
+
+  :: Inklink [config]
+  kind: story
+  mode: solo
+  pov: ann
+  character ann: "Ann" ~ selectable
+
+  :: hall
+  The hall.
+  > [[Wait->hall]]
+  > [[The bell rings->rung]] ~ after 5m
+
+  :: rung
+  The bell.
+  """
+
+  test "a Link timed in real time is taken when time is said to pass" do
+    {:ok, ir} = Engine.build(@a_bell)
+    {:ok, inklink} = Engine.load(ir)
+    {:ok, state} = Engine.start(inklink, 1, %{})
+    links = Engine.view(state).links
+    bell = Enum.find(links, &(&1.label == "The bell rings"))
+    assert bell.due_in == 300_000
+    assert Enum.find(links, &(&1.label == "Wait")).due_in == nil
+    assert {:error, {:not_offered, _, _}} = Engine.take_link(state, bell.id)
+    {:ok, later} = Engine.act(state, {:wait, 200_000})
+    assert Enum.find(Engine.view(later).links, &(&1.id == bell.id)).due_in == 100_000
+    {:ok, rung} = Engine.act(later, {:wait, 100_000})
+    assert Engine.view(rung).nib == "rung"
+    assert Engine.actions(rung) == [{:wait, 200_000}, {:wait, 100_000}]
+    {:ok, again} = Engine.replay(inklink, 1, %{}, Engine.actions(rung))
+    assert Engine.view(again).nib == "rung"
+  end
+
   @round_and_round """
   :: StoryTitle
   Round and Round

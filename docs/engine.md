@@ -44,7 +44,8 @@ assert_eq!(again.view(), state.view());
 | `state.view()` | `&View` | Worked out once, when the state was made. |
 | `state.take_link(id)` | `State` | Only a Link in `view.links`. |
 | `state.answer(words)` | `State` | Only while `view.asks` has an input that is not the jury. |
-| `state.act(&action)` | `State` | Any `Action`; the three above are shorthands. |
+| `state.wait(ms)` | `State` | Real time passes: each Link timed `~ after 5m` whose time has come is taken by itself. |
+| `state.act(&action)` | `State` | Any `Action`; the four above are shorthands. |
 | `inklink.replay(seed, &start, &actions, upto)` | `State` | The state after the first `upto` actions, or all. A refused action has its index in `Refused.at`. |
 | `inklink.replay_all(seed, &start, &actions)` | `Vec<State>` | Every state on the way: the start, then one per action. For going back, and for checking a log's engine events. |
 | `state.events()` | `&[Event]` | What the action that made this state caused (below). |
@@ -72,7 +73,10 @@ none).
 `selectable`), `hints` (offer hints; a Linker may turn them off).
 
 **`Action`**: `TakeLink(id)`, `Answer(words)`, `Vote { who, how, proof }`,
-`TakeFork { fork, from }`.
+`TakeFork { fork, from }`, `Wait(ms)`. A `Wait` is part of the log like any
+other action, so a replay takes timed Links where the reading did: the
+platform logs one when a timed Link's time runs out (or whenever it likes;
+time that has passed is only ever counted once).
 
 **`StoryMap`**: `nodes` (`{ id, title, tags }`, in source order) and
 `edges` (`{ from, to, kind, id, label, stands_in_for, conditional }`, `kind`
@@ -89,7 +93,7 @@ decides who sees them.
 | `pov` | Who the Linker looks through. |
 | `now` | The clock's stop. |
 | `text` | The paragraphs the last action (or the start) showed, in order: `Para`s, each a list of `Span { text, style, pause }` with `style` from `italic`, `bold`, `strikethrough`, `redacted`. A `redacted` span's text is `█`, one for each character hidden: redacted words never reach the view, only their length. A `Para` also has `pause` (a `Pause { ms, kind }` to wait after the paragraph before it, from `[after 2s]` or `[beat 2s]`), `verse`, and `quote` (a `Quote { kind, by, first }` for a paragraph in a `[quote …]` block, `first` on the one that begins it); a span's `pause` is set only on text appended after a wait. `Para::plain()` reads one as text. See `run.md`, Text. |
-| `links` | The Links offered: `{ id, label }`, the label a `Para`. |
+| `links` | The Links offered: `{ id, label, due_in }`, the label a `Para`. `due_in` is set on a Link timed in real time (`~ after 5m`): the milliseconds left before it is taken by itself. It cannot be taken (`not_offered`); its time runs from when it was first offered this turn, and the platform counts it down and sends `Wait`. |
 | `asks` | The open inputs: `{ kind, prompt, options, methods, length, voted }`. |
 | `over` | Nothing offered, nothing asked: the reading has ended. |
 
@@ -249,7 +253,8 @@ is compiled: Rustler builds the crate in release mode with `mix compile`.
 # text: [%{plain: "…", runs: [%{text: "…", style: ["italic"], pause: nil}],
 #         pause: nil | %{ms: 2000, kind: "after"}, verse: false,
 #         quote: nil | %{kind: "letter", by: "A. K." | nil, first: true}}]
-# links: [%{id: "…", label: "plain label", runs: [%{text, style}]}]
+# links: [%{id: "…", label: "plain label", runs: [%{text, style}], due_in: nil | 300_000}]
+# {:ok, later} = Inkjot.Engine.act(state, {:wait, 300_000})
 {:ok, next} = Inkjot.Engine.take_link(state, hd(links).id)
 [%{"type" => "nib_shown", "origin" => "engine", "data" => data} | _] = Inkjot.Engine.events(next)
 {:ok, again} = Inkjot.Engine.replay(inklink, 42, %{}, Inkjot.Engine.actions(next))

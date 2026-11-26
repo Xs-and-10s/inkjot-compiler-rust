@@ -189,4 +189,57 @@ proptest! {
         let round = c.round("outer").unwrap();
         prop_assert_eq!(c.at(t), c.at(t % round));
     }
+
+    /// A name begins on the first turn of its span, and only then: every
+    /// path's span starts with a beginning, and every beginning is the
+    /// start of the span of where the turn is.
+    #[test]
+    fn a_name_begins_where_its_span_starts(c in calendar(), t in 0..200u32) {
+        let round = c.round("outer").unwrap();
+        let path: Vec<String> = c.at(t).into_iter().map(|(_, n)| n).collect();
+        let mut expected = Vec::new();
+        for (depth, named) in c.at(t).into_iter().enumerate() {
+            let span = c.span(&path[..=depth].join(".")).unwrap();
+            let starts = t % round == span.start;
+            prop_assert_eq!(c.begins_on(&path[..=depth].join("."), t), starts);
+            if starts {
+                expected.push(named);
+            }
+        }
+        prop_assert_eq!(c.begins(t), expected);
+    }
+
+    /// `wait until` a name finds the first turn, from now on, that it
+    /// begins on, and the name is the one it is then.
+    #[test]
+    fn the_next_start_is_the_first(c in calendar(), from in 0..60u32, which in 0..5usize) {
+        let inner = c.get("inner").unwrap().clone();
+        let name = &inner.names[which % inner.names.len()];
+        let next = c.next_start(name, from).unwrap();
+        prop_assert!(next >= from);
+        prop_assert!(c.begins_on(name, next));
+        prop_assert!(c.at(next).iter().any(|(_, n)| n == name));
+        prop_assert!((from..next).all(|t| !c.begins_on(name, t)));
+    }
+}
+
+#[test]
+fn beginnings_and_the_next_start() {
+    let c = cal(WEEK);
+    let pair = |p: &str, n: &str| (p.to_string(), n.to_string());
+    assert_eq!(
+        c.begins(5),
+        [pair("day", "tuesday"), pair("watch", "morning")]
+    );
+    assert_eq!(c.begins(6), [pair("watch", "afternoon")]);
+    assert_eq!(c.begins(7), []);
+    assert_eq!(c.next_start("evening", 0), Some(3));
+    assert_eq!(c.next_start("evening", 4), Some(8));
+    assert_eq!(c.next_start("tuesday.evening", 4), Some(8));
+    assert_eq!(c.next_start("saturday", 1), Some(25));
+    assert_eq!(c.next_start("monday", 1), Some(30), "round again");
+    assert_eq!(c.next_start("sunday", 0), None);
+    assert!(c.is_time("tuesday.evening") && c.is_time("evening"));
+    assert!(!c.is_time("evening.tuesday") && !c.is_time("dusk"));
+    assert_eq!(c.index("night"), Some(3));
 }

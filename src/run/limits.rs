@@ -97,6 +97,17 @@ impl Run {
     /// The period a turn falls in, for a limit: the turn itself, its day,
     /// or 0 for the whole reading.
     fn period(&self, limit: &str, turn: u32) -> R<u32> {
+        // `once per hour`: the turn the hour began on.
+        if self.story.calendar.get(limit).is_some() {
+            let begun = (0..=turn).rev().find(|t| {
+                self.story
+                    .calendar
+                    .begins(*t)
+                    .iter()
+                    .any(|(p, _)| p == limit)
+            });
+            return Ok(begun.unwrap_or(0));
+        }
         Ok(match limit {
             "reading" => 0,
             "day" => {

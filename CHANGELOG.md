@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Milestone 21c: time
+
+- Periods: `period phase: night 1, day 1`, `period season: spring, summer
+  ~ 3 each`, `period day: monday, tuesday ~ of watch`. `clock.phase` reads
+  the name it is now, names of one period compare in its order
+  (`clock.hour >= ten`), the clock's range may be written in them
+  (`clock: new_years_eve.eight ..= new_years_eve.midnight`), and `once per
+  hour` limits by one. `period` is no longer reserved.
+- `on turn begins`; `on phase begins night`, `on hour ends eleven`, or any
+  of a period's names (`on watch begins`). The start is not a beginning.
+- `wait until night` (or `tuesday.dusk`) ends turns until it begins; a
+  test may say `given: wait until …`.
+- `clock: … ~ turn ends when pov.all.spent or pov.all.passed`: a `pass`
+  says the pov is done (`me.passed`), `x.spent` says x has none left of
+  what Links cost, and the turn ends when the condition holds. Ex 2's
+  tests now pass with both heroes; an engine test likewise.
+- Real time: a Link `~ after 5m` is taken by itself when its time has
+  passed. The engine has `Action::Wait(ms)` (`{:wait, ms}` in Elixir) and
+  a Link's `due_in`; tests say `do: wait 5m`. Ex 7's night has its
+  deadline this way (Dawn, after two minutes), and its two `on phase
+  begins` handlers, which would have shown the night and the morning
+  twice, are gone.
+
 ### Milestone 21b: cards and seats
 
 - `character guest ~ one per linker`: a seat each, `guest_1` to the

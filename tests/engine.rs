@@ -441,10 +441,14 @@ fn a_rewind_is_reported() {
     let s = inklink.start(1, &at("prologue")).unwrap();
     let s = take(&s, "Wake as Roland, in the pit");
     let s = take(&s, "Look up through the grate");
+    // The turn ends when both heroes have passed.
     let s = take(&s, "End the turn");
+    assert!(!kinds(&s).contains(&"turn_ended"));
+    let s = take(&take(&s, "Switch to Eldric"), "End the turn");
     assert!(kinds(&s).contains(&"turn_ended"));
     let ended = s.events().iter().find(|e| e.kind == "turn_ended").unwrap();
     assert_eq!(data(ended, "stop"), &Value::Num("0".into()));
+    let s = take(&s, "Switch to Roland");
     let s = take(&s, "Tug the bolt across the room");
     let s = take(&s, "Tie the Backward Knot");
     let s = take(&s, "Back to the start of turn 1");

@@ -8,6 +8,7 @@
 
 mod agenda;
 mod cards;
+mod clock;
 mod cohort;
 mod encounter;
 mod events;
@@ -30,6 +31,7 @@ use std::sync::Arc;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::json::Value;
+use crate::period::{Calendar, Each, Period};
 pub use inputs::Ask;
 pub use map::{Edge, Node, StoryMap};
 pub use prose::{Para, Pause, Quote, Span, BAR};
@@ -92,6 +94,43 @@ pub struct Story {
     cue: Value,
     /// Every `recipe`, in source order.
     recipes: Vec<Value>,
+    /// Every `period`: `clock.phase`, `on phase begins night`.
+    calendar: Calendar,
+}
+
+/// `5m`, `30s`, `400ms`: a real time, in milliseconds.
+pub(crate) fn clock_millis(text: &str) -> Option<u64> {
+    clock::millis(text)
+}
+
+/// The calendar the config's `period`s make.
+fn calendar(config: &[Value]) -> R<Calendar> {
+    let mut periods = Vec::new();
+    for s in config
+        .iter()
+        .filter(|s| f(s, "declare").as_str() == Some("period"))
+    {
+        let each = if let Some(lens) = f(s, "lengths").as_arr() {
+            Each::Own(
+                lens.iter()
+                    .filter_map(Value::as_u64)
+                    .map(|n| n as u32)
+                    .collect(),
+            )
+        } else if let Some(n) = f(s, "each").as_u64() {
+            Each::Turns(n as u32)
+        } else if let Some(unit) = f(s, "of").as_str() {
+            Each::Of(unit.to_string())
+        } else {
+            Each::Turns(1)
+        };
+        periods.push(Period {
+            name: f(s, "id").as_str().unwrap_or("").to_string(),
+            names: strs(f(s, "names")),
+            each,
+        });
+    }
+    Calendar::new(periods)
 }
 
 /// `you`, `me`, `i`, `myself`, `yourself`: the pov.
@@ -171,6 +210,7 @@ impl Story {
             narration: None,
             cue: Value::obj([("names", Value::Arr(vec![Value::str("capital")]))]),
             recipes: Vec::new(),
+            calendar: Calendar::default(),
         };
         let config = ir
             .get("config")
@@ -197,6 +237,8 @@ impl Story {
                 },
             );
         }
+        story.calendar = calendar(config)?;
+        story.clock_in_turns();
         story.shows_ballots = ir.to_string().contains("\"insert\": \"ballots\"");
         story.seat_characters(config);
         story.config_lets = config
@@ -205,6 +247,68 @@ impl Story {
             .cloned()
             .collect();
         Ok(story)
+    }
+
+    /// Two names of one period, as where they come in it: `ten` and
+    /// `eleven` are 2 and 3 of the `hour`'s. `None` for anything else.
+    fn times_in_order(&self, a: &V, b: &V) -> Option<(V, V)> {
+        let (V::Id(a), V::Id(b)) = (a, b) else {
+            return None;
+        };
+        let period = &self.calendar.period_of(a)?.name;
+        if self.calendar.period_of(b)?.name != *period {
+            return None;
+        }
+        let at = |n: &str| V::Num(self.calendar.index(n).unwrap_or(0) as f64);
+        Some((at(a), at(b)))
+    }
+
+    /// The clock's first stop: 0, or where `clock: new_years_eve.eight ..`
+    /// begins.
+    fn first_stop(&self) -> u32 {
+        self.defaults
+            .get("clock")
+            .and_then(|c| c.get("range"))
+            .and_then(Value::as_arr)
+            .and_then(|b| b.first())
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u32
+    }
+
+    /// `clock: new_years_eve.eight ..= new_years_eve.midnight`: the clock's
+    /// range in turns, `0..=7`, wherever it is written in the periods' names.
+    fn clock_in_turns(&mut self) {
+        let Some(clock) = self.defaults.get("clock").cloned() else {
+            return;
+        };
+        let Some(bounds) = clock.get("range").and_then(Value::as_arr) else {
+            return;
+        };
+        let inclusive = f(&clock, "inclusive") == &Value::Bool(true);
+        let mut turns = Vec::new();
+        for (i, b) in bounds.iter().enumerate() {
+            let path = match b.get("get").and_then(Value::as_arr) {
+                Some(parts) => strs(&Value::Arr(parts.to_vec())).join("."),
+                None => b.as_str().unwrap_or("").to_string(),
+            };
+            let span = (!path.is_empty())
+                .then(|| self.calendar.span(&path))
+                .flatten();
+            turns.push(match span {
+                // The first turn of where it starts; the last of where it ends.
+                Some(r) if i == 0 => num(r.start),
+                Some(r) if inclusive => num(r.end - 1),
+                Some(r) => num(r.end),
+                None => b.clone(),
+            });
+        }
+        if let Value::Obj(pairs) = self.defaults.get_mut("clock").unwrap() {
+            for (k, v) in pairs.iter_mut() {
+                if k == "range" {
+                    *v = Value::Arr(turns.clone());
+                }
+            }
+        }
     }
 
     /// Record the declarations and the few settings the interpreter needs.
@@ -297,6 +401,10 @@ impl Story {
                         .insert("clock_shown_as".into(), f(s, "shown_as").clone());
                     self.defaults
                         .insert("clock_day".into(), f(s, "day").clone());
+                    self.defaults.insert(
+                        "clock_turn_ends_when".into(),
+                        f(s, "turn_ends_when").clone(),
+                    );
                 }
                 Some("rewind") => self.rewind = Some(s.clone()),
                 Some("narration") => {
@@ -588,6 +696,14 @@ pub struct Run {
     encounter: Option<encounter::Encounter>,
     /// Who asked for a hint this round: `me.asked_hint`.
     hinted: BTreeSet<String>,
+    /// Has the action in hand waited (`wait until night`)? Then its turns
+    /// have ended already.
+    waited: bool,
+    /// Real time, as the platform has counted it out with `wait`, in
+    /// milliseconds; and when each timed Link (`~ after 5m`) was first
+    /// offered this turn, by its id. Neither is part of the world.
+    ms: u64,
+    offered_at: BTreeMap<String, u64>,
     /// What the action in hand has done so far, against the step limit.
     work: Work,
     /// The passages the action in hand entered, in order.
@@ -632,6 +748,7 @@ impl Run {
     /// the same seed and the same Links always goes the same way.
     pub fn new(story: Arc<Story>, seed: u64) -> Run {
         let pov = story.povs.first().cloned().unwrap_or_default();
+        let first_stop = story.first_stop();
         let mut run = Run {
             story,
             pov,
@@ -647,7 +764,7 @@ impl Run {
             evaluating: Vec::new(),
             links: Vec::new(),
             output: Vec::new(),
-            chronon: 0,
+            chronon: first_stop,
             rng: seed.max(1),
             aka: BTreeMap::new(),
             failures: Vec::new(),
@@ -669,6 +786,9 @@ impl Run {
             acting_in: None,
             encounter: None,
             hinted: BTreeSet::new(),
+            waited: false,
+            ms: 0,
+            offered_at: BTreeMap::new(),
             history: Vec::new(),
             saved: BTreeMap::new(),
             reached: Vec::new(),
@@ -895,6 +1015,7 @@ impl Run {
         self.work = Work::default();
         self.trail.clear();
         self.noted.clear();
+        self.waited = false;
     }
 
     /// Note something that happened, for the engine's events.
@@ -1300,6 +1421,13 @@ impl Run {
         if !self.with_link(&link, |run| run.available(&link))? {
             return Err(format!("the Link `{id}` is not available"));
         }
+        // `~ after 5m`: it is taken by itself, when its time comes.
+        if let Some(left) = self.due_in(&link).filter(|l| *l > 0) {
+            return Err(format!(
+                "the Link `{id}` is taken by itself, when its time comes ({}s from now)",
+                left.div_ceil(1000)
+            ));
+        }
         self.take(&link)?;
         self.settle_deaths()
     }
@@ -1498,12 +1626,14 @@ impl Run {
             Some("hint" | "switch" | "pass" | "rewind")
         ) || f(link, "target").as_str() == Some("rewind")
             || self.reads_round(link);
-        if self.each_action()
-            && !free
-            && !self.in_past()
-            && self.paused.is_none()
-            && !self.links.is_empty()
-        {
+        let playing = !self.in_past() && self.paused.is_none() && !self.links.is_empty();
+        // `turn ends when pov.all.passed`: after any action, a pass too.
+        // A `wait until` has already ended the turns it waited through.
+        let over = playing
+            && !self.waited
+            && f(link, "target").as_str() != Some("rewind")
+            && self.turn_is_over()?;
+        if over || (self.each_action() && !free && playing && !self.waited) {
             self.end_turn()?;
             if let Some(ending) = self.go_to.take() {
                 return self.enter(&ending, BTreeMap::new());
@@ -1681,6 +1811,12 @@ impl Run {
                 let at = self.here().to_string();
                 return self.enter(&at, BTreeMap::new());
             }
+            // With `turn ends when`, a pass says the pov is done, and the
+            // turn ends when the condition says.
+            Some("pass") if self.turn_ends_when().is_some() && !self.ends_turn(link) => {
+                self.vals
+                    .insert(format!("{}.passed", self.pov), V::Bool(true));
+            }
             Some("pass") => self.end_turn()?,
             Some("hint") => self.give_hint()?,
             Some("inquest") => {
@@ -1757,8 +1893,11 @@ impl Run {
             before: false,
         })?;
         self.note("turn_ended", Value::obj([("stop", num(self.chronon))]));
+        // `on hour ends eleven`, before the clock moves on.
+        self.periods_end()?;
         // The clock stops at its last stop: `clock: 0..=5`.
-        if self.last_stop().is_none_or(|last| self.chronon < last) {
+        let moved = self.last_stop().is_none_or(|last| self.chronon < last);
+        if moved {
             self.chronon += 1;
         }
         let story = Arc::clone(&self.story);
@@ -1769,6 +1908,14 @@ impl Run {
                     self.vals.insert(format!("{c}.{id}"), full.clone());
                 }
             }
+        }
+        // A new turn: a timed Link's time starts again, and nobody has
+        // passed in it yet.
+        self.offered_at.clear();
+        self.vals.retain(|k, _| !k.ends_with(".passed"));
+        // `on phase begins night`, `on turn begins`.
+        if moved {
+            self.periods_begin()?;
         }
         // What was waiting on the clock.
         self.run_timers()?;
@@ -3100,6 +3247,11 @@ impl Run {
                 line.extend(self.text_para(f(e, "text"))?);
                 self.output.push(line);
             }
+            // `wait until night`: see `clock.rs`.
+            "wait" => {
+                let time = f(e, "until").as_str().unwrap_or("").to_string();
+                self.wait_until(&time)?;
+            }
             "stop" | "nothing" => {}
             other => {
                 return Err(format!(
@@ -3430,7 +3582,11 @@ impl Run {
             "==" | "!=" | "within" | "<" | ">" | "<=" | ">=" | "+" | "-" | "*" | "/" | "mod" => {
                 let a = self.eval(&items[0])?;
                 let b = self.eval(&items[1])?;
-                binary(op, &a, &b)?
+                // `clock.hour >= ten`: names of one period, in its order.
+                match (op.as_str(), self.story.times_in_order(&a, &b)) {
+                    ("<" | ">" | "<=" | ">=", Some((x, y))) => binary(op, &x, &y)?,
+                    _ => binary(op, &a, &b)?,
+                }
             }
             "get" => self.get(items)?,
             // `who.at(spot)`: is someone at a spot within their place?
@@ -3804,6 +3960,13 @@ impl Run {
         Ok(match (id.as_str(), m) {
             ("threat", _) if self.encounter.is_some() => self.threat_member(m),
             ("clock", "now") => V::Num(f64::from(self.when())),
+            // `clock.phase`: the name of the period it is now, `night`.
+            ("clock", p) if story.calendar.get(p).is_some() => story
+                .calendar
+                .at(self.when())
+                .into_iter()
+                .find(|(period, _)| period == p)
+                .map_or(V::Null, |(_, name)| V::Id(name)),
             ("pov", _) => {
                 return Err(format!(
                     "`pov.{m}` needs a method after it, such as `pov.{m}.in(place)`"
@@ -3849,6 +4012,16 @@ impl Run {
             (_, "alive") => V::Bool(!self.vals.get(&format!("{id}.dead")).is_some_and(V::truthy)),
             // `me.past`: re-living an earlier stop, as an echo.
             (_, "past") => V::Bool(self.past.contains_key(&id)),
+            // `me.passed`: took a `pass` this turn. `x.spent`: has none left
+            // of what Links cost.
+            (_, "passed") if matches!(story.kind(&id), Some("character" | "npc")) => V::Bool(
+                self.vals
+                    .get(&format!("{id}.passed"))
+                    .is_some_and(V::truthy),
+            ),
+            (_, "spent") if matches!(story.kind(&id), Some("character" | "npc")) => {
+                V::Bool(self.spent(&id))
+            }
             // `here.passed`: someone dashed through this stop.
             (_, "passed") => V::Bool(
                 self.passed

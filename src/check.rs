@@ -129,6 +129,8 @@ struct Checker {
     /// chain, a `[quote …]` or a `[redacted until …]`, and where. `[end]`
     /// closes the innermost.
     blocks: Vec<(&'static str, usize, usize)>,
+    /// Every `period`, once they are all read: `night`, `new_years_eve.nine`.
+    calendar: crate::period::Calendar,
 }
 
 /// A Link seen in the passage being checked.
@@ -352,6 +354,7 @@ impl Checker {
             }
         }
         let mut seen: HashSet<(String, &'static str)> = HashSet::new();
+        let mut periods = Vec::new();
         for p in passages {
             let mut scratch = Vec::new();
             let (stmts, _) = gather(p, &mut scratch);
@@ -387,6 +390,15 @@ impl Checker {
                 }
                 self.stats.declarations += 1;
                 self.decls.entry(name.to_string()).or_default().insert(kind);
+                // A period's names are times: `night`, `clock.phase == day`.
+                if kind == "period" {
+                    if let Ok(period) = crate::period::Period::parse(&period_text(&s)) {
+                        for n in &period.names {
+                            self.decls.entry(n.clone()).or_default().insert("time");
+                        }
+                        periods.push((period, head.line, head.col));
+                    }
+                }
                 if UNIQUE.contains(&kind) && !seen.insert((name.to_string(), kind)) {
                     self.err(
                         head.line,
@@ -394,6 +406,16 @@ impl Checker {
                         format!("{kind} `{name}` is declared twice"),
                     );
                 }
+            }
+        }
+        // The periods together: each `of` names a period, none is made of
+        // itself. (Each on its own was read above, or is reported in pass two.)
+        let lines: Vec<(usize, usize)> = periods.iter().map(|(_, l, c)| (*l, *c)).collect();
+        match crate::period::Calendar::new(periods.into_iter().map(|(p, _, _)| p).collect()) {
+            Ok(calendar) => self.calendar = calendar,
+            Err(msg) => {
+                let (line, col) = lines[0];
+                self.err(line, col, msg);
             }
         }
     }
@@ -619,6 +641,8 @@ impl Checker {
                     match period {
                         "turn" | "chronon" => {}
                         p if word.as_deref() == Some(p) => {}
+                        // `once per hour`: once in each hour of the clock.
+                        p if self.calendar.get(p).is_some() => {}
                         "day" if has_day => {}
                         "day" => self.err(
                             c.line,
@@ -628,7 +652,7 @@ impl Checker {
                         _ => self.err(
                             c.line,
                             col,
-                            "`once per` takes `turn`, `day`, or the clock's own word",
+                            "`once per` takes `turn`, a period (`once per hour`), `day`, or the clock's own word",
                         ),
                     }
                 }
@@ -1016,6 +1040,11 @@ impl Checker {
             }
         }
         match kind {
+            "period" => {
+                if let Err(msg) = crate::period::Period::parse(&period_text(s)) {
+                    self.err(head.line, head.col, msg);
+                }
+            }
             "way" => self.places(value, " - ", head.line, value_col),
             // A map names a region and lays its places out in rows: `~ a | b | c`.
             "map" => {
@@ -1476,7 +1505,11 @@ impl Checker {
             "moves" => self.moves(rest, line, rest_col),
             "given" => self.effect(value, line, vcol),
             "do" => {
-                if value.starts_with('"') {
+                if let Some(time) = value.strip_prefix("wait ") {
+                    if crate::run::clock_millis(time).is_none() {
+                        self.err(line, vcol, "`do: wait` takes a time such as `5m` or `30s`");
+                    }
+                } else if value.starts_with('"') {
                     if value.len() < 2 || !value.ends_with('"') {
                         self.err(line, vcol, "a Link label in `do:` needs its closing quote");
                     }
@@ -1580,6 +1613,13 @@ impl Checker {
         if event == "before" || event == "after" {
             event = words.next().unwrap_or("");
         }
+        // `on turn begins`, `on phase begins night`, `on hour ends eleven`.
+        let rest_words: Vec<&str> = words.clone().collect();
+        if matches!(rest_words.first(), Some(&("begins" | "ends"))) && event != "turn"
+            || (event == "turn" && rest_words.first() == Some(&"begins"))
+        {
+            return self.period_event(event, &rest_words, rest, line, col);
+        }
         if !EVENTS.contains(&event) {
             let shown = if event.is_empty() {
                 "nothing".to_string()
@@ -1615,6 +1655,43 @@ impl Checker {
             "cross" | "enter" | "leave" | "take" => self.need(arg, kinds, kinds[0], line, arg_col),
             "move" => self.need(arg, kinds, "person", line, arg_col),
             _ => {}
+        }
+    }
+
+    /// `on phase begins night`: a declared period (or the turn), and one of
+    /// its names, if any.
+    fn period_event(&mut self, period: &str, words: &[&str], rest: &str, line: usize, col: usize) {
+        if period != "turn" && !self.has(period, &["period"]) {
+            return self.err(
+                line,
+                col,
+                format!(
+                    "`{period}` is not a declared period; `on … {}` takes `turn` or a period, such as `on phase begins night`",
+                    words[0]
+                ),
+            );
+        }
+        let Some(name) = words.get(1).filter(|w| **w != "by") else {
+            return;
+        };
+        let name_col = col + cols(&rest[..rest.find(name).unwrap_or(0)]);
+        if period == "turn" {
+            return self.err(line, name_col, "a turn has no names: `on turn begins`");
+        }
+        let names = self
+            .calendar
+            .get(period)
+            .map(|p| p.names.clone())
+            .unwrap_or_default();
+        if !names.iter().any(|n| n == name) {
+            self.err(
+                line,
+                name_col,
+                format!(
+                    "`{name}` is not one of the `{period}`'s names ({})",
+                    names.join(", ")
+                ),
+            );
         }
     }
 
@@ -1667,6 +1744,19 @@ impl Checker {
             }
             // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
             "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
+            // `wait until night`: the clock moves on to the next night.
+            "wait" => match core.strip_prefix("wait until ") {
+                Some(time) if self.calendar.is_time(time.trim()) => {}
+                Some(time) => self.err(
+                    line,
+                    col + 11,
+                    format!(
+                        "`{}` is not a time: a name of a declared period, such as `night`, or a path of them, such as `new_years_eve.nine`",
+                        time.trim()
+                    ),
+                ),
+                None => self.err(line, col, "`wait` is written `wait until` a time, such as `wait until night`"),
+            },
             "deal" => match words.as_slice() {
                 [_, n, "from", deck, "to", "each", pile] => {
                     self.expr(n, line, col + 5);
@@ -1985,6 +2075,12 @@ impl Checker {
                 }
             }
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
+            // `~ after 5m`: taken by itself, in real time.
+            "after" if crate::run::clock_millis(arg).is_none() => self.err(
+                c.line,
+                arg_col,
+                format!("`~ after` on a Link takes a real time, such as `5m` or `30s`; `{arg}` is not one"),
+            ),
             "become" | "order" => self.need(arg, &["character"], "character", c.line, arg_col),
             "hint" if !self.has("hints", &["resource"]) => self.err(
                 c.line,
@@ -2440,4 +2536,14 @@ fn single_quote(text: &str) -> Option<usize> {
         }
     }
     None
+}
+
+/// A `period` statement as one line, its clauses joined: what
+/// `Period::parse` reads.
+fn period_text(s: &Stmt) -> String {
+    s.clauses
+        .iter()
+        .map(|c| c.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ~ ")
 }

@@ -40,6 +40,7 @@ here.
 | 20d | Encounters: `[encounter]`, `[round]` and `[resolve]` passages, rounds as turns, patterns, threats and the four counters, `deflects`/`absorbs` items, `next round`, `hp` that runs out. Ex 2's duel is rewritten in general words and tested; Ex 9 checks clean and its Warden can be fought. Milestone 20 done | #44 |
 | 21a | Ex 7's Doppelgänger pass; `strike` and `struck` are `strikethrough`; the plan to v0.6.0 | #45 |
 | 21b | Cards and seats: `one per linker`, decks, piles, `shuffle`, `deal`, `top of`, `my`, `move` to a pile, `~ for cohort`, `{present linker}`, `max`/`min`; Ex 7's role pile is `hand` and its killers' team `mafia` | #46 |
+| 21c | Time: `period`s and named clocks (`clock.phase`, ordered names, clocks in names, `once per hour`), `on … begins` / `ends`, `wait until`, `turn ends when` with `passed` and `spent`, Links timed in real time (`~ after 5m`, `Action::Wait`, `due_in`); Ex 7's night has its deadline | #47 |
 
 ## Next
 
@@ -90,7 +91,8 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      `strike` (and the style `struck`) to `strikethrough`, decided 26 Nov
      2026. Then: 21b (#46), cards and seats (`one per linker`, decks,
      piles, `~ for cohort`); 21c, time (periods and named clocks, night and
-     day, `turn ends when`, the night's deadline); 21d, votes and seats
+     day, `turn ends when`, the night's deadline as a Link timed in real
+     time; the votes it counts are 21d's); 21d, votes and seats
      (`{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating and
      `along seat`, settable `shown_as`, `finale when:`, text tables, the
      quantifiers Ex 7 uses, `first`, `last`, `possessive`); 21e, the
@@ -321,10 +323,12 @@ breaking change.
   comparisons in rule bodies, `~ on contradiction refuse | flag`, and a
   `{note input}` for facts the Linker writes.
 - Quantifiers `some`, `every`, `no`.
-- `on turn begins`, `on turn ends` (v0.5's `on turn` a synonym).
+- `on turn begins`, `on turn ends` (v0.5's `on turn` a synonym). Built
+  in 21c.
 - **Periods:** `period season: spring, summer, autumn, winter ~ 3 each`,
   `period year ~ 4 seasons each`, uneven lengths (`dawn 1, day 4`);
-  `clock.season`, `on season begins summer`.
+  `clock.season`, `on season begins summer`. Built in 21c (a year is
+  `period year: one ~ of season`; `~ 4 seasons each` was not kept).
 - Kind filters: `where:` with `it` for each candidate; `|` for
   alternatives; `{present linker}`.
 - Relations among a kind: `relation trust: you, each gnome ~ 0..=3`,

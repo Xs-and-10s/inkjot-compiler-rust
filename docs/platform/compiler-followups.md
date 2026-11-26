@@ -168,3 +168,20 @@ The compiler's side is in the draft (milestone 21a). The platform's:
 - The engine's plain lines ("Gone in the night: …", "Missing in the night:
   …") are shown whoever tells the morning.
 
+
+## 12. Time in real time (milestone 21c, 26 Nov)
+
+- A Link timed `~ after 5m` comes in the view with `due_in` (milliseconds
+  left) and cannot be taken (`not_offered`). Show it with a countdown.
+  When the time runs out, send `{:wait, ms}` (any amount; the engine
+  counts what it is told): the Link is taken by itself, for whoever it is
+  offered to, once for the table if it is `~ for cohort`. A `Wait` is
+  logged like any other action, so a replay takes it where the reading
+  did.
+- Its time runs from when it was first offered this turn and starts again
+  when the turn ends. Ex 7's day (`To the vote`, five minutes) and its
+  night's deadline (`Dawn`, two minutes) are such Links.
+- The engine is still solo; the table's own `Wait` comes with 21e's
+  seating API.
+- The view's `now` is still the turn. Names of periods (`clock.phase`) are
+  the story's to show, in its text.

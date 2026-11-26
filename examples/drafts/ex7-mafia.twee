@@ -264,10 +264,6 @@ measure haul: count(haul)
 measure haul_needed: haul_needed
 measure returned: returned
 
-on phase begins night
-~ then play night
-on phase begins day
-~ then play morning
 
 :: gathering [prologue]
 (((
@@ -437,6 +433,8 @@ replacement the Doctor stops does not use it up.
 > [[Sleep->night:done]] ~ for guest where: it.alive and it.role == townsfolk
 > [[Wait for morning->night:done]] ~ for guest where: not it.alive or it.is(storyteller)
 
+> [[Dawn->morning]] ~ for cohort ~ after 2m ~ id dawn ~ then wait until day
+
 :: night:looked
 (((
 The Detective asks one question, the classic one: *is this one of them?*
@@ -459,9 +457,10 @@ Is {target} one of them? You find out, by ways of your own.
 :: night:done
 (((
 Waits for everyone. When the last player has chosen, the night is over.
-The night has a deadline too (milestone 21's `~ consensus`): when it
-comes, the votes cast count, and a syndicate that has cast none kills
-nobody.
+The night has a deadline too: Dawn, on the night's first page, is taken
+by itself two minutes after nightfall, wherever each player has got to.
+The votes cast by then count (`~ consensus`, milestone 21d), and a
+syndicate that has cast none kills nobody.
 )))
 --
 You wait for the others.

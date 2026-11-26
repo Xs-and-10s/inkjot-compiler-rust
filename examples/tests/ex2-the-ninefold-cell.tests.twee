@@ -7,6 +7,9 @@ expect: eldric.chained
 expect no link: "Climb the chain"
 
 :: the_first_escape [test]
+(((
+A turn ends when both heroes have passed, or both have spent their vults: Eldric is spent, but Roland must pass too.
+)))
 start: prologue
 do: "Wake as Roland, in the pit"
 do: "Look up through the grate"
@@ -25,6 +28,9 @@ expect: eldric.holds.chain
 expect: eldric.vults == 0
 expect no link: "Go to the Ossuary"
 do: "End the turn"
+do: "Switch to Roland"
+do: "End the turn"
+do: "Switch to Eldric"
 expect: eldric.vults == 60
 do: "Go to the Ossuary"
 expect at: ossuary
@@ -110,6 +116,9 @@ expect: not eldric.wounded
 :: statues_hold_still_while_a_mirror_watches [test]
 start: gate ~ as roland
 do: "End the turn"
+do: "Switch to Eldric"
+do: "End the turn"
+do: "Switch to Roland"
 expect: knight.in(gallery)
 expect: widow.in(gallery)
 
@@ -117,6 +126,9 @@ expect: widow.in(gallery)
 start: gate ~ as roland
 given: set gallery_mirror.open: no
 do: "End the turn"
+do: "Switch to Eldric"
+do: "End the turn"
+do: "Switch to Roland"
 expect: knight.in(gate) and widow.in(gate)
 expect: gate.scale_seal
 expect: knight.fixed
@@ -158,6 +170,9 @@ start: prologue
 do: "Wake as Roland, in the pit"
 do: "Look up through the grate"
 do: "End the turn"
+do: "Switch to Eldric"
+do: "End the turn"
+do: "Switch to Roland"
 do: "Tug the bolt across the room"
 expect: bolted_door.open
 expect: roland.rewinds == 1
@@ -215,6 +230,9 @@ expect no link: "Ask for a hint"
 start: prologue
 do: "Wake as Roland, in the pit"
 do: "End the turn"
+do: "Switch to Eldric"
+do: "End the turn"
+do: "Switch to Roland"
 do: "Ask for a hint"
 expect: hints == 2
 do: "Tie the Backward Knot"
@@ -232,10 +250,15 @@ start: prologue
 do: "Wake as Roland, in the pit"
 given: light flood
 do: "End the turn"
+do: "Switch to Eldric"
+do: "End the turn"
+do: "Switch to Roland"
+do: "End the turn"
+do: "Switch to Eldric"
 do: "End the turn"
 expect text: "You wake where you began"
 expect: not roland.dead
-expect at: oubliette
+expect: roland.in(oubliette)
 
 :: the_collapse_buries_both_heroes [test]
 (((
@@ -245,6 +268,8 @@ start: prologue
 do: "Wake as Roland, in the pit"
 given: light collapse
 given: set collapse.left: 1
+do: "End the turn"
+do: "Switch to Eldric"
 do: "End the turn"
 expect text: "You wake where you began"
 expect: not roland.dead and not eldric.dead
