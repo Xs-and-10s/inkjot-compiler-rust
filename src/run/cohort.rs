@@ -104,6 +104,14 @@ impl Run {
     /// Seat several Linkers, one per character, all starting at `passage`
     /// (or each at their own `start:`). The first is served first.
     pub fn start_cohort(&mut self, passage: Option<&str>, who: &[&str]) -> R<()> {
+        // `guest`, a character `~ one per linker`: the next seat of them.
+        let mut seats: Vec<String> = Vec::new();
+        for w in who {
+            let seat = self.seat_for(w, &seats);
+            seats.push(seat);
+        }
+        let who: Vec<&str> = seats.iter().map(String::as_str).collect();
+        let who = who.as_slice();
         self.order = who.iter().map(|w| w.to_string()).collect();
         // Everyone is in place before anyone looks around.
         if let Some(at) = passage {
@@ -145,6 +153,22 @@ impl Run {
         self.locals = seat.locals;
         self.asking = seat.asking;
         self.paused = seat.paused;
+        Ok(())
+    }
+
+    /// A Link `~ for cohort` was taken: every other seated Linker goes to
+    /// its passage too, and sees it.
+    pub(super) fn everyone_to(&mut self, target: &str) -> R<()> {
+        let served = self.pov.clone();
+        for who in self.order.clone() {
+            if who == served {
+                continue;
+            }
+            self.sit(&who)?;
+            let result = self.enter(target, BTreeMap::new());
+            self.sit(&served)?;
+            result?;
+        }
         Ok(())
     }
 

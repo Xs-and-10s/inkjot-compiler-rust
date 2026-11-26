@@ -35,9 +35,11 @@ here.
 | — | Ex 6 to 9 drafted, reviewed and ready: *Seven Names* (the Library) with its public cut *Cloakroom*, *The Inquest*, *Mafia, by Lamplight*, *Saltmarrow*; pacing reaches the view | #30 to #38 |
 | 19 | The page: `narration:`, `~ selectable` (with `inkjot migrate`), names capitalised at the start of a sentence (`~ keep case`), `cue names:` and `cue directions:`, `[if c; then e]` and `[unless c; then e]`, blocks that `[end]` closes in order, blockquotes, redaction three ways (the hidden words never reach the view), `expect events:`, `expect fork:`, `take fork:`. Ex 8 runs as written | #39 |
 | 20a | Targets and filters: `where:` with `it`, `all(…)`, `~ at` (a Link per target, with `target`), acts that carry their conditions and effects to their Links, Link groups, effects on a set, the config's `let`s in every passage | #41 |
+| 20b | Time and motion: `clock: … ~ each action`, `~ for N turns` and `~ after N turns` (kept in snapshots), handlers on a kind with `entered`, `left`, `crossed`, `moved`, `taken` and `by me`, `on move`, `~ follows me when …`, goals that keep to places (`~ where:`), move every so often (`~ every 2 turns`) or wander; a played passage runs its header | #42 |
 | 20c | Making and the rest: `default takes`, counted items, recipes, tools that break, `gain` of a resource, effects on what an expression names, tables read as values, `nearest(…, where:)`, `toward`, `spreads`, an ending a `play` sends the pov to. Ex 9 plays to the encounter, and can be won without one | #43 |
 | 20d | Encounters: `[encounter]`, `[round]` and `[resolve]` passages, rounds as turns, patterns, threats and the four counters, `deflects`/`absorbs` items, `next round`, `hp` that runs out. Ex 2's duel is rewritten in general words and tested; Ex 9 checks clean and its Warden can be fought. Milestone 20 done | #44 |
-| 20b | Time and motion: `clock: … ~ each action`, `~ for N turns` and `~ after N turns` (kept in snapshots), handlers on a kind with `entered`, `left`, `crossed`, `moved`, `taken` and `by me`, `on move`, `~ follows me when …`, goals that keep to places (`~ where:`), move every so often (`~ every 2 turns`) or wander; a played passage runs its header | #42 |
+| 21a | Ex 7's Doppelgänger pass; `strike` and `struck` are `strikethrough`; the plan to v0.6.0 | #45 |
+| 21b | Cards and seats: `one per linker`, decks, piles, `shuffle`, `deal`, `top of`, `my`, `move` to a pile, `~ for cohort`, `{present linker}`, `max`/`min`; Ex 7's role pile is `hand` and its killers' team `mafia` | #46 |
 
 ## Next
 
@@ -86,7 +88,14 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      messages, and an asynchronous day settled at its deadline.
      21a (#45) did the Doppelgänger pass, and renamed the list effect
      `strike` (and the style `struck`) to `strikethrough`, decided 26 Nov
-     2026. 21 also builds `turn ends when` (Ex 2 declares it).
+     2026. Then: 21b (#46), cards and seats (`one per linker`, decks,
+     piles, `~ for cohort`); 21c, time (periods and named clocks, night and
+     day, `turn ends when`, the night's deadline); 21d, votes and seats
+     (`{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating and
+     `along seat`, settable `shown_as`, `finale when:`, text tables, the
+     quantifiers Ex 7 uses, `first`, `last`, `possessive`); 21e, the
+     engine's cohort API, so the platform can seat a table (the engine is
+     solo today; the interpreter and `inkjot test` already seat cohorts).
    - 22, **Inklog**: rules, `{{ }}`, knowledge bases, `assert` and
      `retract`, quantifiers, facts at a time, `never`, `{note input}`. Done
      when Ex 6's public cut runs and Ex 5 is brought up to date.
@@ -108,7 +117,7 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      `define` steps 1 and 3; facets and `~ conflict`; Ex 10 and Ex 12;
      groups (below).
 
-**Groups** (proposed 26 Nov 2026, for v0.7, with Ex 12): one declaration
+**Groups** (decided 26 Nov 2026, for v0.7, with Ex 12): one declaration
 for any body of people, named or faceless or both: an army, a party, the
 CIA, a visiting team, a religion and its sects. `group fleet: "the Fifth
 Fleet" ~ size 3000 ~ members vance, okafor ~ part of navy`: `size` counts

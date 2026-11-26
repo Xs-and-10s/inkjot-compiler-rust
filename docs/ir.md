@@ -375,6 +375,13 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   carries its group's clauses. `all(…)` and `with: {"where": …}` in calls.
 - `playable` is now the tag `selectable` (a rename in the source, with
   `inkjot migrate`).
+- Milestone 21b: `deck` declarations, `{"declare": "deck", "id",
+  "cards": [{"card": "mafia", "count": expr | "rest"}]}`; `pile`
+  declarations with `per`, `face_down`, `face_up` and the tag `private`;
+  `one_per_linker` on a character; effects `shuffle` and `deal`; the
+  unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
+  insert's `of_each` (`{list hand of each guest}`); the insert `present
+  linker`; the functions `max` and `min`.
 - Milestone 20d: `threat` declarations (`at` an expression, `answered_by`,
   `fails_when`, `on_fail`, `then`, the tag among `tags`); `pattern`
   statements, `{"pattern": "rhyme", "steps": […], "repeat": true,

@@ -142,6 +142,8 @@ impl fmt::Display for Expr {
             Expr::Unary(op, operand) => {
                 if *op == "not" {
                     write!(f, "not ")?;
+                } else if *op == "top" {
+                    write!(f, "top of ")?;
                 } else {
                     write!(f, "{op}")?;
                 }
@@ -529,6 +531,13 @@ impl Parser {
         if self.eat_op("-") {
             return self.nested(|p| Ok(Expr::Unary("-", Box::new(p.unary()?))));
         }
+        // `top of my hand`: the first card of a pile, or of any list.
+        if matches!(self.peek(), Some(Tok::Ident(s)) if s == "top")
+            && matches!(self.toks.get(self.pos + 1), Some((_, Tok::Ident(s))) if s == "of")
+        {
+            self.pos += 2;
+            return self.nested(|p| Ok(Expr::Unary("top", Box::new(p.unary()?))));
+        }
         self.postfix()
     }
 
@@ -621,6 +630,16 @@ impl Parser {
                     return Err((at, format!("`{s}` needs something before it")));
                 }
                 self.pos += 1;
+                // `my hand` is `me.hand`.
+                if s == "my" {
+                    if let Some(Tok::Ident(m)) = self.peek().cloned() {
+                        if !WORD_OPS.contains(&m.as_str()) {
+                            self.pos += 1;
+                            let me = Expr::Name("me".to_string(), At(at));
+                            return Ok(Expr::Member(Box::new(me), m));
+                        }
+                    }
+                }
                 // `i`, `you`, `myself` and `yourself` are the pov, as `me` is.
                 let s = if crate::syntax::POV_NAMES.contains(&s.as_str()) {
                     "me".to_string()

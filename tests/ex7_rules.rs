@@ -21,13 +21,13 @@ fn the_model_follows_the_draft() {
     let src = draft();
     for line in [
         "get members: max(1, players / 4)",
-        "~ card syndicate: members",
+        "~ card mafia: members",
         "~ card doctor: 1",
         "~ card detective: 1",
         "~ card townsfolk: rest",
         "get haul_needed: players / 3 + 1",
         "move each found to it.owner.keepsake when syndicate.special == heist",
-        "get haul: all(guest, where: it.team == syndicate).loot",
+        "get haul: all(guest, where: it.team == mafia).loot",
         "let first_voter: first(victim.chosen_by)",
         "~ consensus ~ when cult_left < 2 or nights mod 2 == 1",
         "it.team != cult and it.role != doctor and it.voted_with(cult)",

@@ -101,6 +101,8 @@ struct Checker {
     decls: HashMap<String, HashSet<&'static str>>,
     /// Free words on declarations (`~ evidence`), plus the built-in ones.
     tags: HashSet<String>,
+    /// Characters `~ one per linker`: `guest_2` names a seat of `guest`.
+    seats: HashSet<String>,
     /// passage → the names it introduces: `let`s, input variables, and the
     /// `with {…}` parameters of Links that lead to it.
     scopes: HashMap<String, HashSet<String>>,
@@ -371,6 +373,17 @@ impl Checker {
                 let name = first_word(head.text[s.kw.len()..].trim_start());
                 if !is_ident(name) {
                     continue; // reported in pass two
+                }
+                // A name that stands for several (`~ one per linker`, `~ count
+                // 4`) is a kind of its own: `~ at guest`.
+                if s.clauses[1..]
+                    .iter()
+                    .any(|c| c.text == "one per linker" || c.text.starts_with("count "))
+                {
+                    self.tags.insert(name.to_string());
+                }
+                if s.clauses[1..].iter().any(|c| c.text == "one per linker") {
+                    self.seats.insert(name.to_string());
                 }
                 self.stats.declarations += 1;
                 self.decls.entry(name.to_string()).or_default().insert(kind);
@@ -1027,6 +1040,33 @@ impl Checker {
                     }
                 }
             }
+            // `deck roles ~ card mafia: members ~ card townsfolk: rest`.
+            "deck" => {
+                for c in &s.clauses[1..] {
+                    if let Some((_, n)) =
+                        c.text.strip_prefix("card ").and_then(|t| t.split_once(':'))
+                    {
+                        if n.trim() != "rest" {
+                            self.expr(n.trim(), c.line, c.col);
+                        }
+                    }
+                }
+            }
+            // `pile hand ~ per guest`: whose it is.
+            "pile" => {
+                for c in &s.clauses[1..] {
+                    if let Some(who) = c.text.strip_prefix("per ") {
+                        let who = who.trim();
+                        if !self.is_kind_word(who) && !self.has(who, &["character", "npc"]) {
+                            self.err(
+                                c.line,
+                                c.col + 4,
+                                format!("a pile is `~ per` a kind of person, such as a character `~ one per linker`; `{who}` is not one"),
+                            );
+                        }
+                    }
+                }
+            }
             // `threat flame: fire ~ at roland ~ answered by prevent, block`.
             "threat" => {
                 let first = Clause {
@@ -1625,6 +1665,20 @@ impl Checker {
                     self.need(arg(2), &["item"], "item", line, col);
                 }
             }
+            // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
+            "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
+            "deal" => match words.as_slice() {
+                [_, n, "from", deck, "to", "each", pile] => {
+                    self.expr(n, line, col + 5);
+                    self.need(deck, &["deck"], "deck", line, word_col(3));
+                    self.need(pile, &["pile"], "pile", line, word_col(6));
+                }
+                _ => self.err(
+                    line,
+                    col,
+                    "`deal` is written `deal 1 from deck to each pile`",
+                ),
+            },
             "end" if arg(1) != "encounter" => {
                 self.err(line, col, "`end` is written `end encounter`");
             }
@@ -2079,6 +2133,11 @@ impl Checker {
             }
             // `{list burning_near}`: a declared list, or a `let` that holds one.
             "list" if self.locals.contains(second) || self.globals.contains(second) => {}
+            // `{list hand of each guest}`: a pile, for everyone of a kind.
+            "list" if content.contains(" of each ") => {
+                self.need(second, &["pile"], "pile", line, col + 5);
+            }
+            "present" if second == "linker" => {}
             "list" => self.need(second, &["list"], "list", line, col + 5),
             "all" if !second.is_empty() => {
                 let rest = &content[content.find("all").unwrap_or(0) + 3..];
@@ -2347,6 +2406,9 @@ impl Lookup for Checker {
     fn is_known(&self, name: &str) -> bool {
         resolve::BUILTINS.contains(&name)
             || self.decls.contains_key(name)
+            || name
+                .rsplit_once('_')
+                .is_some_and(|(base, n)| n.parse::<u32>().is_ok() && self.seats.contains(base))
             || self.tags.contains(name)
             || self.locals.contains(name)
             || self.globals.contains(name)
