@@ -155,9 +155,13 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                     run.sit(value)
                 }
             }
+            // The world is changed directly, and what each Linker is
+            // offered is worked out again for it.
             "given" => {
                 let effect = crate::ir::effect(value);
-                run.apply(&effect, &[]).and_then(|()| run.settle_deaths())
+                run.apply(&effect, &[])
+                    .and_then(|()| run.settle_deaths())
+                    .and_then(|()| if started { run.relist_all() } else { Ok(()) })
             }
             // `do: wait 5m`: real time passes, and timed Links are taken.
             "do" if value.starts_with("wait ") => {

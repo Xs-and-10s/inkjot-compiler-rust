@@ -156,6 +156,26 @@ impl Run {
         Ok(())
     }
 
+    /// Work out again what everyone seated is offered (alone, the pov):
+    /// after a test's `given:` changes the world.
+    pub(crate) fn relist_all(&mut self) -> R<()> {
+        if self.order.is_empty() {
+            return if self.paused.is_none() && !self.here().is_empty() {
+                self.relist()
+            } else {
+                Ok(())
+            };
+        }
+        let served = self.pov.clone();
+        for who in self.order.clone() {
+            self.sit(&who)?;
+            if self.paused.is_none() {
+                self.relist()?;
+            }
+        }
+        self.sit(&served)
+    }
+
     /// A Link `~ for cohort` was taken: every other seated Linker goes to
     /// its passage too, and sees it.
     /// The passage's header was run once, for the one who took it; the

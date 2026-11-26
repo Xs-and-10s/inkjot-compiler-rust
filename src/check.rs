@@ -1575,8 +1575,18 @@ impl Checker {
                     );
                 }
             }
+            // `as: guest_2`: a seat of a character `~ one per linker`.
+            "as" if value
+                .rsplit_once('_')
+                .is_some_and(|(base, n)| n.parse::<u32>().is_ok() && self.seats.contains(base)) => {
+            }
             "as" => self.need(value, &["character"], "character", line, vcol),
             // `vote: vell ~ how device ~ proof cufflink`: a ballot in a test.
+            // `vote: guest_3`: a seat may be voted for too.
+            "vote"
+                if first_word(value).rsplit_once('_').is_some_and(|(base, n)| {
+                    n.parse::<u32>().is_ok() && self.seats.contains(base)
+                }) => {}
             "vote" => self.need(
                 first_word(value),
                 &["character", "npc"],
@@ -1625,6 +1635,10 @@ impl Checker {
                         "`expect fork:` may say which Link it stands in for: `~ for \"label\"`",
                     );
                 }
+            }
+            // `expect at: marking:done`: a passage, sub-Nibs included.
+            "expect" if rest.trim_start().starts_with("at:") => {
+                self.need_passage(value, "the passage expected", line, vcol);
             }
             "expect" => {
                 if value.is_empty() {
@@ -2131,6 +2145,16 @@ impl Checker {
                 }
             }
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
+            // `~ for guest where: it.alive`.
+            "for" if c.text.contains(" where:") => {
+                let (_, cond) = c.text.split_once(" where:").unwrap_or(("", ""));
+                self.where_expr(cond, c.line, c.col + cols(&c.text) - cols(cond));
+            }
+            "consensus" if !arg.is_empty() && arg.parse::<u32>().map_or(true, |n| n == 0) => self.err(
+                c.line,
+                arg_col,
+                "`~ consensus` takes how many each chooses, 1 or more: `~ consensus 2`",
+            ),
             // `~ after 5m`: taken by itself, in real time.
             "after" if crate::run::clock_millis(arg).is_none() => self.err(
                 c.line,
@@ -2257,6 +2281,7 @@ impl Checker {
             "sound" if second == "effect:" => {}
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
+            "ballot" => self.ballot(&c[first.len()..], line, col),
             // `{redacted "TEN" until telegram.dry}`.
             "redacted" => {
                 let text = c["redacted".len()..].trim_start();
@@ -2331,11 +2356,15 @@ impl Checker {
             let (key, value) = (key.trim(), value.trim());
             seen.push(key.to_string());
             match key {
+                // A kind (`suspect`), or a list worked out (`all(guest, where: it.alive)`).
+                "who" if value.contains('(') => self.expression_in(value, line, col),
                 "who" => {
                     if !self.is_kind_word(value) {
-                        self.err(line, col, format!("`who: {value}` should name a kind of suspect: a tag such as `suspect`, or `npc`"));
+                        self.err(line, col, format!("`who: {value}` should name a kind of suspect: a tag such as `suspect`, or `npc`, or a list such as `all(guest, where: it.alive)`"));
                     }
                 }
+                "voters" => self.expression_in(value, line, col),
+                "ties" => self.ties(value, line, col),
                 "how" => self.expression_in(value, line, col),
                 // Tags a conviction must cite: `proof_who and proof_how`.
                 "proof" => {
@@ -2351,7 +2380,7 @@ impl Checker {
                 other => self.err(
                     line,
                     col,
-                    format!("`{{accuse}}` takes who, how, proof and revote, not `{other}`"),
+                    format!("`{{accuse}}` takes who, how, proof, revote, voters and ties, not `{other}`"),
                 ),
             }
         }
@@ -2360,6 +2389,59 @@ impl Checker {
                 line,
                 col,
                 "`{accuse}` needs `who:`, the kind of thing the jury may accuse",
+            );
+        }
+    }
+
+    /// `{ballot for: chosen_special, from: specials, voters: all(guest),
+    /// ties: draw}`: a vote among the table for one of a list.
+    fn ballot(&mut self, args: &str, line: usize, col: usize) {
+        let mut seen = Vec::new();
+        for part in crate::ir::split_args(args) {
+            let Some((key, value)) = part.split_once(':') else {
+                self.err(
+                    line,
+                    col,
+                    format!("`{part}` in `{{ballot}}` needs a name: `for: choice`"),
+                );
+                continue;
+            };
+            let (key, value) = (key.trim(), value.trim());
+            seen.push(key.to_string());
+            match key {
+                "for" => self.expression_in(value, line, col),
+                "from" => {
+                    if !self.is_kind_word(value) && !self.has(value, &["list"]) {
+                        self.err(
+                            line,
+                            col,
+                            format!("`from: {value}` should name a list or a kind"),
+                        );
+                    }
+                }
+                "voters" => self.expression_in(value, line, col),
+                "ties" => self.ties(value, line, col),
+                other => self.err(
+                    line,
+                    col,
+                    format!("`{{ballot}}` takes for, from, voters and ties, not `{other}`"),
+                ),
+            }
+        }
+        for need in ["for", "from"] {
+            if !seen.iter().any(|k| k == need) {
+                self.err(line, col, format!("`{{ballot}}` needs `{need}:`"));
+            }
+        }
+    }
+
+    /// `ties: draw` (drawn by lot among the tied) or `ties: hung`.
+    fn ties(&mut self, value: &str, line: usize, col: usize) {
+        if !["draw", "hung"].contains(&value) {
+            self.err(
+                line,
+                col,
+                "`ties` is `draw` (by lot, among the tied) or `hung`",
             );
         }
     }

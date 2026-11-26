@@ -112,6 +112,11 @@ returned (decided 21 Nov); a consensus on two targets (`~ consensus 2`,
 draw (`accusation.drawn`); and `measure` (built, 21 Nov), for what each
 game reports when it ends.
 
+All of it is built by milestone 21d but the Detective's knowledge base
+(`knowledge findings`, `assert {{ … }} in findings`), which is milestone
+22's. `tests/ex7_play.rs` plays the draft with those lines set aside: its
+own tests, and random games, every one of which must end.
+
 ### Ex 7: tuning from playtests
 
 `tests/ex7_rules.rs` tunes the specials against a plain syndicate with

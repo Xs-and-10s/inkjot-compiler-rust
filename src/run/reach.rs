@@ -103,9 +103,11 @@ impl Run {
         if *when != Value::Null && !self.eval(when)?.truthy() {
             return Ok(());
         }
-        if let Some(how) = f(s, "along").as_str().filter(|h| *h != "way") {
+        let ring = f(s, "along").as_str().filter(|h| self.is_ring(h)).is_some();
+        if let Some(how) = f(s, "along").as_str().filter(|h| *h != "way" && !ring) {
             return Err(format!(
-                "`spreads … ~ along {how}` is not built yet; only `along way` is"
+                "`spreads … ~ along {how}`: `along way`, or a relation the table sits in, \
+                 `relation seat: each guest ~ ring`"
             ));
         }
         let n = f(s, "spreads").as_u64().unwrap_or(1) as usize;
@@ -120,6 +122,25 @@ impl Run {
         let then = f(s, "then").as_arr().unwrap_or(&[]).to_vec();
         let mut reached = Vec::new();
         for source in sources {
+            // Round the table: the seats after the source's, in order.
+            if ring {
+                let mut found = self.things(&kind, None);
+                if cond != Value::Null {
+                    found = self.where_filter(found, &cond)?;
+                }
+                let mut round: Vec<(usize, String)> = found
+                    .into_iter()
+                    .filter_map(|id| Some((self.seats_from(&source, &id)?, id)))
+                    .filter(|(d, _)| *d > 0 && within.is_none_or(|w| *d <= w))
+                    .collect();
+                round.sort();
+                for (_, id) in round.into_iter().take(n) {
+                    if !reached.contains(&id) {
+                        reached.push(id);
+                    }
+                }
+                continue;
+            }
             self.near = Some(source);
             let near = self.nearest_where(&kind, &cond, within);
             self.near = None;

@@ -382,6 +382,17 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 21d: a Link's `for_where` (from `~ for guest where: …`) and
+  `consensus` (how many each chooses); the `ballot` insert (`args`: `for`,
+  `from`, `voters`, `ties`); the jury's `voters` and `ties`, and a `who`
+  that is an expression; the `text input`; `finale_when` statements;
+  tables with `pick` (in place of `roll`), `once`, `columns` and `rows` of
+  `{"row": id, "values": [...]}` (text is `{"str": …}`, a name a string);
+  the effects `{"do": "roll", "args": [table], "where": expr}` and
+  `{"do": "draw", "table", "row"}`; list entries of text alone (`{"label":
+  …}`, no `id`); `pronouns` on a declaration; the functions `first`,
+  `last`, `possessive`. `no`, `some` and `every guest where: …` are lowered
+  as counts.
 - Milestone 21c: `period` declarations, `{"declare": "period", "id":
   "phase", "names": ["night", "day"]}` with one of `"lengths": [1, 1]`,
   `"each": 3` or `"of": "watch"`; handlers `{"on": "begins", "period":

@@ -1098,7 +1098,23 @@ impl Builder {
                 }
                 "when" => whens.push(expression(rest)),
                 "hidden" => hidden = expression(rest.strip_prefix("until").unwrap_or(rest)),
+                // `~ for guest where: it.alive`: who of a kind may take it.
+                "for" if rest.contains(" where:") => {
+                    let (kinds, cond) = rest.split_once(" where:").unwrap_or((rest, ""));
+                    audience = strings(kinds.split(',').map(str::trim));
+                    extra.push(("for_where".into(), expression(cond.trim())));
+                }
                 "for" => audience = strings(rest.split(',').map(str::trim)),
+                // `~ consensus`, `~ consensus 2`: a vote among those who may
+                // take it; each chooses that many.
+                "consensus" => extra.push((
+                    "consensus".into(),
+                    if rest.trim().is_empty() {
+                        num(1)
+                    } else {
+                        token(rest.trim())
+                    },
+                )),
                 "then" => effects.push(effect(rest)),
                 "ends" => ends_turn = Some(true),
                 "private" | "shared" => scope = Some(word.to_string()),
@@ -1383,10 +1399,16 @@ pub(crate) fn effect(text: &str) -> Value {
     match verb {
         "set" => {
             let (target, value) = rest.split_once(':').unwrap_or((rest, ""));
-            let (value, until) = value
-                .trim()
-                .split_once(" until ")
-                .unwrap_or((value.trim(), ""));
+            // `set x: y until …`, but not an "until" in quoted text.
+            let value = value.trim();
+            let at = value
+                .match_indices(" until ")
+                .map(|(i, _)| i)
+                .find(|i| value[..*i].matches('"').count() % 2 == 0);
+            let (value, until) = match at {
+                Some(i) => (&value[..i], &value[i + " until ".len()..]),
+                None => (value, ""),
+            };
             pairs.push(("target".into(), expression(target)));
             pairs.push(("value".into(), expression(value)));
             if !until.is_empty() {
@@ -1726,9 +1748,9 @@ fn insert(content: &str) -> Value {
                 ("until", expression(until)),
             ])
         }
-        // The jury and the inputs take typed arguments.
-        "accuse" => Value::obj([
-            ("insert", Value::str("accuse")),
+        // The jury, a ballot, and the inputs take typed arguments.
+        "accuse" | "ballot" => Value::obj([
+            ("insert", Value::str(first)),
             ("args", insert_args(&c[first.len()..])),
         ]),
         _ if second == "input" => Value::obj([

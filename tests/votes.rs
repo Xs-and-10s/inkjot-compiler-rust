@@ -124,6 +124,170 @@ expect at: all_gone
 expect text: "Only one is left."
 "#;
 
+/// A table of four: two crows choose together at night, a vote by day, a
+/// ballot for the weather, and a rumour that goes round the table.
+const ROOST: &str = r#":: StoryTitle
+Roost
+
+:: StoryData
+{"ifid": "x", "format": "Inkjot", "format-version": "0.6.0", "start": "dusk"}
+
+:: Inklink [config]
+kind: game
+mode: cohort
+cohort: 4..=6
+clock: 0.. ~ shown as "turn"
+period phase: night 1, day 1
+character guest: "a guest" ~ selectable ~ custom ~ one per linker
+~ state alive: yes
+~ state team: town
+~ state heard: no
+~ state method: peck
+relation seat: each guest ~ ring ~ in order joined
+state victim: nobody ~ of guest
+state second: nobody ~ of guest
+state weather: nothing ~ of weathers
+state rumour: no
+list teams ~ holds town, crow
+list weathers: "the weather" ~ holds rain: "rain", shine: "shine", fog: "fog"
+
+:: dusk
+{ballot for: weather, from: weathers, ties: draw}
+> [[Nightfall->night]] ~ for cohort ~ when ballot.done ~ then wait until night
+
+:: night
+> ~ for guest where: it.alive and it.team == crow ~ consensus
+> [[Peck {target}->night:done]] ~ at guest where: it.alive and it.team != crow ~ then set victim: target ~ then set me.method: peck
+> [[Swoop on {target}->night:done]] ~ at guest where: it.alive and it.team != crow ~ then set victim: target ~ then set me.method: swoop
+
+> [[Sleep->night:done]] ~ for guest where: it.team != crow
+
+:: night:done
+You wait.
+> [[Morning->morning]] ~ for cohort ~ when cohort.all.chose ~ then wait until day
+
+:: morning
+let first: first(victim.chosen_by)
+set victim.alive: no when victim != nobody
+--
+{if victim == nobody then "Nobody died." else "{victim} died, by {first.method}."}
+> [[The vote->vote]] ~ for cohort
+
+:: vote
+{accuse who: all(guest, where: it.alive), voters: all(guest, where: it.alive), revote: 1, ties: draw}
+> [[Counted->counted]] ~ for cohort ~ when accusation.done
+
+:: counted
+set accusation.who.alive: no
+spreads 1 from all(guest, where: it.heard) to nearest(guest, where: not it.heard) ~ along seat ~ then set it.heard: yes ~ when rumour
+--
+{ballots}
+
+:: marking
+> ~ for guest where: it.team == crow ~ consensus 2
+> [[Mark {target}->marking:done]] ~ at guest where: it.team != crow ~ then set victim: first(targets) ~ then set second: last(targets)
+
+:: marking:done
+> [[Dawn->marking:done]] ~ for cohort ~ then wait until day
+
+:: the_weather_is_voted [test]
+start: dusk ~ as guest, guest, guest, guest
+answer: rain
+as: guest_2
+answer: rain
+as: guest_3
+answer: fog
+expect: not ballot.done
+as: guest_4
+answer: shine
+expect: ballot.done and weather == rain
+
+:: crows_choose_together [test]
+start: night ~ as guest, guest, guest, guest
+given: set guest_1.team: crow
+given: set guest_2.team: crow
+given: set guest_3.name: "Cas"
+given: set guest_4.name: "Dot"
+as: guest_1
+do: "Swoop on Dot"
+expect: victim == nobody
+as: guest_2
+do: "Peck Cas"
+as: guest_3
+do: "Sleep"
+as: guest_4
+do: "Sleep"
+do: "Morning"
+(((
+A tie: the first chosen, Dot, by the one who chose first, their way.
+)))
+expect: not guest_4.alive and guest_3.alive
+expect text: "Dot died, by swoop."
+expect: guest_4.chosen_by == [guest_1]
+
+:: no_votes_no_kill [test]
+start: night ~ as guest, guest, guest, guest
+given: set guest_1.team: crow
+as: guest_2
+do: "Sleep"
+as: guest_3
+do: "Sleep"
+as: guest_4
+do: "Sleep"
+expect no link: "Morning"
+as: guest_1
+expect link: "Peck a guest"
+
+:: the_living_vote_and_the_rumour_goes_round [test]
+start: vote ~ as guest, guest, guest, guest
+given: set rumour: yes
+given: set guest_1.heard: yes
+given: set guest_1.team: crow
+given: set guest_1.name: "Ash"
+given: set guest_2.name: "Bel"
+given: set guest_3.name: "Cas"
+given: set guest_4.alive: no
+vote: guest_3
+as: guest_2
+vote: guest_3
+as: guest_4
+expect no link: "Counted"
+as: guest_3
+vote: guest_2
+expect: accusation.done and accusation.who == guest_3 and not accusation.drawn
+expect: guest_2.voted_with(crow) and not guest_3.voted_with(crow)
+do: "Counted"
+expect text: "2 for Cas; 1 for Bel"
+expect: not guest_3.alive
+expect: guest_2.heard and not guest_3.heard
+
+:: two_each_and_the_two_most_chosen [test]
+start: marking ~ as guest, guest, guest, guest, guest
+given: set guest_1.team: crow
+given: set guest_2.team: crow
+given: set guest_3.name: "Cas"
+given: set guest_4.name: "Dot"
+given: set guest_5.name: "Eve"
+as: guest_1
+do: "Mark Cas"
+expect at: marking
+expect no link: "Mark Cas"
+do: "Mark Dot"
+expect at: marking:done
+as: guest_2
+do: "Mark Dot"
+do: "Mark Eve"
+do: "Dawn"
+expect: victim == guest_4 and second == guest_3
+expect: guest_4.chosen_by == [guest_1, guest_2]
+
+:: the_dead_have_no_vote [test]
+start: vote ~ as guest, guest, guest, guest
+given: set guest_4.alive: no
+as: guest_4
+expect: not (guest_4 in accusation.voters)
+"#;
+
 fn errors(src: &str) -> Vec<String> {
     inkjot::check(src)
         .diags
@@ -136,18 +300,21 @@ fn errors(src: &str) -> Vec<String> {
 #[test]
 fn it_checks_clean() {
     assert_eq!(errors(LODGE), Vec::<String>::new());
+    assert_eq!(errors(ROOST), Vec::<String>::new());
 }
 
 #[test]
 fn its_tests_pass() {
-    let ir = inkjot::build(LODGE).unwrap_or_else(|r| panic!("{:#?}", r.diags));
-    for o in run_all(LODGE, &ir).unwrap() {
-        assert!(
-            o.passed(),
-            "`{}`: {:#?}\n{}",
-            o.name,
-            o.failures,
-            o.transcript.join("\n")
-        );
+    for src in [LODGE, ROOST] {
+        let ir = inkjot::build(src).unwrap_or_else(|r| panic!("{:#?}", r.diags));
+        for o in run_all(src, &ir).unwrap() {
+            assert!(
+                o.passed(),
+                "`{}`: {:#?}\n{}",
+                o.name,
+                o.failures,
+                o.transcript.join("\n")
+            );
+        }
     }
 }

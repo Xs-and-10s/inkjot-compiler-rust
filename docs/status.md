@@ -41,6 +41,7 @@ here.
 | 21a | Ex 7's Doppelgänger pass; `strike` and `struck` are `strikethrough`; the plan to v0.6.0 | #45 |
 | 21b | Cards and seats: `one per linker`, decks, piles, `shuffle`, `deal`, `top of`, `my`, `move` to a pile, `~ for cohort`, `{present linker}`, `max`/`min`; Ex 7's role pile is `hand` and its killers' team `mafia` | #46 |
 | 21c | Time: `period`s and named clocks (`clock.phase`, ordered names, clocks in names, `once per hour`), `on … begins` / `ends`, `wait until`, `turn ends when` with `passed` and `spent`, Links timed in real time (`~ after 5m`, `Action::Wait`, `due_in`); Ex 7's night has its deadline | #47 |
+| 21d | Votes and seats: `~ for … where:`, `~ consensus`, `{ballot}`, the jury's `voters:` and `ties: draw`, seats in a ring, tables with named columns, lists of text, quantifiers, `first`/`last`/`possessive`, pronouns, settable `shown_as`, `{text input}`, `finale when:`. Ex 7 plays, but for its knowledge base | #48 |
 
 ## Next
 

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Milestone 21d: votes and seats
+
+- `~ for guest where: …`; `~ consensus` and `~ consensus 2`, settled as
+  the turn ends (`x.chosen_by`, `targets`); `cohort.all.chose`.
+- `{ballot for: …, from: list, voters: …, ties: draw}` and `ballot.done`;
+  the jury's `who:` as a list, `voters:`, `ties: draw`, an optional `how:`,
+  `accusation.voters`, `accusation.drawn`, and `it.voted_with(…)`. A jury
+  nobody may sit on decides at once, by lot (found by Ex 7's random games:
+  a table where everyone pays a debt could not vote).
+- Seats in a ring (`relation seat: each guest ~ ring`) and `spreads …
+  ~ along seat`.
+- Tables with named columns (`roll t where:`, `draw t row`, `t.column`);
+  lists of text, picked their way by `one(list)`; `no`/`some`/`every guest
+  where: …`; `first`, `last`, `possessive`; pronouns; `set x.shown_as: …`;
+  `{text input}`; `{choose input}` from a list; `finale when:`.
+- A `~ for cohort` passage's header runs once, for the one who took it;
+  the others arrive with its `let`s, and statements about `me` run for
+  each. Whole numbers divide into whole numbers, rounded down.
+- Fixed: a value `~ of guest` was counted as one of the guests; a story's
+  own `alive` was ignored; `until` inside quoted text cut a `set` in two;
+  `expect at:` refused a sub-Nib; tests may sit at and vote for seats, and
+  `given:` lists what is offered again.
+- Ex 7 now checks clean but for the Detective's knowledge base (milestone
+  22's), and plays: `tests/ex7_play.rs` runs its own tests with those two
+  lines set aside, and 32 random games, every one of which ends.
+
 ### Milestone 21c: time
 
 - Periods: `period phase: night 1, day 1`, `period season: spring, summer

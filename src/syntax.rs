@@ -191,16 +191,54 @@ pub(crate) const RETIRED: &[(&str, &str)] = &[
 
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
-    "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
-    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch", "id",
+    "cost",
+    "when",
+    "hidden",
+    "for",
+    "then",
+    "ends",
+    "private",
+    "shared",
+    "capacity",
+    "clash",
+    "check",
+    "chance",
+    "hint",
+    "inquest",
+    "order",
+    "after",
+    "become",
+    "with",
+    "by",
+    "switch",
+    "id",
     // Inquests: where a fork's pending slot rejoins, its brief, who wrote it.
-    "rejoin", "brief", "credit",
+    "rejoin",
+    "brief",
+    "credit",
     // Analysis: read by the Inker's reports, never by play.
-    "beat", "weighs", "arc", "stakes", "plants", "pays", "predict", "lasting", "tone", "reveals",
-    "pass", "release", "requires", "once", "loud", "quiet", "choice",
+    "beat",
+    "weighs",
+    "arc",
+    "stakes",
+    "plants",
+    "pays",
+    "predict",
+    "lasting",
+    "tone",
+    "reveals",
+    "pass",
+    "release",
+    "requires",
+    "once",
+    "loud",
+    "quiet",
+    "choice",
     // A target chosen by the Linker: `~ at item here where: …`.
     "at", // A tool the Link uses, which may break: `~ uses pick`.
     "uses",
+    // A vote among those who may take it: `~ consensus`, `~ consensus 2`.
+    "consensus",
 ];
 
 /// The input family: `{name input for: me.name}`.

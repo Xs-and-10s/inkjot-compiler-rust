@@ -66,6 +66,8 @@ pub const BUILTINS: &[&str] = &[
     "pov",
     "scenario",
     "accusation",
+    // `ballot.done`: the table's last `{ballot}`.
+    "ballot",
     // What a Link with `~ at` was taken on, in its effects and its passage.
     "target",
     // What an `on` handler's event happened to: `on enter shaft when entered.burnt`.

@@ -185,3 +185,18 @@ The compiler's side is in the draft (milestone 21a). The platform's:
   seating API.
 - The view's `now` is still the turn. Names of periods (`clock.phase`) are
   the story's to show, in its text.
+
+## 13. Votes at a table (milestone 21d, 26 Nov)
+
+- A `{ballot}` comes in `asks` with `kind: "ballot"`, `options` (the
+  list's entries) and `voted`; it is answered with `Answer([option])`.
+  A decided ballot or jury is no longer asked.
+- The jury at a table: `who:` may be a list of seats, `how:` may be
+  missing (then the ask's `methods` is empty, and a vote's `how` is `""`),
+  and only `voters:` may vote; others are refused (`bad_answer`). Ties may
+  be drawn by lot.
+- Consensus Links (`~ consensus`): taking one is a vote; its effects
+  happen when the turn ends. Night results therefore land together, at
+  the morning, as §11 asks.
+- A `~ for cohort` Link moves the whole table; the platform shows each seat
+  its own view of the passage. The engine is still solo (21e).

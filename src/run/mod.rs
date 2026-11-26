@@ -24,6 +24,7 @@ pub mod test;
 mod time;
 mod timers;
 mod value;
+mod votes;
 
 use events::Event;
 use std::sync::Arc;
@@ -96,13 +97,27 @@ pub struct Story {
     recipes: Vec<Value>,
     /// Every `period`: `clock.phase`, `on phase begins night`.
     calendar: Calendar,
-    /// The rows of tables with named columns, by row: its table and values.
+    /// The rows of tables with named columns, by row: its table and values;
+    /// and the tables themselves, by name. (Kept apart from the other
+    /// declarations: Ex 7's `table syndicate` shares its name with the
+    /// `state syndicate` that holds the row drawn.)
     rows: BTreeMap<String, (String, Vec<Value>)>,
+    tables: BTreeMap<String, Value>,
 }
 
 /// `5m`, `30s`, `400ms`: a real time, in milliseconds.
 pub(crate) fn clock_millis(text: &str) -> Option<u64> {
     clock::millis(text)
+}
+
+/// Does a lowered statement say `me` (or `my`, which is lowered to it)?
+fn mentions_me(v: &Value) -> bool {
+    match v {
+        Value::Str(s) => s == "me",
+        Value::Arr(items) => items.iter().any(mentions_me),
+        Value::Obj(pairs) => pairs.iter().any(|(_, v)| mentions_me(v)),
+        _ => false,
+    }
 }
 
 /// One of a set of pronouns, by its `they` form: `pronoun("she", "their")`
@@ -230,6 +245,7 @@ impl Story {
             recipes: Vec::new(),
             calendar: Calendar::default(),
             rows: BTreeMap::new(),
+            tables: BTreeMap::new(),
         };
         let config = ir
             .get("config")
@@ -259,6 +275,7 @@ impl Story {
         story.calendar = calendar(config)?;
         for t in config.iter().filter(|s| s.get("columns").is_some()) {
             let table = f(t, "id").as_str().unwrap_or("").to_string();
+            story.tables.insert(table.clone(), t.clone());
             for row in f(t, "rows").as_arr().unwrap_or(&[]) {
                 if let Some(id) = f(row, "row").as_str() {
                     let values = f(row, "values").as_arr().unwrap_or(&[]).to_vec();
@@ -281,7 +298,7 @@ impl Story {
     /// columns: that row's value in that column.
     fn column(&self, row: &str, column: &str) -> Option<&Value> {
         let (table, values) = self.rows.get(row)?;
-        let i = strs(self.field(table, "columns"))
+        let i = strs(f(self.tables.get(table)?, "columns"))
             .iter()
             .position(|c| c == column)?;
         values.get(i)
@@ -740,6 +757,10 @@ pub struct Run {
     /// run once, for the one who took it: the others arrive with its `let`s
     /// as they were, and its effects are not done again.
     table_arrival: Option<BTreeMap<String, Local>>,
+    /// The votes cast in each consensus this turn (`votes.rs`), and who
+    /// has done something this turn (`cohort.all.chose`).
+    votes: BTreeMap<String, Vec<votes::Vote>>,
+    chose: BTreeSet<String>,
     /// While the pov does an act kept away from any place (a spellbook's,
     /// `spell:kindle`): the place they are doing it in.
     acting_in: Option<String>,
@@ -836,6 +857,8 @@ impl Run {
             go_to: None,
             finale_now: None,
             table_arrival: None,
+            votes: BTreeMap::new(),
+            chose: BTreeSet::new(),
             acting_in: None,
             encounter: None,
             hinted: BTreeSet::new(),
@@ -1502,7 +1525,15 @@ impl Run {
                 left.div_ceil(1000)
             ));
         }
+        let chooser = self.pov.clone();
+        let doing = !matches!(
+            f(&link, "kind").as_str(),
+            Some("hint" | "switch" | "rewind")
+        );
         self.take(&link)?;
+        if doing {
+            self.chose.insert(chooser);
+        }
         self.settle_deaths()?;
         self.enter_finale()
     }
@@ -1514,6 +1545,10 @@ impl Run {
         }
         // An echo may look and learn, but take nothing and reach for nothing.
         if self.in_past() && (self.is_claim(link) || f(link, "act").as_str() == Some("take")) {
+            return Ok(false);
+        }
+        // A vote already cast for this, or all a voter may cast.
+        if !self.may_vote(link) {
             return Ok(false);
         }
         // Already reached for, and waiting to be settled.
@@ -1534,11 +1569,19 @@ impl Run {
                 // `~ for cohort`: everyone at the table.
                 Some("cohort") => seated,
                 Some(w) => {
-                    w == pov || self.story.has_tag(&pov, w) || self.story.kind(&pov) == Some(w)
+                    w == pov
+                        || self.story.has_tag(&pov, w)
+                        || self.story.kind(&pov) == Some(w)
+                        || self.story.of(&pov) == Some(w)
                 }
                 None => false,
             };
             if !audience.iter().any(fits) {
+                return Ok(false);
+            }
+            // `~ for guest where: it.alive`: and the one being served fits.
+            let cond = f(link, "for_where").clone();
+            if cond != Value::Null && self.where_filter(vec![pov], &cond)?.is_empty() {
                 return Ok(false);
             }
         }
@@ -1874,15 +1917,25 @@ impl Run {
                 before: false,
             })?;
         }
-        let effects = f(link, "effects").as_arr().unwrap_or(&[]).to_vec();
-        self.with_link(link, |run| {
-            for effect in &effects {
-                run.apply(effect, &[])?;
-            }
-            Ok(())
-        })?;
+        // `~ consensus`: a vote, done when the turn ends (`votes.rs`); a
+        // voter with more to choose stays.
+        let voting = Self::consensus_of(link).is_some();
+        let chosen_all = !voting || self.cast_vote(link);
+        if !voting {
+            let effects = f(link, "effects").as_arr().unwrap_or(&[]).to_vec();
+            self.with_link(link, |run| {
+                for effect in &effects {
+                    run.apply(effect, &[])?;
+                }
+                Ok(())
+            })?;
+        }
         self.pov = pov;
-        let target = f(link, "target").as_str().unwrap_or("here").to_string();
+        let target = if chosen_all {
+            f(link, "target").as_str().unwrap_or("here").to_string()
+        } else {
+            "here".to_string()
+        };
         let params = match f(link, "with") {
             Value::Obj(pairs) => pairs
                 .iter()
@@ -2007,6 +2060,9 @@ impl Run {
     }
 
     fn end_turn(&mut self) -> R<()> {
+        // The votes cast this turn count now.
+        self.settle_votes()?;
+        self.chose.clear();
         let actor = self.pov.clone();
         self.fire(Event {
             on: "turn",
@@ -2179,11 +2235,13 @@ impl Run {
             self.locals = shared.clone();
         }
         for (i, stmt) in p.header.iter().enumerate().skip(start) {
-            // Joining the table: what was done is done; only a `next:` and
-            // an input are the Linker's own.
+            // Joining the table: what was done for it is done. What is each
+            // Linker's own is done again, for them: a statement about `me`
+            // (`set me.role: top of my hand`), a `next:`, an input.
             if joining.is_some()
                 && !inputs::is_input(stmt)
                 && f(stmt, "setting").as_str() != Some("next")
+                && !mentions_me(stmt)
             {
                 continue;
             }
@@ -2850,7 +2908,7 @@ impl Run {
                         .collect();
                     text.push(&names.join(" and "), style);
                 }
-                kind if kind == "accuse" || kind.ends_with(" input") => {
+                kind if kind == "accuse" || kind == "ballot" || kind.ends_with(" input") => {
                     let prompt = self.meet_input(part)?;
                     if !quiet {
                         text.push(&prompt, style);
@@ -3010,7 +3068,7 @@ impl Run {
 
     /// Text worked out on a copy of the run, for a `&self` caller: showing
     /// a name changes nothing.
-    fn text_now(&self, v: &Value) -> Option<String> {
+    pub(super) fn text_now(&self, v: &Value) -> Option<String> {
         match v {
             Value::Str(s) => Some(s.clone()),
             other => self.clone().text_of(other).ok(),
@@ -3349,7 +3407,7 @@ impl Run {
                 result?;
             }
             // `roll standoff`: roll on a table.
-            "roll" if self.story.field(&word(0), "columns") != &Value::Null => {
+            "roll" if self.story.tables.contains_key(&word(0)) => {
                 self.draw_row(&word(0), f(e, "where"))?
             }
             "roll" => self.roll_table(&word(0))?,
@@ -3961,6 +4019,12 @@ impl Run {
                             .any(|(_, from, to)| *from == a && *to == b),
                 )
             }
+            // `it.voted_with(cult)`: voted as one of them did, at the last jury.
+            "voted_with" => {
+                let a = self.who(&items[0])?;
+                let side = self.eval(items.get(1).unwrap_or(&Value::Null))?;
+                V::Bool(self.voted_with(&a, &side)?)
+            }
             // `it.like(shaft)`: made from that archetype.
             "like" => {
                 let a = self.who(&items[0])?;
@@ -4102,6 +4166,14 @@ impl Run {
 
     /// `x.a.b`: walk a path of members.
     fn get(&mut self, path: &[Value]) -> R<V> {
+        // `cohort.all.chose`: everyone seated has done something this turn.
+        if path.len() == 3
+            && path[0].as_str() == Some("cohort")
+            && path[1].as_str() == Some("all")
+            && path[2].as_str() == Some("chose")
+        {
+            return Ok(V::Bool(self.all_chose()));
+        }
         // `pov.all.here`, `pov.any.blessed`: the rest of the path, for each pov.
         if path.first().and_then(Value::as_str) == Some("pov") && path.len() > 2 {
             let all = path[1].as_str() == Some("all");
@@ -4507,7 +4579,16 @@ fn binary(op: &str, a: &V, b: &V) -> R<V> {
         "+" => V::Num(nums()?.0 + nums()?.1),
         "-" => V::Num(nums()?.0 - nums()?.1),
         "*" => V::Num(nums()?.0 * nums()?.1),
-        "/" => V::Num(nums()?.0 / nums()?.1),
+        // Whole numbers divide into a whole number, rounded down: one in
+        // four of five players is one (`players / 4`).
+        "/" => {
+            let (x, y) = nums()?;
+            if x.fract() == 0.0 && y.fract() == 0.0 && y != 0.0 {
+                V::Num((x / y).floor())
+            } else {
+                V::Num(x / y)
+            }
+        }
         _ => V::Num(nums()?.0.rem_euclid(nums()?.1)), // mod
     })
 }

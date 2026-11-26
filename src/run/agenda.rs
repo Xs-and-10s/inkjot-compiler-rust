@@ -624,13 +624,12 @@ impl Run {
     /// game` is drawn once: rolled again, it keeps its row.
     pub(super) fn draw_row(&mut self, table: &str, cond: &Value) -> R<()> {
         let story = Arc::clone(&self.story);
-        if story.field(table, "once") == &Value::Bool(true)
+        if f(&story.tables[table], "once") == &Value::Bool(true)
             && self.vals.get(table).is_some_and(|v| v.name().is_some())
         {
             return Ok(());
         }
-        let rows: Vec<String> = story
-            .field(table, "rows")
+        let rows: Vec<String> = f(&story.tables[table], "rows")
             .as_arr()
             .unwrap_or(&[])
             .iter()
@@ -644,7 +643,9 @@ impl Run {
         if rows.is_empty() {
             return Err(format!("no row of the table `{table}` fits its `where:`"));
         }
-        let order = story.field(table, "pick").as_str().unwrap_or("shuffled");
+        let order = f(&story.tables[table], "pick")
+            .as_str()
+            .unwrap_or("shuffled");
         // The bag is per set of rows, so a narrower draw keeps its own.
         let key = format!("{table}:{}", rows.join(","));
         let i = self.pick_index(&key, rows.len(), order);
