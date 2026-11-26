@@ -32,6 +32,12 @@ pub fn build(src: &str) -> Result<Value, Report> {
     Ok(Builder::new(&passages).inklink(&passages))
 }
 
+/// Lower one expression, as the IR has it: for tools and tests.
+#[doc(hidden)]
+pub fn lower_expression(text: &str) -> Value {
+    expression(text)
+}
+
 /// Lower a source to IR without checking it first: for tools and tests
 /// that look at a draft still being built. What a check would refuse may
 /// lower to nonsense.
@@ -1604,17 +1610,25 @@ fn insert(content: &str) -> Value {
         {
             named(first, "")
         }
+        // `{present linker}`: the name of whoever is reading.
+        "present" if second == "linker" => named("present linker", ""),
         "embed" if second == "nib:" => Value::obj([
             ("insert", Value::str("embed")),
             ("nib", Value::str(c.split('"').nth(1).unwrap_or(""))),
         ]),
         "list" => {
             let options = c.split('~').skip(1).map(str::trim);
-            Value::obj([
-                ("insert", Value::str("list")),
-                ("list", Value::str(second)),
-                ("options", strings(options)),
-            ])
+            let head = c.split('~').next().unwrap_or("");
+            let mut pairs = vec![
+                ("insert".to_string(), Value::str("list")),
+                ("list".to_string(), Value::str(second)),
+                ("options".to_string(), strings(options)),
+            ];
+            // `{list hand of each guest}`: a pile, everyone's.
+            if let Some(kind) = head.split_once(" of each ").map(|(_, k)| k.trim()) {
+                pairs.push(("of_each".to_string(), Value::str(kind)));
+            }
+            Value::Obj(pairs)
         }
         // `{reveal link: "Look closer", text: "…"}` → `{"link": …, "text": …}`.
         "embed" | "reveal" | "sound" | "ambient" if second.ends_with(':') => Value::obj([

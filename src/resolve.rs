@@ -41,6 +41,9 @@ pub const FUNCTIONS: &[&str] = &[
     "all",
     "alone_with",
     "nearest",
+    // `max(1, players / 4)`.
+    "max",
+    "min",
     // Helpers for text.
     "plural",
     "capital",

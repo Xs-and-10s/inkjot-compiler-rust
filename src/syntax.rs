@@ -13,6 +13,8 @@ pub(crate) const MARGIN_TAGS: &[&str] =
 /// Statements that declare an id.
 pub(crate) const DECLS: &[&str] = &[
     "threat",
+    "deck",
+    "pile",
     "place",
     "spot",
     "way",
@@ -150,6 +152,9 @@ pub(crate) const EFFECTS: &[&str] = &[
     "pin",
     "skip",
     "end",
+    // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
+    "shuffle",
+    "deal",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by

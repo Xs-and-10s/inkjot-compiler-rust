@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Milestone 21b: cards and seats
+
+- `character guest ~ one per linker`: a seat each, `guest_1` to the
+  cohort's largest; `count(guest)` counts those seated; seating a Linker
+  as `guest` takes the next seat. Characters now take their `~ state`.
+- Decks (`deck roles ~ card mafia: members ~ card townsfolk: rest`),
+  piles (`pile hand ~ per guest ~ private ~ face down`), `shuffle`, `deal
+  1 from roles to each hand`, `top of …`, `my hand`, piles as members and
+  over lists, `move card to x.pile`, `move each … to it.…`, `count(…)` of
+  any list, deck or declared list, `{list hand of each guest}`.
+- `~ for cohort`: one Linker takes it for the table, and everyone goes.
+- `{present linker}`; `max(…)`, `min(…)`.
+- Ex 7: the pile `role` is `hand` (beside the state `role`), and the
+  killers' card and team are `mafia`, since a bare `syndicate` reads the
+  syndicate drawn. Its cards check and deal; the rest is 21c and 21d.
+
 ### Milestone 21a: the Doppelgänger pass, and `strikethrough`
 
 - Ex 7's Doppelgänger Clan, as agreed on 25 Nov 2026: each vote carries

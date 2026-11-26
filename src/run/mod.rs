@@ -7,6 +7,7 @@
 //! is an error naming the feature, never a silent guess.
 
 mod agenda;
+mod cards;
 mod cohort;
 mod encounter;
 mod events;
@@ -197,6 +198,7 @@ impl Story {
             );
         }
         story.shows_ballots = ir.to_string().contains("\"insert\": \"ballots\"");
+        story.seat_characters(config);
         story.config_lets = config
             .iter()
             .filter(|s| s.get("let").is_some())
@@ -351,9 +353,50 @@ impl Story {
         strs(self.field(id, "tags")).iter().any(|t| t == tag)
     }
 
-    /// `item stave: … ~ count 4`: the name of the four, not a thing itself.
+    /// `item stave: … ~ count 4`: the name of the four, not a thing itself;
+    /// likewise a character `~ one per linker`.
     fn counted(&self, id: &str) -> bool {
-        self.field(id, "count").as_u64().unwrap_or(1) > 1 && self.field(id, "of") == &Value::Null
+        self.field(id, "of") == &Value::Null
+            && (self.field(id, "count").as_u64().unwrap_or(1) > 1
+                || self.field(id, "one_per_linker") == &Value::Bool(true))
+    }
+
+    /// `character guest ~ one per linker`: a character for each seat,
+    /// `guest_1` to as many as the cohort may have (twelve, if it does not
+    /// say). Tests name them: `set guest_2.alive: no`.
+    fn seat_characters(&mut self, config: &[Value]) {
+        let most = config
+            .iter()
+            .find(|s| f(s, "setting").as_str() == Some("cohort"))
+            .and_then(|s| {
+                f(f(s, "value"), "range")
+                    .as_arr()
+                    .and_then(|r| r.get(1))
+                    .and_then(Value::as_u64)
+            })
+            .unwrap_or(12);
+        let per: Vec<(String, Decl)> = self
+            .decls
+            .iter()
+            .filter(|(_, d)| f(&d.fields, "one_per_linker") == &Value::Bool(true))
+            .map(|(id, d)| (id.clone(), d.clone()))
+            .collect();
+        for (id, d) in per {
+            for n in 1..=most {
+                let mut fields = d.fields.clone();
+                if let Value::Obj(pairs) = &mut fields {
+                    pairs.retain(|(k, _)| k != "id");
+                    pairs.push(("id".into(), Value::str(format!("{id}_{n}"))));
+                    pairs.push(("of".into(), Value::str(&id)));
+                }
+                let seat = Decl {
+                    kind: d.kind.clone(),
+                    fields,
+                    home: d.home.clone(),
+                };
+                self.decls.insert(format!("{id}_{n}"), seat);
+            }
+        }
     }
 
     /// What a counted thing is one of: `stave#2` is a `stave`.
@@ -676,6 +719,16 @@ impl Run {
                     if let Some(place) = field("in").as_str() {
                         self.place.insert(id.clone(), place.to_string());
                     }
+                    // `~ state alive: yes`: its archetype's, its own, `with`.
+                    let like = field("like").as_str().unwrap_or("");
+                    for source in [story.field(like, "state"), field("state"), field("with")] {
+                        if let Value::Obj(facts) = source {
+                            for (name, v) in facts {
+                                let v = self.constant(v);
+                                self.vals.entry(format!("{id}.{name}")).or_insert(v);
+                            }
+                        }
+                    }
                 }
                 "item" if story.counted(id) => {}
                 // A place's facts: its archetype's, its own, then `with`.
@@ -809,7 +862,12 @@ impl Run {
     pub fn start(&mut self, passage: Option<&str>, who: Option<&str>) -> R<()> {
         self.begin_action();
         if let Some(who) = who {
-            self.pov = who.to_string();
+            // Alone at a table of `~ one per linker` seats: the first.
+            self.pov = if self.order.is_empty() && self.is_per_linker(who) {
+                self.seat_for(who, &[])
+            } else {
+                who.to_string()
+            };
         }
         let passage = match passage {
             Some(p) => p.to_string(),
@@ -1267,8 +1325,11 @@ impl Run {
         }
         if let Some(audience) = link.get("for").and_then(Value::as_arr) {
             let pov = self.pov.clone();
+            let seated = self.order.is_empty() || self.order.contains(&pov);
             let fits = |w: &Value| match w.as_str() {
                 Some("pov") => true,
+                // `~ for cohort`: everyone at the table.
+                Some("cohort") => seated,
                 Some(w) => {
                     w == pov || self.story.has_tag(&pov, w) || self.story.kind(&pov) == Some(w)
                 }
@@ -1643,7 +1704,17 @@ impl Run {
             }
             "here" => self.relist()?,
             "rewind" => self.begin_rewind()?,
-            _ => self.enter(&target, params)?,
+            _ => {
+                self.enter(&target, params)?;
+                // `~ for cohort`: one Linker takes it for the whole table,
+                // and everyone goes.
+                let together = f(link, "for")
+                    .as_arr()
+                    .is_some_and(|a| a.iter().any(|w| w.as_str() == Some("cohort")));
+                if together && !self.order.is_empty() {
+                    self.everyone_to(&target)?;
+                }
+            }
         }
         if let Some(place) = noise {
             if self.loud_act(&place) {
@@ -2455,6 +2526,11 @@ impl Run {
                     let more = self.render(&nib, quiet)?;
                     links.extend(more);
                 }
+                // `{present linker}`: the name of whoever is reading.
+                "present linker" => {
+                    let name = self.label(&self.pov.clone());
+                    text.push(&name, style);
+                }
                 "present" => {
                     let here = place_of(self.here()).to_string();
                     let who: Vec<String> = self
@@ -2502,6 +2578,16 @@ impl Run {
                         self.claimants.clone()
                     };
                     text.push(&names, style);
+                }
+                // `{list hand of each guest}`: everyone's pile, a line each.
+                "list" if part.get("of_each").is_some() => {
+                    let pile = f(part, "list").as_str().unwrap_or("").to_string();
+                    let kind = f(part, "of_each").as_str().unwrap_or("").to_string();
+                    let lines = self.piles_text(&pile, &kind);
+                    if !quiet {
+                        self.output
+                            .extend(lines.iter().map(String::as_str).map(Para::plain_text));
+                    }
                 }
                 "list" => {
                     let name = f(part, "list").as_str().unwrap_or("");
@@ -2806,6 +2892,38 @@ impl Run {
                         en.struck = true;
                     }
                 }
+            }
+            // `move each found to it.owner.keepsake`.
+            "move" if args.first().and_then(Value::as_str) == Some("each") => {
+                let to = args.last().cloned().unwrap_or(Value::Null);
+                self.move_each(&args.get(1).cloned().unwrap_or(Value::Null), &to)?;
+            }
+            // `move taken to first_voter.loot`: a card to a pile.
+            "move"
+                if args
+                    .last()
+                    .and_then(|a| a.get("get"))
+                    .and_then(Value::as_arr)
+                    .and_then(|p| p.last())
+                    .and_then(Value::as_str)
+                    .is_some_and(|p| self.story.kind(p) == Some("pile")) =>
+            {
+                let card = match self.eval(&args[0])? {
+                    V::Null => return Ok(()),
+                    v => v.name().unwrap_or("").to_string(),
+                };
+                self.move_card(&card, args.last().unwrap_or(&Value::Null))?;
+            }
+            // `shuffle roles`, `deal 1 from roles to each hand` (cards.rs).
+            "shuffle" => self.shuffle(&word(0))?,
+            "deal" => {
+                let n = self
+                    .eval(args.first().unwrap_or(&Value::Null))?
+                    .num()
+                    .unwrap_or(1.0) as usize;
+                let deck = word(2);
+                let pile = word(args.len() - 1);
+                self.deal(n, &deck, &pile)?;
             }
             "move" => {
                 let who = self.who(&args[0])?;
@@ -3253,6 +3371,13 @@ impl Run {
             }
             // `plural(count tobin.hand, "card")`, or with the plural given:
             // `plural(n, "mouse", "mice")`.
+            // `top of my hand`: the first of a list.
+            "top" => match self.eval(x)? {
+                V::List(items) => items.first().cloned().unwrap_or(V::Null),
+                one => one,
+            },
+            "max" => self.extreme(items, true)?,
+            "min" => self.extreme(items, false)?,
             "plural" => {
                 let n = self.eval(&items[0])?.num().unwrap_or(0.0);
                 let one = self.eval(&items[1])?.to_string();
@@ -3413,6 +3538,14 @@ impl Run {
                         .collect(),
                 )
             }
+            // `count(it.keepsake)`: a list worked out, counted.
+            "count" if items.first().is_some_and(|i| i.as_str().is_none()) => {
+                match self.eval(&items[0])? {
+                    V::List(l) => V::Num(l.len() as f64),
+                    V::Null => V::Num(0.0),
+                    _ => V::Num(1.0),
+                }
+            }
             "count" | "one" | "all" => {
                 let tag = items
                     .first()
@@ -3433,8 +3566,15 @@ impl Run {
                             .unwrap_or_default(),
                     }),
                 };
+                // `count(roles)`: a deck, or a declared list, is counted itself.
+                let listed = matches!(self.story.kind(&tag), Some("deck" | "list"));
                 // `count(burning)`: a `let` that holds a list is counted itself.
                 let mut found = match self.locals.contains_key(&tag) {
+                    _ if listed => self
+                        .lists
+                        .get(&tag)
+                        .map(|l| l.iter().map(|e| e.id.clone()).collect())
+                        .unwrap_or_default(),
                     true => match self.name(&tag)? {
                         V::List(items) => items
                             .iter()
@@ -3644,8 +3784,22 @@ impl Run {
         let id = match v {
             V::Id(id) => id.clone(),
             V::List(items) if m == "count" => return Ok(V::Num(items.len() as f64)),
+            // `all(guest, …).loot`: everyone's pile, together.
+            V::List(items) if self.story.kind(m) == Some("pile") => {
+                let mut all = Vec::new();
+                for i in items.iter().filter_map(V::name) {
+                    if let V::List(cards) = self.pile_of(i, m) {
+                        all.extend(cards);
+                    }
+                }
+                return Ok(V::List(all));
+            }
             _ => return Ok(V::Null),
         };
+        // `my hand`, `target.keepsake`: the cards in a pile.
+        if self.story.kind(m) == Some("pile") {
+            return Ok(self.pile_of(&id, m));
+        }
         let story = Arc::clone(&self.story);
         Ok(match (id.as_str(), m) {
             ("threat", _) if self.encounter.is_some() => self.threat_member(m),
@@ -3859,6 +4013,12 @@ impl Run {
                     _ if self.story.counted(id) => false,
                     _ => d.kind == tag || self.tagged(id, tag) || self.story.of(id) == Some(tag),
                 };
+                // A seat no Linker sits in is no one.
+                let empty_seat = self.story.of(id).is_some_and(|base| {
+                    self.story.field(base, "one_per_linker") == &Value::Bool(true)
+                }) && !self.order.contains(id)
+                    && self.pov != **id;
+                let tagged = tagged && !empty_seat;
                 tagged && place.is_none_or(|p| self.location(id) == p)
             })
             .map(|(id, _)| id.clone())

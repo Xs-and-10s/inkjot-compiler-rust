@@ -52,6 +52,8 @@ enum Shape {
     Turns,
     /// `breaks 1 in 6`: a chance.
     Chance,
+    /// `card syndicate: members`, `card locket, compass`: cards and how many.
+    Cards,
     /// `oubliette for roland, chapel for eldric`, or a single word.
     PerWho,
 }
@@ -130,6 +132,12 @@ const PATTERNS: &[Pattern] = &[
     p(&["via"], "via", Shape::Token),
     p(&["pace"], "pace", Shape::Token),
     p(&["follows"], "follows", Shape::Follows),
+    // Cards: `card doctor: 1` on a deck; `face down` on a pile; a
+    // character `one per linker`.
+    p(&["card"], "cards", Shape::Cards),
+    p(&["face", "down"], "face_down", Shape::Flag),
+    p(&["face", "up"], "face_up", Shape::Flag),
+    p(&["one", "per", "linker"], "one_per_linker", Shape::Flag),
     // Items: `count 4`, `plural "staves"`, `breaks 1 in 6`.
     p(&["count"], "count", Shape::Token),
     p(&["plural"], "plural", Shape::Text),
@@ -421,6 +429,28 @@ impl<'a> Fields<'a> {
                 ])
             }
             Shape::Turns => token(rest.split_whitespace().next().unwrap_or("")),
+            Shape::Cards => {
+                let cards: Vec<Value> = match rest.split_once(':') {
+                    Some((card, n)) => vec![Value::obj([
+                        ("card", Value::str(card.trim())),
+                        (
+                            "count",
+                            if n.trim() == "rest" {
+                                Value::str("rest")
+                            } else {
+                                expression(n.trim())
+                            },
+                        ),
+                    ])],
+                    None => rest
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|c| !c.is_empty())
+                        .map(|c| Value::obj([("card", Value::str(c)), ("count", token("1"))]))
+                        .collect(),
+                };
+                Value::Arr(cards)
+            }
             Shape::Chance => match rest.split_whitespace().collect::<Vec<_>>().as_slice() {
                 [n, "in", d] => Value::obj([("chance", token(n)), ("in", token(d))]),
                 _ => Value::str(rest),

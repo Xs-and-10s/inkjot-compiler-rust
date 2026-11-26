@@ -512,6 +512,41 @@ offered everywhere, walks, takes and recipes are not offered in an
 ending, or in a prologue that is not a place: those have only their own
 Links.
 
+## Cards and seats
+
+**One per Linker.** `character guest: "a guest" ~ selectable ~ custom ~ one
+per linker` is a character for each seat: `guest_1`, `guest_2`, … up to
+the cohort's largest size (twelve if it does not say), each with its own
+state (`~ state alive: yes`) and name. Seating a Linker as `guest` gives
+them the next free seat. The name stands for those seated: `count(guest)`,
+`all(guest, where: …)`, `~ at guest`; a seat nobody sits in is no one.
+Tests name a seat: `set guest_2.alive: no`.
+
+**Decks.** `deck roles` with `~ card mafia: members`, `~ card doctor: 1`,
+`~ card townsfolk: rest` (as many as make one card for each player
+seated), or `~ card locket, compass` (one of each). A deck is built the
+first time it is shuffled; `shuffle roles` builds it if need be and
+shuffles it, from the run's own dice.
+
+**Piles.** `pile hand ~ per guest ~ private ~ face down ~ shown as "your
+card"`: a pile for each guest. `deal 1 from roles to each hand` deals from
+the top of the deck, in seat order, until it runs out. `my hand` and
+`target.keepsake` are the cards in a pile; over a list, everyone's
+together (`all(guest, …).loot`). `top of …` is the first card of a pile
+or any list; `count(…)` counts a pile, a deck, a declared list or a list
+worked out. `move locket to me.loot` moves a card from wherever it is;
+`move each found to it.owner.keepsake` moves each of a list, `it` each in
+turn. A card is a name and may carry facts (`set taken.owner: target`).
+`{list hand of each guest}` shows everyone's pile, a line each.
+`~ private`, `~ face down` and `~ face up` are kept for the platform,
+which decides who sees what.
+
+**Together.** A Link `~ for cohort` is offered to everyone seated; when
+one Linker takes it, its effects run once and every seated Linker goes to
+its passage. `{present linker}` is the name of whoever is reading.
+
+`max(a, b, …)` and `min(…)` are the largest and smallest.
+
 ## Encounters
 
 An encounter is a fight, a chase, a standoff: an opponent who does

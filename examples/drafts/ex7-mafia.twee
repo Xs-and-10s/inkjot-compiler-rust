@@ -80,6 +80,13 @@ npc lamplighter: "the Lamplighter" ~ voice
 (((The engine's own voice, when it moderates.)))
 
 (((
+`mafia` is the card, and the team, of the killers, whatever the syndicate
+drawn calls them: `syndicate` is the syndicate drawn (`syndicate.mafia` is
+what it calls its members), so a bare `syndicate` in a comparison would
+read that, not a team. The pile a role is dealt to is `hand`, beside the
+state `role` it is turned into.
+)))
+(((
 The deck of roles, sized to the players (not the Storyteller, who plays
 no role): one in four is the syndicate,
 rounded down, at least one; a Doctor and a Detective from five players up;
@@ -87,11 +94,11 @@ everyone else is town. Dealt face down, one each, into a pile only its
 owner sees.
 )))
 deck roles
-~ card syndicate: members
+~ card mafia: members
 ~ card doctor: 1
 ~ card detective: 1
 ~ card townsfolk: rest
-pile role ~ per guest ~ private ~ face down ~ shown as "your card"
+pile hand ~ per guest ~ private ~ face down ~ shown as "your card"
 
 (((
 The Heist Crew's game is played with keepsakes: everyone is dealt one,
@@ -104,7 +111,7 @@ deck keepsakes
 ~ card locket, pocket_watch, signet_ring, cameo, silver_flask, music_box, opera_glasses, tin_soldier, compass, hatpin, fountain_pen, harmonica
 pile keepsake ~ per guest ~ face up ~ shown as "keepsake"
 pile loot ~ per guest ~ private ~ shown as "loot"
-get haul: all(guest, where: it.team == syndicate).loot
+get haul: all(guest, where: it.team == mafia).loot
 
 (((
 What each player knows. The Detective's findings are the Detective's
@@ -186,7 +193,7 @@ Cult) has been taken in since.
 get players: count(guest)
 get members: max(1, players / 4)
 get town_left: count(guest, where: it.alive and it.team == town)
-get syndicate_left: count(guest, where: it.alive and it.team == syndicate)
+get syndicate_left: count(guest, where: it.alive and it.team == mafia)
 (((
 The Heist Crew needs a third of the table's keepsakes, plus one. They take
 one a night, and a thief voted out gives back what they carried, so the
@@ -311,7 +318,7 @@ tied. "Surprise us" draws among all four.
 @lamplighter Nobody dies this weekend. Something, every night, goes missing. {haul_needed} keepsakes in the Crew’s bag and they’re off on the morning train.
 
 [end]
-> [[Deal the cards->dealt]] ~ for cohort ~ then shuffle roles ~ then deal 1 from roles to each role ~ then shuffle keepsakes ~ then deal 1 from keepsakes to each keepsake
+> [[Deal the cards->dealt]] ~ for cohort ~ then shuffle roles ~ then deal 1 from roles to each hand ~ then shuffle keepsakes ~ then deal 1 from keepsakes to each keepsake
 
 :: dealt
 (((
@@ -319,23 +326,23 @@ Each player sees only their own card. `{present linker}` is the Linker
 reading this, so each sees their own name and role; the Storyteller sees
 everyone's.
 )))
-set me.role: top of my role
-set me.team: syndicate when me.role == syndicate and syndicate.special != cult
-set me.team: cult when me.role == syndicate and syndicate.special == cult
+set me.role: top of my hand
+set me.team: mafia when me.role == mafia and syndicate.special != cult
+set me.team: cult when me.role == mafia and syndicate.special == cult
 --
 [if me.is(storyteller)]
-You look round the table at every card. {list role of each guest ~ one per line}
+You look round the table at every card. {list hand of each guest ~ one per line}
 
 [else]
 {present linker}, you turn your card over under your hand.
 
-[if me.role == syndicate]
+[if me.role == mafia]
 You are a **{syndicate.mafia}**.
 
-[if me.role == syndicate and members == 1]
+[if me.role == mafia and members == 1]
 You are alone. Nobody at this table is with you.
 
-[if me.role == syndicate and members > 1]
+[if me.role == mafia and members > 1]
 The others are {all(guest, where: it.team == me.team and it != me)}.
 
 [if me.role == doctor and syndicate.special != collectors and syndicate.special != cult]
@@ -397,8 +404,8 @@ Night in {syndicate.setting}. Eyes closed, if you please.
 The lamp is dark tonight. The Long Night keeps its own calendar: tomorrow it turns again.
 
 [end]
-> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == none ~ consensus
-> [[{capital(syndicate.kills)}: {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target
+> ~ for guest where: it.alive and it.team == mafia and syndicate.special == none ~ consensus
+> [[{capital(syndicate.kills)}: {target}->night:done]] ~ at guest where: it.alive and it.team != mafia ~ then set victim: target
 
 (((
 The Doppelgänger Clan. Each vote carries its voter's way of doing it:
@@ -406,18 +413,18 @@ The Doppelgänger Clan. Each vote carries its voter's way of doing it:
 chosen) does it their way. Each member may take a face once: a
 replacement the Doctor stops does not use it up.
 )))
-> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == doppelganger ~ consensus
-> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ when not me.swapped ~ then set victim: target ~ then set me.method: replace
-> [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != syndicate ~ then set victim: target ~ then set me.method: kill
+> ~ for guest where: it.alive and it.team == mafia and syndicate.special == doppelganger ~ consensus
+> [[Replace {target}->night:done]] ~ at guest where: it.alive and it.team != mafia ~ when not me.swapped ~ then set victim: target ~ then set me.method: replace
+> [[Kill {target} and keep your own face->night:done]] ~ at guest where: it.alive and it.team != mafia ~ then set victim: target ~ then set me.method: kill
 
-> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == collectors ~ consensus 2
-> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != syndicate ~ then set victim: first(targets) ~ then set second: last(targets)
+> ~ for guest where: it.alive and it.team == mafia and syndicate.special == collectors ~ consensus 2
+> [[Mark {target}->night:done]] ~ at guest where: it.alive and not it.marked and it.team != mafia ~ then set victim: first(targets) ~ then set second: last(targets)
 
 > ~ for guest where: it.alive and it.team == cult ~ consensus ~ when cult_left < 2 or nights mod 2 == 1
 > [[Take {target} into the dark->night:done]] ~ at guest where: it.alive and it.team != cult and it.role != doctor and it.voted_with(cult) ~ then set victim: target
 
-> ~ for guest where: it.alive and it.team == syndicate and syndicate.special == heist ~ consensus
-> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != syndicate and count(it.keepsake) > 0 ~ then set victim: target
+> ~ for guest where: it.alive and it.team == mafia and syndicate.special == heist ~ consensus
+> [[Lift {target}’s {top of target.keepsake}->night:done]] ~ at guest where: it.alive and it.team != mafia and count(it.keepsake) > 0 ~ then set victim: target
 
 > ~ for guest where: it.alive and it.role == doctor
 > [[Save {target}->night:done]] ~ at guest where: it.alive and it != me.saved_last ~ when syndicate.special != collectors and syndicate.special != cult ~ then set saved: target ~ then set me.saved_last: target
@@ -692,7 +699,7 @@ finale when: syndicate.special == heist and count(haul) >= haul_needed
 --
 The cards go face up, all at once:
 
-{list role of each guest ~ one per line}
+{list hand of each guest ~ one per line}
 
 [if syndicate.special == doppelganger]
 And the faces: {all(guest, where: it.shown_as != it.name)} {if count(guest, where: it.shown_as != it.name) == 1 then "was" else "were"} not who they seemed.
