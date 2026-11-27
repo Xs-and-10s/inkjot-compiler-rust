@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Milestone 23a: the encounter drafts
+
+- Ex 11, *The Meridian Key*: a party of four, one command each a round,
+  classes as archetypes, kinds of harm, cooldowns, pattern phases, several
+  opponents, `unleash` from the world.
+- Ex 13, *Once Saved*: a debate as an encounter; objections as threats,
+  answers as counters tagged by kind, moves chosen by weight, rebuttals,
+  `unleash … ~ by` someone, outcome tiers.
+- Both are linted by `tests/drafts.rs`; `inkjot check` lists what they
+  still need.
+
 ### Milestone 22c: Ex 5 brought up to date
 
 - What a declared fact means is true in the world from the start, as kept

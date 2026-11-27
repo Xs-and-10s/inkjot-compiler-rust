@@ -43,6 +43,7 @@ here.
 | 21c | Time: `period`s and named clocks (`clock.phase`, ordered names, clocks in names, `once per hour`), `on … begins` / `ends`, `wait until`, `turn ends when` with `passed` and `spent`, Links timed in real time (`~ after 5m`, `Action::Wait`, `due_in`); Ex 7's night has its deadline | #47 |
 | 21d | Votes and seats: `~ for … where:`, `~ consensus`, `{ballot}`, the jury's `voters:` and `ties: draw`, seats in a ring, tables with named columns, lists of text, quantifiers, `first`/`last`/`possessive`, pronouns, settable `shown_as`, `{text input}`, `finale when:`. Ex 7 plays, but for its knowledge base | #48 |
 | 21e | The engine seats a table (`Start.seats`, `Action::As`, `view_of`); knowledge bases and `assert … in`, a store only. Ex 7 plays whole. Milestone 21 done | #49 |
+| 23a | Drafts of Ex 11 (*The Meridian Key*, a JRPG level and its boss) and Ex 13 (*Once Saved*, a debate on eternal security), linted, with what each asks of the milestone | #53 |
 | 22c | Ex 5 brought up to date and running: meanings true in the world, `~ known` facts, `verb … ~ one value`, `observe`, a fact's terms, `relation … each`, `from:` a list, the clock running out into a finale anywhere; Inklog's closures remembered. Milestone 22 done | #52 |
 | 22b | Ex 6 runs: `^` lookups in facts, `never` and `note` (refuse or flag), `{contradictions}`, `{known about}`, the `{note}` input, `for each`, facts as Link parameters, `x.did(act)`, scenes `play`ed by NPCs, checkpoints `on death` and `each hour` that keep a `per linker` notebook, `refill each turn` | #51 |
 | 22a | Inklog's core: facts asked of bases, rules to a fixed point with stratified `not`, quantifiers with a dot, `world` and `knows`, `~ means`, `~ for`, `~ starts with`, `~ reads`, `retract`, `[rules]`; a notice for `~ then … ~ when` on a Link | #50 |
@@ -118,7 +119,10 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      not only a fixed pattern; and what Ex 11 asks for (several opponents,
      pattern phases, resistances and weaknesses, cooldowns, one command per
      ally a round). Drafts first, as with Ex 6 to 9. Done when Ex 11 and
-     Ex 13 run.
+     Ex 13 run. In three parts: 23a, the two drafts (#53); 23b, the
+     general words (`~ as`, `unleash`, `landed`, moves by weight, counters
+     as tags, `answer`) until Ex 13 runs; 23c, what Ex 11 adds (several
+     opponents, commands, kinds of harm, cooldowns, phases) until it runs.
    - 24, **close v0.6**: `retell`, `define` step 2 if it still earns its
      place, the IR frozen, release v0.6.0. **Then the platform**, with
      v0.7 alongside.

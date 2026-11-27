@@ -253,6 +253,72 @@ book ("Lasts 4 turns", "Power 2") and once in its effect, and the two can
 drift. `tests/ex9_map.rs` checks they agree, which is the cost of the
 general words. Verdict in `docs/define.md`.
 
+## Ex 11: The Meridian Key (`ex11-meridian-key.twee`)
+
+A JRPG-style `game`, one level and its boss, in an original setting: four
+scouts of the Lantern (a vanguard, an arcanist, a medic, a scout) steal
+the Meridian Key from an Auric Dominion relay under a glacier. You look
+through the lead and give the other three one command each a round; the
+lead can change hands between fights. Two encounters: two hangar
+sentries, then Prefect Orrel in the Lamplighter frame, whose armour turns
+bullets until lightning breaks it, and who stops following the drill at
+half strength.
+
+What it asks of milestone 23:
+
+| Construct | Example |
+|---|---|
+| Several opponents | `encounter sentry_a, sentry_b`, `~ at opponent here` |
+| One command per ally a round | `> [[Ivo: ion bolt at {target}->…]] ~ ion_bolt ~ by ivo`, `~ one command each`, `end round` |
+| Classes as archetypes | `:: vanguard [archetype]` with its `hp` and acts |
+| Kinds of harm | `wound target 3 ~ as ion`; `~ resists kinetic when self.armoured`, `~ weak to ion`, `~ immune to cold` |
+| Cooldowns | `~ cooldown 3 rounds`, `ivo.cooling(frostfall)` |
+| Pattern phases | `pattern drill: … ~ while orrel.hp > 15`, `pattern unbound: … ~ by weight`, `on pattern unbound begins` |
+| A threat from the world | `unleash klaxon`, as the Key leaves its pillar |
+| Healing and getting up | `heal target 4`, `revive target` |
+| The lead | `lead ivo` |
+| The encounter's state | `encounter.over`, `orrel.pattern.next` |
+
+## Ex 13: Once Saved (`ex13-once-saved.twee`)
+
+A debate `game`, solo, and an acceptance test for encounters that are not
+fights. Thanksgiving, on the back porch: your cousin Ben, a Baptist Sunday
+school teacher, holds "once saved, always saved"; you hold, with Trent,
+that grace is lost by mortal sin and perseverance is a gift no one may
+promise himself. His side is argued at its strongest, from the texts his
+churches lead with (John 10, Romans 8, Ephesians 1 and 2, 1 John 5 and 2),
+in the King James; yours from Trent's decree on justification, St Thomas
+(I-II q.109 a.10) and Cornelius à Lapide, with the Douay-Rheims. Both are
+public domain.
+
+Objections are threats; answers are counters, tagged by kind
+(distinction, Scripture, logic, analogy, authority, concession); pressing
+a point of your own costs the round and brings his rebuttal. A good answer
+moves him; citing the Church or granting his point helps him understand
+you without moving him; an objection left standing costs you. Outcome
+tiers: both, defended, convinced, a tie, lost; how well he understands you
+colours each. No Inquests, no rewinds; hints are what he said before.
+
+What it asks of milestone 23:
+
+| Construct | Example |
+|---|---|
+| The kind of exchange | `encounter ben ~ as debate` (`debate` is proposed beside the decided five) |
+| Moves by weight, each once | `pattern objections: … ~ by weight ~ each once`, with `~ weight 6 ~ when …` on each threat |
+| Counters that are any tag | `~ answered by distinction, scripture, authority` |
+| Answering | `answer ben`, `threat.answered_with` |
+| Rebuttals | `hypothetical first when you.did(press_hebrews_six)` (Ex 2's `first when`) |
+| A threat from someone outside the pattern | `unleash carols_question ~ by carol`, which takes the round's place |
+| Rounds | `on round begins when encounter.round == 4`, `encounter.over`, `ben.objections.done` |
+| Hints with conditions | `hint: "…" ~ when next == john_ten` |
+| `landed` | the outcome once called `hit` |
+
+**Checked while writing.** À Lapide's reading of Hebrews 6 is as the
+Haydock commentary reports it: with Estius, he says the Greek Fathers and
+most of the Latins read "impossible … to be renewed" of a second baptism.
+Trent's lines are from Session VI (chapters 8, 9, 12, 13, 15; canons 16
+and 23).
+
 ## Ex 6, the public cut: Cloakroom (`ex6-cloakroom.twee`)
 
 The full Ex 6, *Seven Names*, lives in the Inklinks Library. This is a

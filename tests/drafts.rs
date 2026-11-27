@@ -480,6 +480,16 @@ fn ex9_lints_clean() {
 }
 
 #[test]
+fn ex11_lints_clean() {
+    assert_eq!(lint(&draft("ex11-meridian-key.twee")), Vec::<String>::new());
+}
+
+#[test]
+fn ex13_lints_clean() {
+    assert_eq!(lint(&draft("ex13-once-saved.twee")), Vec::<String>::new());
+}
+
+#[test]
 #[ignore = "lints the draft named by INKJOT_DRAFT"]
 fn a_draft_from_elsewhere() {
     let path = std::env::var("INKJOT_DRAFT").expect("INKJOT_DRAFT names a .twee file");
