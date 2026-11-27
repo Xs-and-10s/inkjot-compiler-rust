@@ -609,6 +609,71 @@ its passage. `{present linker}` is the name of whoever is reading.
 
 `max(a, b, …)` and `min(…)` are the largest and smallest.
 
+## Votes at a table
+
+```text
+> ~ for guest where: it.alive and it.team == mafia ~ consensus
+> [[Kill {target}->night:done]] ~ at guest where: it.alive and it.team != mafia ~ then set victim: target
+> [[Morning->morning]] ~ for cohort ~ when cohort.all.chose ~ then wait until day
+```
+
+**Who may take a Link.** `~ for guest where: it.alive` offers it only to
+those of that kind (a seat's `guest`) for whom the condition holds, `it`
+being each.
+
+**Consensus.** The Links of a group marked `~ consensus` are a vote among
+those the group is for. Taking one casts a vote for its target, and the
+voter goes on where it leads; what it says to do is not done yet. When the
+turn ends, the votes cast count (all of them, or as many as came before a
+deadline: none, and nothing happens). The target most chosen wins, a tie
+going to the one chosen first; then the first vote placed on the winner is
+done, by its voter (`me`), with `target` the winner. `x.chosen_by` lists who
+voted for x, first to last. `~ consensus 2`: each chooses two, staying
+until they have, and `targets` is the two most chosen, most first.
+
+**`cohort.all.chose`**: everyone seated has taken a Link this turn (not a
+hint or a switch).
+
+**A ballot** (`{ballot for: …, from: list, voters: …, ties: draw}`) asks
+each voter (everyone seated, unless `voters:` says) for one entry of a list,
+answered like any input. When all have, the most chosen is kept in `for:`
+and `ballot.done` holds; a tie is drawn by lot (`ballot.drawn`), or with
+`ties: hung` left undecided (`ballot.hung`). Met on a later turn, it is a
+new ballot.
+
+**Around the table.** `relation seat: each guest ~ ring ~ in order joined`
+seats the table in a ring, in the order they joined; `spreads 1 from
+all(guest, where: it.heard) to nearest(guest, where: not it.heard) ~ along
+seat` goes round it to the next seat that fits.
+
+**Arriving together.** A Link `~ for cohort` runs its passage's header
+once, for the one who took it; the others arrive with its `let`s as they
+were. A statement about `me` (`set me.role: top of my hand`) is each
+Linker's, and is done again for each.
+
+**The game ends** with `finale when:` in a `[finale]` passage: as each turn
+begins, the first (in source order) whose condition holds sends the table
+there, once the action in hand is done, and the Link it was taking leads
+nowhere else.
+
+**Tables with named columns.** `table syndicate: shuffled ~ one per game ~
+columns name, mafia, special ~ row vampires: "the Vampires", "Vampire",
+none`: `roll syndicate` draws a row (`shuffled`: every row once before any
+again; `random`; `cycle`) among those `where:` holds for (`roll syndicate
+where: it.special == chosen_special`), and sets the value of the table's
+name to it; `syndicate.mafia` reads its column. `~ one per game`: it is
+drawn once. A test chooses: `given: draw syndicate vampires`. A list may
+hold text alone (`list deaths ~ pick shuffled ~ holds "found in the snow",
+"…"`), and `one(list)` picks an entry its way.
+
+**Reading people.** `no guest where: …`, `some guest where: …`, `every
+guest where: …` (the condition runs to the end); `first(x)`, `last(x)`;
+`possessive(x)` ("Ada’s"); `x.pronouns` and `x.they`, `x.them`, `x.their`,
+`x.theirs`, `x.themself` (`~ pronouns she`, or `they` until set; `~
+pronouns chosen` is the Linker's to set); `set x.shown_as: …` gives x a face
+to be shown by, while `x.name` stays theirs. Whole numbers divide into a
+whole number, rounded down (`players / 4`).
+
 ## Encounters
 
 An encounter is a fight, a chase, a standoff: an opponent who does
@@ -790,7 +855,9 @@ Links, until it is answered (Ex 2's mouth hears three cantrips, then decides).
 | Input | Answer | Kept as |
 |---|---|---|
 | `{name input for: me.name, max: 24}` | text, not empty, at most `max` letters | text; `{me.name}` shows it, and a `custom` character's name is empty until then |
-| `{choose input for: words, from: cantrip, length: 3}` | that many of the things of that kind, in order | a list: `words == [gust, spark, hush]` |
+| `{choose input for: words, from: cantrip, length: 3}` | that many of the things of that kind (or entries of a list, `from: moderators`), in order | a list: `words == [gust, spark, hush]`; with `length: 1`, the one chosen |
+| `{text input for: report, max: 600}` | any text, at most `max` characters | text |
+| `{ballot for: chosen_special, from: specials, voters: all(guest), ties: draw}` | one of the list's entries, once each voter | the most chosen, when every voter has answered; see "Votes at a table" |
 
 The rest of the family (`pick`, `rank`, `number`, `secret`, …) is checked
 but not run yet.
@@ -801,7 +868,17 @@ the dead too, as ghosts: a suspect (anything tagged as `who:` says), a
 method (one of `how:`), and any proof they can cite, which is only what they
 hold or know. When all have voted, the ballots are shown to everyone
 together. The pairing with the most votes wins; a tie is a hung jury, which
-votes again as often as `revote:` allows and then stays hung. Then:
+votes again as often as `revote:` allows and then stays hung, or, with
+`ties: draw`, is drawn by lot among the tied (`accusation.drawn`).
+
+At a table (Ex 7), `who:` may be a list worked out when the jury sits
+(`who: all(guest, where: it.alive)`), `how:` may be left out, and
+`voters:` says who votes (`all(guest, where: it.alive and not
+it.voteless)`; `accusation.voters` keeps them): the others are not waited
+for. A jury nobody may sit on decides at once, by lot. A jury met on a later
+turn is a new one. Each voter's choice is kept until then, for
+`it.voted_with(cult)`: x voted as one of that team (or that person) did.
+Then:
 
 | Lookup | Holds when |
 |---|---|

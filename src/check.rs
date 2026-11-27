@@ -116,6 +116,8 @@ struct Checker {
     link_ids: HashSet<String>,
     /// The passage being checked, and its Links so far, for forks.
     here: String,
+    /// Its tags.
+    here_tags: Vec<String>,
     links_here: Vec<LinkSeen>,
     /// Where the first fork is, if the Inklink has any.
     first_fork: Option<(usize, usize)>,
@@ -390,6 +392,19 @@ impl Checker {
                 }
                 self.stats.declarations += 1;
                 self.decls.entry(name.to_string()).or_default().insert(kind);
+                // A table's rows are names: `syndicate.special == vampires`.
+                if kind == "table" {
+                    for c in &s.clauses[1..] {
+                        if let Some((row, _)) =
+                            c.text.strip_prefix("row ").and_then(|r| r.split_once(':'))
+                        {
+                            self.decls
+                                .entry(row.trim().to_string())
+                                .or_default()
+                                .insert("row");
+                        }
+                    }
+                }
                 // A period's names are times: `night`, `clock.phase == day`.
                 if kind == "period" {
                     if let Ok(period) = crate::period::Period::parse(&period_text(&s)) {
@@ -527,6 +542,7 @@ impl Checker {
         self.locals = self.scope_of(&p.name);
         self.link_ids.clear();
         self.here = p.name.clone();
+        self.here_tags = p.tags.clone();
         self.links_here.clear();
         let mut diags = std::mem::take(&mut self.diags);
         let (stmts, body) = gather(p, &mut diags);
@@ -1011,6 +1027,15 @@ impl Checker {
                     "`~ playable` is now `~ selectable`: every character can be played, and this one is offered at the start; `inkjot migrate` rewrites it",
                 );
             }
+            if let Some(set) = text.strip_prefix("pronouns ") {
+                if !["she", "he", "they", "it", "chosen"].contains(&set.trim()) {
+                    self.err(
+                        c.line,
+                        c.col + 9,
+                        "`pronouns` is one of: she, he, they, it, chosen",
+                    );
+                }
+            }
             // `~ pick cycle`: how `{x.aka}` picks from the names.
             if let Some(how) = text.strip_prefix("pick ") {
                 if !AKA_PICKS.contains(&how.trim()) {
@@ -1375,6 +1400,25 @@ impl Checker {
                     self.expr(to, line, rest_col);
                 }
             }
+            // `finale when: …`: in a `[finale]` passage, when the game ends there.
+            "finale" => {
+                if !rest.trim_start().starts_with("when:") || value.is_empty() {
+                    self.err(
+                        line,
+                        rest_col,
+                        "`finale` is written `finale when: condition`",
+                    );
+                } else {
+                    self.expr(value, line, vcol);
+                }
+                if !self.here_tags.iter().any(|t| t == "finale") {
+                    self.err(
+                        line,
+                        head.col,
+                        "`finale when:` belongs in a `[finale]` passage",
+                    );
+                }
+            }
             // `measure nights: nights`: reported when the reading ends.
             "measure" => {
                 let name = first_word(rest);
@@ -1531,8 +1575,18 @@ impl Checker {
                     );
                 }
             }
+            // `as: guest_2`: a seat of a character `~ one per linker`.
+            "as" if value
+                .rsplit_once('_')
+                .is_some_and(|(base, n)| n.parse::<u32>().is_ok() && self.seats.contains(base)) => {
+            }
             "as" => self.need(value, &["character"], "character", line, vcol),
             // `vote: vell ~ how device ~ proof cufflink`: a ballot in a test.
+            // `vote: guest_3`: a seat may be voted for too.
+            "vote"
+                if first_word(value).rsplit_once('_').is_some_and(|(base, n)| {
+                    n.parse::<u32>().is_ok() && self.seats.contains(base)
+                }) => {}
             "vote" => self.need(
                 first_word(value),
                 &["character", "npc"],
@@ -1581,6 +1635,10 @@ impl Checker {
                         "`expect fork:` may say which Link it stands in for: `~ for \"label\"`",
                     );
                 }
+            }
+            // `expect at: marking:done`: a passage, sub-Nibs included.
+            "expect" if rest.trim_start().starts_with("at:") => {
+                self.need_passage(value, "the passage expected", line, vcol);
             }
             "expect" => {
                 if value.is_empty() {
@@ -1799,7 +1857,19 @@ impl Checker {
                 col + 7,
             ),
             "burn" | "light" => self.need(arg(1), &["fuse"], "fuse", line, col + cols(verb) + 1),
-            "roll" => self.need(arg(1), &["table"], "table", line, col + 5),
+            "roll" => {
+                self.need(arg(1), &["table"], "table", line, col + 5);
+                if let Some((_, cond)) = core.split_once(" where:") {
+                    self.where_expr(cond, line, col + cols(core) - cols(cond));
+                }
+            }
+            "draw" => match words.as_slice() {
+                [_, table, row] => {
+                    self.need(table, &["table"], "table", line, word_col(1));
+                    self.need(row, &["row"], "row of a table", line, word_col(2));
+                }
+                _ => self.err(line, col, "`draw` is written `draw table row`, such as `draw syndicate vampires`"),
+            },
             "wake" => self.need(arg(1), &["npc", "character"], "NPC", line, col + 5),
             "play" => match arg(1) {
                 "" => self.err(line, col, "`play` needs a passage name"),
@@ -2075,6 +2145,16 @@ impl Checker {
                 }
             }
             "take" => self.need(arg, &["item"], "item", c.line, arg_col),
+            // `~ for guest where: it.alive`.
+            "for" if c.text.contains(" where:") => {
+                let (_, cond) = c.text.split_once(" where:").unwrap_or(("", ""));
+                self.where_expr(cond, c.line, c.col + cols(&c.text) - cols(cond));
+            }
+            "consensus" if !arg.is_empty() && arg.parse::<u32>().map_or(true, |n| n == 0) => self.err(
+                c.line,
+                arg_col,
+                "`~ consensus` takes how many each chooses, 1 or more: `~ consensus 2`",
+            ),
             // `~ after 5m`: taken by itself, in real time.
             "after" if crate::run::clock_millis(arg).is_none() => self.err(
                 c.line,
@@ -2201,6 +2281,7 @@ impl Checker {
             "sound" if second == "effect:" => {}
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
+            "ballot" => self.ballot(&c[first.len()..], line, col),
             // `{redacted "TEN" until telegram.dry}`.
             "redacted" => {
                 let text = c["redacted".len()..].trim_start();
@@ -2275,11 +2356,15 @@ impl Checker {
             let (key, value) = (key.trim(), value.trim());
             seen.push(key.to_string());
             match key {
+                // A kind (`suspect`), or a list worked out (`all(guest, where: it.alive)`).
+                "who" if value.contains('(') => self.expression_in(value, line, col),
                 "who" => {
                     if !self.is_kind_word(value) {
-                        self.err(line, col, format!("`who: {value}` should name a kind of suspect: a tag such as `suspect`, or `npc`"));
+                        self.err(line, col, format!("`who: {value}` should name a kind of suspect: a tag such as `suspect`, or `npc`, or a list such as `all(guest, where: it.alive)`"));
                     }
                 }
+                "voters" => self.expression_in(value, line, col),
+                "ties" => self.ties(value, line, col),
                 "how" => self.expression_in(value, line, col),
                 // Tags a conviction must cite: `proof_who and proof_how`.
                 "proof" => {
@@ -2295,7 +2380,7 @@ impl Checker {
                 other => self.err(
                     line,
                     col,
-                    format!("`{{accuse}}` takes who, how, proof and revote, not `{other}`"),
+                    format!("`{{accuse}}` takes who, how, proof, revote, voters and ties, not `{other}`"),
                 ),
             }
         }
@@ -2304,6 +2389,59 @@ impl Checker {
                 line,
                 col,
                 "`{accuse}` needs `who:`, the kind of thing the jury may accuse",
+            );
+        }
+    }
+
+    /// `{ballot for: chosen_special, from: specials, voters: all(guest),
+    /// ties: draw}`: a vote among the table for one of a list.
+    fn ballot(&mut self, args: &str, line: usize, col: usize) {
+        let mut seen = Vec::new();
+        for part in crate::ir::split_args(args) {
+            let Some((key, value)) = part.split_once(':') else {
+                self.err(
+                    line,
+                    col,
+                    format!("`{part}` in `{{ballot}}` needs a name: `for: choice`"),
+                );
+                continue;
+            };
+            let (key, value) = (key.trim(), value.trim());
+            seen.push(key.to_string());
+            match key {
+                "for" => self.expression_in(value, line, col),
+                "from" => {
+                    if !self.is_kind_word(value) && !self.has(value, &["list"]) {
+                        self.err(
+                            line,
+                            col,
+                            format!("`from: {value}` should name a list or a kind"),
+                        );
+                    }
+                }
+                "voters" => self.expression_in(value, line, col),
+                "ties" => self.ties(value, line, col),
+                other => self.err(
+                    line,
+                    col,
+                    format!("`{{ballot}}` takes for, from, voters and ties, not `{other}`"),
+                ),
+            }
+        }
+        for need in ["for", "from"] {
+            if !seen.iter().any(|k| k == need) {
+                self.err(line, col, format!("`{{ballot}}` needs `{need}:`"));
+            }
+        }
+    }
+
+    /// `ties: draw` (drawn by lot among the tied) or `ties: hung`.
+    fn ties(&mut self, value: &str, line: usize, col: usize) {
+        if !["draw", "hung"].contains(&value) {
+            self.err(
+                line,
+                col,
+                "`ties` is `draw` (by lot, among the tied) or `hung`",
             );
         }
     }
@@ -2332,11 +2470,13 @@ impl Checker {
             match key {
                 "for" => has_for = true,
                 "from" => {
-                    if !self.is_kind_word(value) {
+                    if !self.is_kind_word(value) && !self.has(value, &["list"]) {
                         self.err(
                             line,
                             col,
-                            format!("`from: {value}` should name a kind, a tag or an archetype"),
+                            format!(
+                                "`from: {value}` should name a kind, a tag, an archetype or a list"
+                            ),
                         );
                     }
                 }

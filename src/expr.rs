@@ -419,7 +419,62 @@ impl Parser {
             self.pos += 1;
             return self.nested(|p| Ok(Expr::Unary("not", Box::new(p.not()?))));
         }
+        if let Some(q) = self.quantifier() {
+            return self.nested(|p| p.quantified(q));
+        }
         self.cmp()
+    }
+
+    /// `no guest where: …`, `some guest where: …`, `every guest where: …`:
+    /// the quantifier, if one starts here.
+    fn quantifier(&self) -> Option<&'static str> {
+        let q = match self.peek() {
+            Some(Tok::Ident(s)) if s == "no" => "no",
+            Some(Tok::Ident(s)) if s == "some" => "some",
+            Some(Tok::Ident(s)) if s == "every" => "every",
+            _ => return None,
+        };
+        let kind = matches!(self.toks.get(self.pos + 1), Some((_, Tok::Ident(_))));
+        let where_ =
+            matches!(self.toks.get(self.pos + 2), Some((_, Tok::Ident(w))) if w == "where");
+        let colon = matches!(self.toks.get(self.pos + 3), Some((_, Tok::Op(":"))));
+        (kind && where_ && colon).then_some(q)
+    }
+
+    /// A quantifier over a kind, as the count it stands for: `no guest
+    /// where: c` is `count(guest, where: c) == 0`; `some`, `> 0`; `every`,
+    /// none where it does not hold. The condition runs to the end.
+    fn quantified(&mut self, q: &'static str) -> Result<Expr, ParseError> {
+        let at = self.toks[self.pos + 1].0;
+        let Some((_, Tok::Ident(kind))) = self.toks.get(self.pos + 1).cloned() else {
+            unreachable!("checked by quantifier()")
+        };
+        self.pos += 4;
+        let cond = self.or()?;
+        let cond = if q == "every" {
+            Expr::Unary("not", Box::new(cond))
+        } else {
+            cond
+        };
+        let count = Expr::Call(
+            Box::new(Expr::name("count")),
+            vec![
+                Arg {
+                    key: None,
+                    value: Expr::Name(kind, At(at)),
+                },
+                Arg {
+                    key: Some("where".into()),
+                    value: cond,
+                },
+            ],
+        );
+        let (op, n) = if q == "some" { (">", "0") } else { ("==", "0") };
+        Ok(Expr::Binary(
+            op,
+            Box::new(count),
+            Box::new(Expr::Num(n.into())),
+        ))
     }
 
     fn cmp(&mut self) -> Result<Expr, ParseError> {

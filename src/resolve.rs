@@ -44,9 +44,14 @@ pub const FUNCTIONS: &[&str] = &[
     // `max(1, players / 4)`.
     "max",
     "min",
+    // `first(victim.chosen_by)`, `last(targets)`: the ends of a list.
+    "first",
+    "last",
     // Helpers for text.
     "plural",
     "capital",
+    // `possessive(victim)`: "Ada’s".
+    "possessive",
 ];
 
 /// Names every Inklink can use without declaring them.
@@ -61,6 +66,8 @@ pub const BUILTINS: &[&str] = &[
     "pov",
     "scenario",
     "accusation",
+    // `ballot.done`: the table's last `{ballot}`.
+    "ballot",
     // What a Link with `~ at` was taken on, in its effects and its passage.
     "target",
     // What an `on` handler's event happened to: `on enter shaft when entered.burnt`.

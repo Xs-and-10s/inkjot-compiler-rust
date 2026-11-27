@@ -93,6 +93,8 @@ const PATTERNS: &[Pattern] = &[
     p(&["formally"], "formally", Shape::Text),
     p(&["aka"], "aka", Shape::Aka),
     p(&["pick"], "aka_pick", Shape::Token),
+    // `~ pronouns she`, or `chosen` by the Linker.
+    p(&["pronouns"], "pronouns", Shape::Token),
     p(&["else"], "else", Shape::Token),
     p(&["weight"], "weight", Shape::Token),
     p(&["of"], "of", Shape::Token),
@@ -308,6 +310,40 @@ impl<'a> Fields<'a> {
             self.add(key, quoted_text(text).unwrap_or(Value::str(text)));
             return;
         }
+        // A table with named columns: `~ columns name, setting`, then
+        // `~ row vampires: "the Vampires", "a village …"`.
+        if let Some(cols) = text.strip_prefix("columns ") {
+            let cols = cols.split(',').map(|c| Value::str(c.trim())).collect();
+            self.add("columns", Value::Arr(cols));
+            return;
+        }
+        if let Some((id, values)) = text.strip_prefix("row ").and_then(|r| r.split_once(':')) {
+            let values = super::split_args(values)
+                .iter()
+                .map(|v| {
+                    // Text is `{"str": …}` (or `{"text": …}` with braces),
+                    // a name a plain string.
+                    if v.starts_with('"') {
+                        match quoted_text(v).unwrap_or(Value::str(v)) {
+                            Value::Str(t) => Value::obj([("str", Value::Str(t))]),
+                            text => text,
+                        }
+                    } else {
+                        expression(v)
+                    }
+                })
+                .collect();
+            let row = Value::obj([
+                ("row", Value::str(id.trim())),
+                ("values", Value::Arr(values)),
+            ]);
+            self.add("rows", Value::Arr(vec![row]));
+            return;
+        }
+        if text == "one per game" {
+            self.add("once", Value::Bool(true));
+            return;
+        }
         // A map row: `orrery | gallery | gate`.
         if text.contains('|') {
             let row = text.split('|').map(|c| Value::str(c.trim())).collect();
@@ -399,8 +435,17 @@ impl<'a> Fields<'a> {
             }
             Shape::Holds => {
                 let mut entries = Vec::new();
-                for item in rest.split(',') {
-                    let item = item.trim();
+                for item in super::split_args(rest) {
+                    let item = item.as_str();
+                    // `holds "found in the bell tower", "…"`: text alone,
+                    // numbered by the interpreter (`vampire_deaths#1`).
+                    if item.starts_with('"') {
+                        entries.push(Value::obj([(
+                            "label",
+                            super::styled_value(quoted(item).unwrap_or(item)),
+                        )]));
+                        continue;
+                    }
                     let (item, mark) = match item.split_once(" as ") {
                         Some((i, m)) => (i.trim(), Some(m.trim())),
                         None => (item, None),

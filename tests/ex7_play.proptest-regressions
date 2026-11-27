@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 0823a907932e2cf5c7c0ba99ab1f6eea1a3ab3f6e14f62beac89fe4f1d03c229 # shrinks to n = 7, seed = 2146, picks = [9591, 4006, 37114, 63206, 44582, 3871, 29129, 61896, 54934, 34541, 27925, 60053, 3508, 8392, 27329, 62914, 13101, 14219, 23864, 37690, 6247, 14304, 25397, 65037, 42502, 46647, 32758, 8628, 64364, 4708, 8209, 51857, 23632, 2281, 58915, 1550, 54821, 46432, 58759, 21239, 65314, 61020, 43492, 4674, 27990, 53569, 8983, 59666, 5990, 10444]

@@ -1,5 +1,5 @@
-//! Ex 7's rules, played out. The draft can't run yet (decks, tables,
-//! periods and group choices aren't built), so this is a model of its rules
+//! Ex 7's rules, played out. This was written before the draft could run
+//! (it runs now: `tests/ex7_play.rs`), so it is a model of its rules
 //! (the deck's sizes, who may be chosen at night, debts, conversions,
 //! thefts, a vote whose ties are drawn) played by players who choose at
 //! random. The draft's own numbers are checked first, so the model can't

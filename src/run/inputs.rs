@@ -70,7 +70,7 @@ pub(super) struct Ballot {
 pub(super) fn is_input(v: &Value) -> bool {
     f(v, "insert")
         .as_str()
-        .is_some_and(|i| i == "accuse" || i.ends_with(" input"))
+        .is_some_and(|i| i == "accuse" || i == "ballot" || i.ends_with(" input"))
 }
 
 impl Run {
@@ -94,19 +94,31 @@ impl Run {
         for input in open {
             let args = f(&input, "args").clone();
             let kind = f(&input, "insert").as_str().unwrap_or("").to_string();
+            // A jury or ballot that has decided asks nothing more.
+            let decided = |key: &str| self.vals.get(key).is_some_and(V::truthy);
+            if (kind == "accuse" && decided("accusation.done"))
+                || (kind == "ballot" && decided("ballot.done"))
+            {
+                continue;
+            }
             let (options, methods) = match kind.as_str() {
-                "choose input" => (self.options(&args)?, Vec::new()),
-                "accuse" => (self.suspects(&args), self.methods(&args)?),
+                "choose input" | "ballot" => (self.options(&args)?, Vec::new()),
+                "accuse" => (self.suspects(&args)?, self.methods(&args)?),
                 _ => (Vec::new(), Vec::new()),
             };
             let prompt = self.prompt(&input)?;
+            let voted = if kind == "ballot" {
+                self.vals.contains_key(&format!("ballot.vote.{}", self.pov))
+            } else {
+                self.ballots.contains_key(&self.pov)
+            };
             out.push(Ask {
                 kind,
                 prompt,
                 options,
                 methods,
                 length: f(&args, "length").as_u64().map(|n| n as usize),
-                voted: self.ballots.contains_key(&self.pov),
+                voted,
             });
         }
         Ok(out)
@@ -114,6 +126,21 @@ impl Run {
 
     /// Note an input met while showing a passage, and say what it asks.
     pub(super) fn meet_input(&mut self, input: &Value) -> R<String> {
+        // A jury or a ballot met on a later turn is a new one.
+        for (insert, key) in [("accuse", "accusation"), ("ballot", "ballot")] {
+            if f(input, "insert").as_str() == Some(insert) {
+                self.fresh_vote(key);
+            }
+        }
+        // A jury nobody may sit on decides at once.
+        if f(input, "insert").as_str() == Some("accuse")
+            && !self.vals.get("accusation.done").is_some_and(V::truthy)
+        {
+            let args = f(input, "args").clone();
+            if self.jury(&args)?.is_empty() {
+                return self.decide_unvoted(&args, input);
+            }
+        }
         if !self.asking.contains(input) {
             self.asking.push(input.clone());
         }
@@ -128,6 +155,26 @@ impl Run {
                 Some(max) => format!("(Type a name, up to {max} letters.)"),
                 None => String::from("(Type a name.)"),
             },
+            "text input" => match f(&args, "max").as_u64() {
+                Some(max) => format!("(Write it, up to {max} characters.)"),
+                None => String::from("(Write it.)"),
+            },
+            "ballot" => {
+                if self.vals.get("ballot.done").is_some_and(V::truthy) {
+                    return Ok(String::new());
+                }
+                let options: Vec<String> = self
+                    .options(&args)?
+                    .iter()
+                    .map(|o| self.option_label(&args, o))
+                    .collect();
+                let mine = if self.vals.contains_key(&format!("ballot.vote.{}", self.pov)) {
+                    " Your vote is cast."
+                } else {
+                    ""
+                };
+                format!("(Vote for one of: {}.{mine})", or_list(&options))
+            }
             "choose input" => {
                 let options = self.options(&args)?;
                 match f(&args, "length").as_u64() {
@@ -139,18 +186,26 @@ impl Run {
                 if self.vals.get("accusation.done").is_some_and(V::truthy) {
                     return Ok(String::new());
                 }
-                let who: Vec<String> = self.suspects(&args).iter().map(|s| self.label(s)).collect();
+                let who: Vec<String> = self
+                    .suspects(&args)?
+                    .iter()
+                    .map(|s| self.label(s))
+                    .collect();
                 let how = self.methods(&args)?;
                 let mine = if self.ballots.contains_key(&self.pov) {
                     " Your ballot is cast."
                 } else {
                     ""
                 };
-                format!(
-                    "(Vote: who, of {}; how, of {}; and cite your proof.{mine})",
-                    or_list(&who),
-                    or_list(&how)
-                )
+                if how.is_empty() {
+                    format!("(Vote for one of: {}.{mine})", or_list(&who))
+                } else {
+                    format!(
+                        "(Vote: who, of {}; how, of {}; and cite your proof.{mine})",
+                        or_list(&who),
+                        or_list(&how)
+                    )
+                }
             }
             other => {
                 return Err(format!(
@@ -160,9 +215,17 @@ impl Run {
         })
     }
 
-    /// What a `{choose input}` chooses from: everything of its kind.
+    /// What a `{choose input}` chooses from: the entries of a list
+    /// (`from: moderators`), or everything of a kind (`from: cantrip`).
     fn options(&self, args: &Value) -> R<Vec<String>> {
         let kind = f(args, "from").as_str().unwrap_or("");
+        if self.story.kind(kind) == Some("list") {
+            return Ok(self
+                .lists
+                .get(kind)
+                .map(|l| l.iter().map(|e| e.id.clone()).collect())
+                .unwrap_or_default());
+        }
         let mut ids: Vec<String> = self
             .story
             .decls
@@ -174,7 +237,18 @@ impl Run {
         Ok(ids)
     }
 
-    fn suspects(&self, args: &Value) -> Vec<String> {
+    /// Who the jury may accuse: those of a kind (`who: suspect`), or a
+    /// list worked out now (`who: all(guest, where: it.alive)`).
+    fn suspects(&mut self, args: &Value) -> R<Vec<String>> {
+        if let who @ Value::Obj(_) = f(args, "who") {
+            return Ok(match self.eval(&who.clone())? {
+                V::List(items) => items
+                    .iter()
+                    .filter_map(|i| i.name().map(str::to_string))
+                    .collect(),
+                one => one.name().map(str::to_string).into_iter().collect(),
+            });
+        }
         let kind = f(args, "who").as_str().unwrap_or("suspect");
         let mut ids: Vec<String> = self
             .story
@@ -184,7 +258,7 @@ impl Run {
             .cloned()
             .collect();
         ids.sort();
-        ids
+        Ok(ids)
     }
 
     fn methods(&mut self, args: &Value) -> R<Vec<String>> {
@@ -213,6 +287,9 @@ impl Run {
             .cloned()
             .ok_or("nothing here is asking for an answer")?;
         let args = f(&input, "args").clone();
+        if f(&input, "insert").as_str() == Some("ballot") {
+            return self.ballot_vote(&args, words);
+        }
         let value = match f(&input, "insert").as_str().unwrap_or("") {
             "name input" => {
                 let name = words.join(" ");
@@ -227,6 +304,16 @@ impl Run {
                 }
                 V::Str(name.to_string())
             }
+            // `{text input for: report, max: 600}`: anything, within the limit.
+            "text input" => {
+                let text = words.join(" ");
+                if let Some(max) = f(&args, "max").as_u64() {
+                    if text.chars().count() > max as usize {
+                        return Err(format!("this is at most {max} characters"));
+                    }
+                }
+                V::Str(text)
+            }
             "choose input" => {
                 let options = self.options(&args)?;
                 if let Some(bad) = words.iter().find(|w| !options.contains(w)) {
@@ -240,7 +327,12 @@ impl Run {
                         return Err(format!("choose exactly {n}"));
                     }
                 }
-                V::List(words.iter().map(|w| V::Id(w.clone())).collect())
+                // `length: 1` into a single value: `moderator`, not a list.
+                if f(&args, "length").as_u64() == Some(1) {
+                    V::Id(words[0].clone())
+                } else {
+                    V::List(words.iter().map(|w| V::Id(w.clone())).collect())
+                }
             }
             other => {
                 return Err(format!(
@@ -282,7 +374,12 @@ impl Run {
             return Err("the jury has already decided".into());
         }
         let args = f(&jury, "args").clone();
-        let suspects = self.suspects(&args);
+        let suspects = self.suspects(&args)?;
+        // `voters: all(guest, where: it.alive)`: only they vote.
+        let voters = self.jury(&args)?;
+        if !voters.contains(&self.pov) {
+            return Err(format!("`{}` has no vote here", self.pov));
+        }
         if !suspects.iter().any(|s| s == who) {
             return Err(format!("`{who}` is not a suspect: {}", suspects.join(", ")));
         }
@@ -304,6 +401,9 @@ impl Run {
                 ));
             }
         }
+        // Remembered for `it.voted_with(…)`, until the next jury.
+        self.vals
+            .insert(format!("{me}.voted_for"), V::Id(who.to_string()));
         self.ballots.insert(
             me,
             Ballot {
@@ -312,7 +412,6 @@ impl Run {
                 proof: proof.to_vec(),
             },
         );
-        let voters = self.voters();
         if voters.iter().all(|v| self.ballots.contains_key(v)) {
             self.tally(&args)
         } else {
@@ -320,6 +419,122 @@ impl Run {
                 .push("(Your ballot is cast. Waiting for the others.)".into());
             self.relist()
         }
+    }
+
+    /// A jury with no voters: the tally of nothing, drawn among everyone.
+    fn decide_unvoted(&mut self, args: &Value, input: &Value) -> R<String> {
+        if !self.asking.contains(input) {
+            self.asking.push(input.clone());
+        }
+        let voters = Vec::new();
+        self.tally_with(args, &voters)?;
+        self.prompt(input)
+    }
+
+    /// Who sits on this jury or votes in this ballot: `voters:` worked out
+    /// now, or every Linker.
+    fn jury(&mut self, args: &Value) -> R<Vec<String>> {
+        match f(args, "voters") {
+            Value::Null => Ok(self.voters()),
+            v => Ok(match self.eval(&v.clone())? {
+                V::List(items) => items
+                    .iter()
+                    .filter_map(|i| i.name().map(str::to_string))
+                    .collect(),
+                one => one.name().map(str::to_string).into_iter().collect(),
+            }),
+        }
+    }
+
+    /// A new jury or ballot, met on a later turn than the last: forget the
+    /// last one's votes and verdict.
+    fn fresh_vote(&mut self, key: &str) {
+        let turn = V::Num(f64::from(self.chronon));
+        if self.vals.get(&format!("{key}.turn")) == Some(&turn) {
+            return;
+        }
+        let prefix = format!("{key}.");
+        self.vals.retain(|k, _| !k.starts_with(&prefix));
+        if key == "accusation" {
+            self.ballots.clear();
+            self.vals.retain(|k, _| !k.ends_with(".voted_for"));
+        }
+        self.vals.insert(format!("{key}.turn"), turn);
+    }
+
+    /// The text a ballot shows for one of its options: the list's label.
+    fn option_label(&self, args: &Value, option: &str) -> String {
+        let list = f(args, "from").as_str().unwrap_or("");
+        self.lists
+            .get(list)
+            .and_then(|l| l.iter().find(|e| e.id == option))
+            .and_then(|e| e.label.as_ref())
+            .and_then(|l| self.text_now(l))
+            .unwrap_or_else(|| self.label(option))
+    }
+
+    /// `{ballot …}`: the pov votes for one option. When every voter has,
+    /// the most chosen is kept in `for:`.
+    fn ballot_vote(&mut self, args: &Value, words: &[String]) -> R<()> {
+        if self.vals.get("ballot.done").is_some_and(V::truthy) {
+            return Err("the ballot is over".into());
+        }
+        let voters = self.jury(args)?;
+        if !voters.contains(&self.pov) {
+            return Err(format!("`{}` has no vote in this ballot", self.pov));
+        }
+        let options = self.options(args)?;
+        let choice = words.join(" ");
+        if !options.contains(&choice) {
+            return Err(format!("`{choice}` is not one of: {}", options.join(", ")));
+        }
+        self.vals
+            .insert(format!("ballot.vote.{}", self.pov), V::Id(choice));
+        if !voters
+            .iter()
+            .all(|v| self.vals.contains_key(&format!("ballot.vote.{v}")))
+        {
+            self.output
+                .push("(Your vote is cast. Waiting for the others.)".into());
+            return self.relist();
+        }
+        // Count, in the order first voted for (seating order).
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for v in &voters {
+            if let Some(c) = self.vals.get(&format!("ballot.vote.{v}")).and_then(V::name) {
+                match counts.iter_mut().find(|(o, _)| o == c) {
+                    Some((_, n)) => *n += 1,
+                    None => counts.push((c.to_string(), 1)),
+                }
+            }
+        }
+        let top = counts.iter().map(|(_, n)| *n).max().unwrap_or(0);
+        let leaders: Vec<String> = counts
+            .iter()
+            .filter(|(_, n)| *n == top)
+            .map(|(o, _)| o.clone())
+            .collect();
+        let drawn = leaders.len() > 1;
+        let winner = if drawn && f(args, "ties").as_str() != Some("hung") {
+            let i = self.roll(leaders.len() as u64) as usize - 1;
+            Some(leaders[i].clone())
+        } else if drawn {
+            None
+        } else {
+            Some(leaders[0].clone())
+        };
+        self.vals.insert("ballot.done".into(), V::Bool(true));
+        self.vals
+            .insert("ballot.drawn".into(), V::Bool(drawn && winner.is_some()));
+        self.vals
+            .insert("ballot.hung".into(), V::Bool(winner.is_none()));
+        if let Some(w) = winner {
+            let key = self.path(f(args, "for"))?;
+            self.vals.insert(key, V::Id(w.clone()));
+            self.vals.insert("ballot.winner".into(), V::Id(w));
+        }
+        let lines = Vec::new();
+        self.tell_jury(&voters, lines)
     }
 
     /// How many Linkers are playing, or how many of them are alive.
@@ -341,7 +556,16 @@ impl Run {
 
     /// Count the ballots, show them to everyone, and decide or revote.
     fn tally(&mut self, args: &Value) -> R<()> {
-        let voters = self.voters();
+        let voters = self.jury(args)?;
+        self.tally_with(args, &voters)
+    }
+
+    fn tally_with(&mut self, args: &Value, voters: &[String]) -> R<()> {
+        let voters = voters.to_vec();
+        self.vals.insert(
+            "accusation.voters".into(),
+            V::List(voters.iter().cloned().map(V::Id).collect()),
+        );
         let ballots: Vec<Ballot> = voters
             .iter()
             .filter_map(|v| self.ballots.get(v).cloned())
@@ -355,12 +579,26 @@ impl Run {
                 None => counts.push((pair, 1)),
             }
         }
+        // Nobody may vote (Ex 7: every voter paid a debt): every suspect
+        // ties, with nothing.
+        let unvoted: Vec<(String, String)> = if voters.is_empty() {
+            self.suspects(args)?
+                .into_iter()
+                .map(|s| (s, String::new()))
+                .collect()
+        } else {
+            Vec::new()
+        };
         let top = counts.iter().map(|(_, n)| *n).max().unwrap_or(0);
-        let leaders: Vec<&(String, String)> = counts
-            .iter()
-            .filter(|(_, n)| *n == top)
-            .map(|(p, _)| p)
-            .collect();
+        let leaders: Vec<&(String, String)> = if voters.is_empty() {
+            unvoted.iter().collect()
+        } else {
+            counts
+                .iter()
+                .filter(|(_, n)| *n == top)
+                .map(|(p, _)| p)
+                .collect()
+        };
         // Kept for `{ballots}`: most votes first, ties in seating order.
         let mut sorted = counts.clone();
         sorted.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
@@ -384,7 +622,7 @@ impl Run {
             .get("accusation.revotes")
             .and_then(V::num)
             .unwrap_or_else(|| f(args, "revote").as_u64().unwrap_or(0) as f64);
-        if leaders.len() != 1 && revotes > 0.0 {
+        if leaders.len() != 1 && revotes > 0.0 && !voters.is_empty() {
             self.vals
                 .insert("accusation.revotes".into(), V::Num(revotes - 1.0));
             self.ballots.clear();
@@ -392,6 +630,14 @@ impl Run {
             return self.tell_jury(&voters, lines);
         }
         self.vals.insert("accusation.done".into(), V::Bool(true));
+        // `ties: draw`: by lot, among the tied, once the revotes are spent.
+        let mut leaders = leaders;
+        let drawn = leaders.len() > 1 && f(args, "ties").as_str() == Some("draw");
+        if drawn {
+            let i = self.roll(leaders.len() as u64) as usize - 1;
+            leaders = vec![leaders[i]];
+        }
+        self.vals.insert("accusation.drawn".into(), V::Bool(drawn));
         if leaders.len() != 1 {
             self.vals.insert("accusation.hung".into(), V::Bool(true));
             self.vals
@@ -431,7 +677,11 @@ impl Run {
         self.vals
             .insert("accusation.proven".into(), V::Bool(proven));
         if !framed {
-            lines.push(format!("The jury accuses {}, by {how}.", self.label(&who)));
+            lines.push(if how.is_empty() {
+                format!("The jury accuses {}.", self.label(&who))
+            } else {
+                format!("The jury accuses {}, by {how}.", self.label(&who))
+            });
         }
         self.tell_jury(&voters, lines)
     }
@@ -441,7 +691,13 @@ impl Run {
     pub(super) fn ballots_text(&self) -> String {
         self.tally
             .iter()
-            .map(|(who, how, n)| format!("{n} for {}, by {how}", self.label(who)))
+            .map(|(who, how, n)| {
+                if how.is_empty() {
+                    format!("{n} for {}", self.label(who))
+                } else {
+                    format!("{n} for {}, by {how}", self.label(who))
+                }
+            })
             .collect::<Vec<_>>()
             .join("; ")
     }

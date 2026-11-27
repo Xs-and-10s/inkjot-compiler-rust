@@ -96,6 +96,8 @@ pub(crate) const SETTINGS: &[&str] = &[
     "cue",
     // A value reported when the reading ends: `measure nights: nights`.
     "measure",
+    // `finale when: …`, in a `[finale]` passage.
+    "finale",
     // Making things: `recipe pawl: horseshoe ~ using hammer ~ make`.
     "recipe",
     // `spreads 1 from ablaze to nearest(place, where: …) ~ along way`.
@@ -158,6 +160,8 @@ pub(crate) const EFFECTS: &[&str] = &[
     // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
     "shuffle",
     "deal",
+    // `draw syndicate vampires`: a table's row, chosen.
+    "draw",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -187,22 +191,60 @@ pub(crate) const RETIRED: &[(&str, &str)] = &[
 
 /// Words that may start a Link clause, besides the name of a declared act or combo.
 pub(crate) const LINK_CLAUSES: &[&str] = &[
-    "cost", "when", "hidden", "for", "then", "ends", "private", "shared", "capacity", "clash",
-    "check", "chance", "hint", "inquest", "order", "after", "become", "with", "by", "switch", "id",
+    "cost",
+    "when",
+    "hidden",
+    "for",
+    "then",
+    "ends",
+    "private",
+    "shared",
+    "capacity",
+    "clash",
+    "check",
+    "chance",
+    "hint",
+    "inquest",
+    "order",
+    "after",
+    "become",
+    "with",
+    "by",
+    "switch",
+    "id",
     // Inquests: where a fork's pending slot rejoins, its brief, who wrote it.
-    "rejoin", "brief", "credit",
+    "rejoin",
+    "brief",
+    "credit",
     // Analysis: read by the Inker's reports, never by play.
-    "beat", "weighs", "arc", "stakes", "plants", "pays", "predict", "lasting", "tone", "reveals",
-    "pass", "release", "requires", "once", "loud", "quiet", "choice",
+    "beat",
+    "weighs",
+    "arc",
+    "stakes",
+    "plants",
+    "pays",
+    "predict",
+    "lasting",
+    "tone",
+    "reveals",
+    "pass",
+    "release",
+    "requires",
+    "once",
+    "loud",
+    "quiet",
+    "choice",
     // A target chosen by the Linker: `~ at item here where: …`.
     "at", // A tool the Link uses, which may break: `~ uses pick`.
     "uses",
+    // A vote among those who may take it: `~ consensus`, `~ consensus 2`.
+    "consensus",
 ];
 
 /// The input family: `{name input for: me.name}`.
 pub(crate) const INPUTS: &[&str] = &[
-    "name", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret", "roll",
-    "note",
+    "name", "text", "choose", "act", "pick", "rank", "allocate", "number", "target", "secret",
+    "roll", "note",
 ];
 
 /// Who may write a fork: the Inker, or a role the platform fills. Roles

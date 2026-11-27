@@ -475,7 +475,7 @@ its Link, so the save can stop any of them: a death, a theft, a mark, a
 taking. `report` holds the table's version; MonkeyPaw or
 the Storyteller may tell it differently.
 )))
-let flourish: one syndicate.deaths
+let flourish: one(syndicate.deaths)
 (((
 Who does the deed for the syndicate: the first member who placed their
 vote on the target chosen.
@@ -640,7 +640,7 @@ raise lynched_syndicate 1 when lynched.team != town
 raise lynched_town 1 when lynched.team == town
 raise disguised_lynched 1 when lynched.shown_as != lynched.name
 raise draws 1 when accusation.drawn
-set each guest.voteless: no
+set all(guest).voteless: no
 (((
 A thief voted out is searched: what they stole goes back to its owners,
 and can be stolen again.
@@ -648,7 +648,7 @@ and can be stolen again.
 let found: lynched.loot
 move each found to it.owner.keepsake when syndicate.special == heist
 raise returned count(found) when syndicate.special == heist
-spreads 1 to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ then set it.heard: yes ~ when whispered
+spreads 1 from all(guest, where: it.heard) to nearest(guest, where: it.alive and not it.heard) ~ along seat ~ then set it.heard: yes ~ when whispered
 --
 {ballots}
 
@@ -709,41 +709,119 @@ And the luggage: {list loot of each guest where count(it.loot) > 0 ~ one per lin
 [end]
 
 :: five_players_one_syndicate [test]
-start: gathering ~ cohort 5
+start: gathering ~ as guest, guest, guest, guest, guest
 given: draw syndicate vampires
 do: "Draw the syndicate"
+expect text: "the Vampires"
 do: "Deal the cards"
 expect: syndicate_left == 1
 expect: count(guest, where: it.role == doctor) == 1
 expect: count(guest, where: it.role == detective) == 1
+expect: count(guest, where: it.role == townsfolk) == 2
+
+:: a_special_syndicate_is_voted_for [test]
+start: gathering ~ as guest, guest, guest, guest, guest
+do: "Ask for a special syndicate"
+as: guest_2
+do: "Ask for a special syndicate"
+as: guest_3
+do: "Ask for a special syndicate"
+do: "Choose the special syndicate"
+answer: cult
+as: guest_1
+answer: cult
+as: guest_2
+answer: heist
+as: guest_4
+answer: cult
+as: guest_5
+answer: surprise
+expect: ballot.done and chosen_special == cult
+do: "Draw it"
+expect: syndicate == cult
 
 :: the_doctor_cannot_save_twice [test]
-start: night ~ cohort 5 ~ as doctor_player
+start: night ~ as guest, guest, guest, guest, guest
 given: draw syndicate vampires
-given: set me.saved_last: guest_2
-expect no link: "Save {guest_2}"
+given: set guest_1.role: doctor
+given: set guest_2.name: "Bea"
+given: set guest_1.saved_last: guest_2
+as: guest_1
+expect no link: "Save Bea"
 
 :: the_dead_do_not_vote [test]
-start: vote ~ cohort 6
+(((
+The living vote; the dead are not waited for.
+)))
+start: vote ~ as guest, guest, guest, guest, guest
 given: set guest_3.alive: no
-expect: not guest_3.in(accusation.voters)
+vote: guest_2
+as: guest_2
+vote: guest_1
+as: guest_4
+vote: guest_2
+as: guest_5
+vote: guest_2
+expect: accusation.done and accusation.who == guest_2
+expect: not (guest_3 in accusation.voters)
 
 :: a_name_taken_in_is_not_marked [test]
-start: morning ~ cohort 5
+start: night ~ as guest, guest, guest, guest, guest
 given: draw syndicate collectors
+given: set guest_1.team: mafia
 given: set victim: guest_2
 given: set saved: guest_2
+as: guest_1
+do: "Sleep"
+as: guest_2
+do: "Sleep"
+as: guest_3
+do: "Sleep"
+as: guest_4
+do: "Sleep"
+as: guest_5
+do: "Sleep"
+do: "Morning"
+expect at: morning
 expect: not guest_2.marked
 
 :: a_guest_sat_up_with_is_not_taken [test]
-start: morning ~ cohort 5
+start: night ~ as guest, guest, guest, guest, guest
 given: draw syndicate cult
+given: set guest_1.team: cult
 given: set victim: guest_2
 given: set saved: guest_2
+as: guest_1
+do: "Sleep"
+as: guest_2
+do: "Sleep"
+as: guest_3
+do: "Sleep"
+as: guest_4
+do: "Sleep"
+as: guest_5
+do: "Sleep"
+do: "Morning"
 expect: guest_2.team == town
 
 :: the_town_wins_when_none_are_left [test]
-start: counted ~ cohort 5
-given: set each guest.team: town
+(((
+The one Vampire is voted out; the town has won, as the night begins.
+)))
+start: vote ~ as guest, guest, guest, guest, guest
+given: draw syndicate vampires
+given: set guest_2.team: mafia
+given: wait until day
+vote: guest_2
+as: guest_2
+vote: guest_1
+as: guest_3
+vote: guest_2
+as: guest_4
+vote: guest_2
+as: guest_5
+vote: guest_2
+do: "The vote is counted"
+do: "Night falls"
 expect at: town_wins
 expect events: ending_reached

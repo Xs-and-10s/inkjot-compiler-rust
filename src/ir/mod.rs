@@ -763,6 +763,10 @@ impl Builder {
             }
             "combo" => f.add("acts", strings(value.split(',').map(str::trim))),
             "relation" => f.add("between", strings(value.split(',').map(str::trim))),
+            // `table syndicate: shuffled`: rows drawn, not rolled for.
+            "table" if matches!(value.trim(), "shuffled" | "random" | "cycle") => {
+                f.add("pick", Value::str(value.trim()))
+            }
             "table" => f.add(
                 "roll",
                 expression(value.strip_prefix("roll ").unwrap_or(value)),
@@ -867,6 +871,12 @@ impl Builder {
                 return Value::Obj(f.into_pairs());
             }
             // `measure nights: nights` → `{"measure": "nights", "value": …}`.
+            // `finale when: no guest where: …`: the game ends here when it holds.
+            "finale" => {
+                let cond = rest.trim().strip_prefix("when:").unwrap_or(rest).trim();
+                f.add("finale_when", expression(cond));
+                return Value::Obj(f.into_pairs());
+            }
             "measure" => {
                 let (name, expr) = rest.split_once(':').unwrap_or((rest, ""));
                 f.add("measure", Value::str(name.trim()));
@@ -1088,7 +1098,23 @@ impl Builder {
                 }
                 "when" => whens.push(expression(rest)),
                 "hidden" => hidden = expression(rest.strip_prefix("until").unwrap_or(rest)),
+                // `~ for guest where: it.alive`: who of a kind may take it.
+                "for" if rest.contains(" where:") => {
+                    let (kinds, cond) = rest.split_once(" where:").unwrap_or((rest, ""));
+                    audience = strings(kinds.split(',').map(str::trim));
+                    extra.push(("for_where".into(), expression(cond.trim())));
+                }
                 "for" => audience = strings(rest.split(',').map(str::trim)),
+                // `~ consensus`, `~ consensus 2`: a vote among those who may
+                // take it; each chooses that many.
+                "consensus" => extra.push((
+                    "consensus".into(),
+                    if rest.trim().is_empty() {
+                        num(1)
+                    } else {
+                        token(rest.trim())
+                    },
+                )),
                 "then" => effects.push(effect(rest)),
                 "ends" => ends_turn = Some(true),
                 "private" | "shared" => scope = Some(word.to_string()),
@@ -1373,15 +1399,34 @@ pub(crate) fn effect(text: &str) -> Value {
     match verb {
         "set" => {
             let (target, value) = rest.split_once(':').unwrap_or((rest, ""));
-            let (value, until) = value
-                .trim()
-                .split_once(" until ")
-                .unwrap_or((value.trim(), ""));
+            // `set x: y until …`, but not an "until" in quoted text.
+            let value = value.trim();
+            let at = value
+                .match_indices(" until ")
+                .map(|(i, _)| i)
+                .find(|i| value[..*i].matches('"').count() % 2 == 0);
+            let (value, until) = match at {
+                Some(i) => (&value[..i], &value[i + " until ".len()..]),
+                None => (value, ""),
+            };
             pairs.push(("target".into(), expression(target)));
             pairs.push(("value".into(), expression(value)));
             if !until.is_empty() {
                 pairs.push(("until".into(), Value::str(until.trim())));
             }
+        }
+        // `roll syndicate where: it.special == chosen_special`: only rows
+        // the condition holds for.
+        "roll" if rest.contains(" where:") => {
+            let (table, cond) = rest.split_once(" where:").unwrap_or((rest, ""));
+            pairs.push(("args".into(), Value::Arr(vec![Value::str(table.trim())])));
+            pairs.push(("where".into(), expression(cond.trim())));
+        }
+        // `draw syndicate vampires`: a table's row, chosen (in tests).
+        "draw" => {
+            let mut w = rest.split_whitespace();
+            pairs.push(("table".into(), Value::str(w.next().unwrap_or(""))));
+            pairs.push(("row".into(), Value::str(w.next().unwrap_or(""))));
         }
         // `wait until night`, `wait until new_years_eve.nine`.
         "wait" if rest.starts_with("until ") => {
@@ -1703,9 +1748,9 @@ fn insert(content: &str) -> Value {
                 ("until", expression(until)),
             ])
         }
-        // The jury and the inputs take typed arguments.
-        "accuse" => Value::obj([
-            ("insert", Value::str("accuse")),
+        // The jury, a ballot, and the inputs take typed arguments.
+        "accuse" | "ballot" => Value::obj([
+            ("insert", Value::str(first)),
             ("args", insert_args(&c[first.len()..])),
         ]),
         _ if second == "input" => Value::obj([
