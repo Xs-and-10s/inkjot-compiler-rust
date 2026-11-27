@@ -43,6 +43,7 @@ here.
 | 21c | Time: `period`s and named clocks (`clock.phase`, ordered names, clocks in names, `once per hour`), `on … begins` / `ends`, `wait until`, `turn ends when` with `passed` and `spent`, Links timed in real time (`~ after 5m`, `Action::Wait`, `due_in`); Ex 7's night has its deadline | #47 |
 | 21d | Votes and seats: `~ for … where:`, `~ consensus`, `{ballot}`, the jury's `voters:` and `ties: draw`, seats in a ring, tables with named columns, lists of text, quantifiers, `first`/`last`/`possessive`, pronouns, settable `shown_as`, `{text input}`, `finale when:`. Ex 7 plays, but for its knowledge base | #48 |
 | 21e | The engine seats a table (`Start.seats`, `Action::As`, `view_of`); knowledge bases and `assert … in`, a store only. Ex 7 plays whole. Milestone 21 done | #49 |
+| 22b | Ex 6 runs: `^` lookups in facts, `never` and `note` (refuse or flag), `{contradictions}`, `{known about}`, the `{note}` input, `for each`, facts as Link parameters, `x.did(act)`, scenes `play`ed by NPCs, checkpoints `on death` and `each hour` that keep a `per linker` notebook, `refill each turn` | #51 |
 | 22a | Inklog's core: facts asked of bases, rules to a fixed point with stratified `not`, quantifiers with a dot, `world` and `knows`, `~ means`, `~ for`, `~ starts with`, `~ reads`, `retract`, `[rules]`; a notice for `~ then … ~ when` on a Link | #50 |
 
 ## Next

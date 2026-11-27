@@ -198,6 +198,10 @@ const PATTERNS: &[Pattern] = &[
     p(&["shows"], "shows", Shape::Token),
     // Rewinds and checkpoints.
     p(&["on", "death", "in"], "on_death_in", Shape::Id),
+    // `checkpoint hour ~ on death ~ each hour`: any death, and reached
+    // each time an hour begins.
+    p(&["on", "death"], "on_death", Shape::Flag),
+    p(&["each"], "each", Shape::Token),
     p(&["keeps"], "keeps", Shape::Ids),
     p(&["resets"], "resets", Shape::Ids),
     p(&["to"], "to", Shape::PerWho),

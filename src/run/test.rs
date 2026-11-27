@@ -162,6 +162,7 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                 run.apply(&effect, &[])
                     .and_then(|()| run.settle_deaths())
                     .and_then(|()| if started { run.relist_all() } else { Ok(()) })
+                    .and_then(|()| run.arrive_pending())
             }
             // `do: wait 5m`: real time passes, and timed Links are taken.
             "do" if value.starts_with("wait ") => {
@@ -241,17 +242,21 @@ fn run_one(story: &Arc<Story>, name: &str, line: usize, stmts: &[Stmt]) -> Outco
                 result
             }
             "expect" if how == "events" => {
-                let missing: Vec<&str> = value
+                // `died`: reported; `not died`: not.
+                let wrong: Vec<&str> = value
                     .split(',')
                     .map(str::trim)
-                    .filter(|k| !events.iter().any(|e| e == k))
+                    .filter(|k| match k.strip_prefix("not ") {
+                        Some(k) => events.iter().any(|e| e == k.trim()),
+                        None => !events.iter().any(|e| e == k),
+                    })
                     .collect();
-                if missing.is_empty() {
+                if wrong.is_empty() {
                     Ok(())
                 } else {
                     Err(format!(
                         "expected the events {}; the engine reported: {}",
-                        missing.join(", "),
+                        wrong.join(", "),
                         events.join(", ")
                     ))
                 }

@@ -53,6 +53,7 @@ eight o'clock to midnight. Four quarter-hours to spend each turn.
 period hour: eight 1, nine 2, ten 2, eleven 2, midnight 1
 period evening: new_years_eve ~ of hour
 clock: new_years_eve.eight ..= new_years_eve.midnight ~ shown as "turn"
+~ turn ends when me.spent
 resource time: 4 ~ refill each turn ~ shown as "time left this turn"
 
 character attendant: "the cloakroom attendant" ~ selectable ~ custom ~ pronouns chosen
@@ -200,6 +201,7 @@ goal read_your_notebook
 goal the_lights
 ~ toward cloakroom
 ~ weight 8
+~ pace dash
 ~ when {{ you must_go }} in dossier and clock.hour == eleven and not {{ you gone @ new_years_eve.eleven }} in dossier
 ~ then play cloakroom:dark when you.in(cloakroom)
 
@@ -496,11 +498,21 @@ do: "Tell Bruno you’re leaving before midnight"
 given: wait until new_years_eve.eleven
 expect events: not died
 
+:: two_proofs_name_wren [test]
+start: bar
+given: learn lark_hand
+given: learn score_code
+given: wait until new_years_eve.eleven
+do: "Tell the Inspector: Anton Keller is WREN"
+expect: proofs_given == 2
+expect: named == keller
+
 :: dying_keeps_the_notebook [test]
 start: cloakroom
 given: note {{ lark is keller }} in notebook
 given: assert {{ you must_go }} in dossier
 given: wait until new_years_eve.eleven
 do: "Keep still among the coats"
-expect events: died, checkpoint_reached
+expect events: died, rewound
+expect: clock.hour == eleven
 expect: {{ lark is keller }} in notebook

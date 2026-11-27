@@ -1409,12 +1409,25 @@ fn cost(text: &str) -> Value {
 
 /// `{target: roland, max: 3}` as an object of tokens.
 fn parameters(text: &str) -> Value {
-    let inner = text.trim().trim_start_matches('{').trim_end_matches('}');
+    let t = text.trim();
+    let inner = t
+        .strip_prefix('{')
+        .and_then(|t| t.strip_suffix('}'))
+        .unwrap_or(t);
     Value::Obj(
-        inner
-            .split(',')
+        split_args(inner)
+            .iter()
             .filter_map(|pair| pair.split_once(':'))
-            .map(|(key, value)| (key.trim().to_string(), token(value.trim())))
+            .map(|(key, value)| {
+                let value = value.trim();
+                // `{story: {{ you leaving @ … }}}`: a fact, as a value.
+                let v = if value.starts_with("{{") {
+                    Value::obj([("fact", fact_value(value))])
+                } else {
+                    token(value)
+                };
+                (key.trim().to_string(), v)
+            })
             .collect(),
     )
 }
@@ -1467,6 +1480,23 @@ pub(crate) fn effect(text: &str) -> Value {
             pairs.push(("args".into(), Value::Arr(vec![Value::str(table.trim())])));
             pairs.push(("where".into(), expression(cond.trim())));
         }
+        // `for each P in all(person, in: here): assert {{ P seen_at here }} in dossier`.
+        "for" if rest.starts_with("each ") => {
+            let rest = &rest["each ".len()..];
+            let (var, more) = rest.split_once(" in ").unwrap_or((rest, ""));
+            let (list, then) = split_top_colon(more);
+            pairs[0].1 = Value::str("for each");
+            pairs.push(("var".into(), Value::str(var.trim())));
+            pairs.push(("in".into(), expression(list.trim())));
+            pairs.push(("then".into(), effect(then.trim())));
+        }
+        // `note {{ lark is orme }} in notebook`: the Linker writes a fact,
+        // as the base's `never`s allow.
+        "note" => {
+            let (fact, base) = rest.rsplit_once(" in ").unwrap_or((rest, ""));
+            pairs.push(("fact".into(), fact_value(fact)));
+            pairs.push(("in".into(), Value::str(base.trim())));
+        }
         // `assert {{ target guilty }} in findings`, `retract {{ sky rains }}`;
         // with no `in`, the world.
         "assert" | "retract" => {
@@ -1504,6 +1534,20 @@ pub(crate) fn effect(text: &str) -> Value {
     }
     pairs.push(("when".into(), when.unwrap_or(Value::Null)));
     Value::Obj(pairs)
+}
+
+/// `list: effect`, split at the first colon outside brackets and quotes
+/// (`all(person, in: here): assert …` has one inside).
+fn split_top_colon(text: &str) -> (&str, &str) {
+    let mask = crate::syntax::top_mask(text);
+    match text
+        .char_indices()
+        .find(|(i, c)| *c == ':' && mask[*i])
+        .map(|(i, _)| i)
+    {
+        Some(i) => (&text[..i], &text[i + 1..]),
+        None => (text, ""),
+    }
 }
 
 /// `rule name: body => head ~ in base ~ known ~ learned from fact`.
@@ -1842,6 +1886,61 @@ fn insert(content: &str) -> Value {
         }
         // `{present linker}`: the name of whoever is reading.
         "present" if second == "linker" => named("present linker", ""),
+        // `{known about: covers ~ in notebook ~ with times}`.
+        "known" if second == "about:" => {
+            let mut parts = c["known".len()..].split('~').map(str::trim);
+            let about = parts
+                .next()
+                .unwrap_or("")
+                .trim_start_matches("about:")
+                .trim();
+            let mut pairs = vec![
+                ("insert".to_string(), Value::str("known about")),
+                ("about".to_string(), expression(about)),
+                ("in".to_string(), Value::str("knows")),
+                ("with_times".to_string(), Value::Bool(false)),
+            ];
+            for p in parts {
+                if let Some(base) = p.strip_prefix("in ") {
+                    pairs[2].1 = Value::str(base.trim());
+                } else if p == "with times" {
+                    pairs[3].1 = Value::Bool(true);
+                }
+            }
+            Value::Obj(pairs)
+        }
+        // `{contradictions ~ in notebook}`.
+        "contradictions" => Value::obj([
+            ("insert", Value::str("contradictions")),
+            (
+                "in",
+                Value::str(c.split("~ in ").nth(1).unwrap_or("").trim()),
+            ),
+        ]),
+        // `{note who: cover, is: suspect ~ in notebook}`: the Linker writes
+        // a fact, its subject one of a kind, its object one of another.
+        "note" if second == "who:" => {
+            let (args, base) = c["note".len()..]
+                .split_once("~ in ")
+                .unwrap_or((&c[4..], ""));
+            let parts = split_args(args.trim());
+            let pair = |i: usize| -> (String, String) {
+                parts
+                    .get(i)
+                    .and_then(|p| p.split_once(':'))
+                    .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
+                    .unwrap_or_default()
+            };
+            let (_, who) = pair(0);
+            let (verb, what) = pair(1);
+            Value::obj([
+                ("insert", Value::str("note")),
+                ("who", Value::str(who)),
+                ("verb", Value::str(verb)),
+                ("what", Value::str(what)),
+                ("in", Value::str(base.trim())),
+            ])
+        }
         "embed" if second == "nib:" => Value::obj([
             ("insert", Value::str("embed")),
             ("nib", Value::str(c.split('"').nth(1).unwrap_or(""))),

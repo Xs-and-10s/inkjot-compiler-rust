@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Milestone 22b: Ex 6 runs
+
+- `^name` in a fact looks the name up; a bare word is always the word,
+  and the checker notices one that is also in scope.
+- `never … ~ on contradiction refuse | flag`, and `note {{ … }} in base`:
+  the Linker writes, and a note that would break a refusing `never` is
+  not kept. `base.contradicted`, `{contradictions ~ in base}`, `{known
+  about: x ~ in base ~ with times}`, and the `{note who: kind, verb:
+  kind ~ in base}` input (ask kind `"note"`).
+- `for each P in list: effect`; facts as Link parameters; `x.did(act)` and
+  a Link's parameters in NPC reactions; archetype members counted by
+  `count(informant)`; `you.knows(it)` inside `count(…, where: …)`.
+- A `play` of a place's passage with Links of its own goes there, as a
+  scene; a test's `given:` arrives where an effect sent the pov.
+- Checkpoints `~ on death` (anywhere) and `~ each hour`; one with no
+  `resets` resets everything, the clock too; bases `~ per linker` come
+  through a fall-back or a rewind as they are.
+- `refill each turn`; `expect events: not died`.
+- Ex 6 checks clean, passes its own tests, and every random evening ends.
+
 ### Milestone 22a: Inklog's core
 
 - Facts in expressions (`{{ hale is ashe }} in notebook`, `?`, variables,

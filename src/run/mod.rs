@@ -410,7 +410,9 @@ impl Story {
                 self.measures
                     .push((name.to_string(), f(s, "value").clone()));
             }
-            if s.get("checkpoint").is_some() && s.get("on_death_in").is_some() {
+            if s.get("checkpoint").is_some()
+                && (s.get("on_death_in").is_some() || s.get("on_death").is_some())
+            {
                 self.checkpoints.push(s.clone());
             }
             if f(s, "declare").as_str() == Some("way") {
@@ -798,6 +800,10 @@ pub struct Run {
     /// has done something this turn (`cohort.all.chose`).
     votes: BTreeMap<String, Vec<votes::Vote>>,
     chose: BTreeSet<String>,
+    /// The acts each did this turn (`you.did(ask)`), and the parameters of
+    /// the pov's last Link (`topic`), for NPCs' reactions.
+    did: BTreeMap<String, BTreeSet<String>>,
+    did_with: BTreeMap<String, V>,
     /// While the pov does an act kept away from any place (a spellbook's,
     /// `spell:kindle`): the place they are doing it in.
     acting_in: Option<String>,
@@ -896,6 +902,8 @@ impl Run {
             table_arrival: None,
             votes: BTreeMap::new(),
             chose: BTreeSet::new(),
+            did: BTreeMap::new(),
+            did_with: BTreeMap::new(),
             acting_in: None,
             encounter: None,
             hinted: BTreeSet::new(),
@@ -1447,10 +1455,13 @@ impl Run {
     /// `target`, chiefly, for its label, its conditions and its effects.
     fn with_link<T>(&mut self, link: &Value, work: impl FnOnce(&mut Self) -> R<T>) -> R<T> {
         let params: Vec<(String, V)> = match f(link, "with") {
-            Value::Obj(pairs) => pairs
-                .iter()
-                .map(|(k, v)| (k.clone(), self.constant(v)))
-                .collect(),
+            Value::Obj(pairs) => {
+                let mut out = Vec::new();
+                for (k, v) in pairs {
+                    out.push((k.clone(), self.param_value(v)?));
+                }
+                out
+            }
             _ => return work(self),
         };
         let saved: Vec<(String, Option<Local>)> = params
@@ -1810,6 +1821,15 @@ impl Run {
         self.story.defaults.get("clock_each_action") == Some(&Value::Bool(true))
     }
 
+    /// A scene or an ending an effect played outside any action (a test's
+    /// `given:`, time passing): arrive there now.
+    pub(crate) fn arrive_pending(&mut self) -> R<()> {
+        match self.go_to.take() {
+            Some(p) => self.enter(&p, BTreeMap::new()),
+            None => Ok(()),
+        }
+    }
+
     /// `finale when: no guest where: it.alive and it.team != town`: at the
     /// start of each turn, the first `[finale]` (in source order) whose
     /// condition holds is due.
@@ -1976,12 +1996,23 @@ impl Run {
             "here".to_string()
         };
         let params = match f(link, "with") {
-            Value::Obj(pairs) => pairs
-                .iter()
-                .map(|(k, v)| (k.clone(), self.constant(v)))
-                .collect(),
+            Value::Obj(pairs) => {
+                let mut out = BTreeMap::new();
+                for (k, v) in pairs {
+                    out.insert(k.clone(), self.param_value(v)?);
+                }
+                out
+            }
             _ => BTreeMap::new(),
         };
+        // `you.did(ask)`, for the NPCs who see it this turn.
+        if let Some(act) = f(link, "act").as_str() {
+            self.did
+                .entry(actor.clone())
+                .or_default()
+                .insert(act.to_string());
+            self.did_with = params.clone();
+        }
         match f(link, "kind").as_str() {
             Some("walk") => {
                 let to = self
@@ -2119,7 +2150,11 @@ impl Run {
         }
         let story = Arc::clone(&self.story);
         for id in story.ids_of("resource") {
-            if story.field(&id, "refill").as_str() == Some("chronon") {
+            // `refill each chronon`, or `each turn`: a turn is a chronon.
+            if matches!(
+                story.field(&id, "refill").as_str(),
+                Some("chronon" | "turn")
+            ) {
                 let full = self.constant(story.field(&id, "value"));
                 for c in story.ids_of("character") {
                     self.vals.insert(format!("{c}.{id}"), full.clone());
@@ -2162,6 +2197,8 @@ impl Run {
         // Then everyone you are not playing takes their move, and the NPCs
         // note who they saw.
         self.agendas()?;
+        self.did.clear();
+        self.did_with.clear();
         self.look();
         self.history.push(Arc::new(self.snapshot()));
         Ok(())
@@ -2521,7 +2558,11 @@ impl Run {
         } else if let Some(effect) = s.get("effect") {
             let clauses = f(s, "clauses").as_arr().unwrap_or(&[]).to_vec();
             self.apply(effect, &clauses)?;
-        } else if let (Some(name), None) = (f(s, "checkpoint").as_str(), s.get("on_death_in")) {
+        } else if let (Some(name), None, None) = (
+            f(s, "checkpoint").as_str(),
+            s.get("on_death_in"),
+            s.get("on_death"),
+        ) {
             self.reach_checkpoint(name);
         } else if f(s, "setting").as_str() == Some("next") {
             return Ok(f(s, "value").as_str().map(str::to_string));
@@ -2956,6 +2997,28 @@ impl Run {
                 "ballots" => {
                     let tally = self.ballots_text();
                     text.push(&tally, style);
+                }
+                // `{known about: you ~ in dossier ~ with times}`,
+                // `{contradictions ~ in notebook}`: a line each.
+                "known about" | "contradictions" => {
+                    let base = f(part, "in").as_str().unwrap_or("knows").to_string();
+                    let lines = if f(part, "insert").as_str() == Some("contradictions") {
+                        self.contradiction_lines(&base)?
+                    } else {
+                        let about = f(part, "about").clone();
+                        let times = f(part, "with_times") == &Value::Bool(true);
+                        self.known_about(&about, &base, times)?
+                    };
+                    if !quiet {
+                        self.output
+                            .extend(lines.iter().map(String::as_str).map(Para::plain_text));
+                    }
+                }
+                "note" => {
+                    let prompt = self.meet_input(part)?;
+                    if !quiet {
+                        text.push(&prompt, style);
+                    }
                 }
                 "claimants" => {
                     let names = if self.claimants.is_empty() {
@@ -3426,7 +3489,14 @@ impl Run {
                         matches!(t.as_str(), "ending" | "finale" | "epilogue" | "encounter")
                     })
                 });
-                if ending {
+                // A scene at a place, with Links of its own (Ex 6's lights
+                // going out in the cloakroom): gone to, once the action is
+                // done, so its Links are what is offered.
+                let scene = self.story.kind(place_of(&passage)) == Some("place")
+                    && self.story.passages.get(&passage).is_some_and(|p| {
+                        p.body.iter().any(|n| f(n, "type").as_str() == Some("link"))
+                    });
+                if ending || scene {
                     self.go_to.get_or_insert(passage);
                     return Ok(());
                 }
@@ -3453,6 +3523,8 @@ impl Run {
             // `assert {{ target guilty }} in findings`: kept (`knowledge.rs`).
             "assert" => self.assert_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
             "retract" => self.retract_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
+            "note" => self.note_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or(""))?,
+            "for each" => self.for_each(e)?,
             // `draw syndicate vampires`: that row, as if it had been drawn.
             "draw" => {
                 let table = f(e, "table").as_str().unwrap_or("").to_string();
@@ -3905,7 +3977,14 @@ impl Run {
                 _ => V::Null,
             },
             "knows" | "holds" => {
-                let thing = items.get(1).and_then(Value::as_str).unwrap_or("");
+                // `you.knows(telegram_text)`, or a name in scope:
+                // `you.knows(it)` among `count(fact, where: …)`.
+                let arg = items.get(1).unwrap_or(&Value::Null);
+                let thing = match arg.as_str() {
+                    Some(name) if !self.locals.contains_key(name) => name.to_string(),
+                    _ => self.eval(arg)?.name().unwrap_or("").to_string(),
+                };
+                let thing = thing.as_str();
                 let check = |run: &Self, who: &str| {
                     if op == "knows" {
                         run.knows.get(who).is_some_and(|k| k.contains(thing))
@@ -4080,6 +4159,12 @@ impl Run {
                             .iter()
                             .any(|(_, from, to)| *from == a && *to == b),
                 )
+            }
+            // `you.did(ask)`: did that act this turn.
+            "did" => {
+                let a = self.who(&items[0])?;
+                let act = items.get(1).and_then(Value::as_str).unwrap_or("");
+                V::Bool(self.did.get(&a).is_some_and(|d| d.contains(act)))
             }
             // `it.voted_with(cult)`: voted as one of them did, at the last jury.
             "voted_with" => {
@@ -4326,6 +4411,10 @@ impl Run {
             ("cohort", "size") => V::Num(self.voters_count(false)),
             ("cohort", "alive") => V::Num(self.voters_count(true)),
             (_, "aka") => self.aka(&id),
+            // `notebook.contradicted`: a flagged `never` is broken.
+            (_, "contradicted") if story.kind(&id) == Some("knowledge") => {
+                V::Bool(self.contradicted(&id)?)
+            }
             // `x.pronouns`, `x.they`, `x.them`, `x.their`, `x.theirs`,
             // `x.themself`: by the pronouns set, given, or `they`.
             (_, "pronouns") if matches!(story.kind(&id), Some("character" | "npc")) => {
@@ -4557,7 +4646,13 @@ impl Run {
                             && !self.tagged(id, "lifeless")
                     }
                     _ if self.story.counted(id) => false,
-                    _ => d.kind == tag || self.tagged(id, tag) || self.story.of(id) == Some(tag),
+                    // An archetype names everything made from it: `informant`.
+                    _ => {
+                        d.kind == tag
+                            || self.tagged(id, tag)
+                            || self.story.of(id) == Some(tag)
+                            || self.story.field(id, "like").as_str() == Some(tag)
+                    }
                 };
                 // A seat no Linker sits in is no one.
                 let empty_seat = self.story.of(id).is_some_and(|base| {

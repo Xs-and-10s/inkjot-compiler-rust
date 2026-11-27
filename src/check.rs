@@ -134,6 +134,10 @@ struct Checker {
     /// The word of the last clause seen on the Link being checked, for the
     /// notice about a `~ when` straight after a `~ then`.
     last_link_clause: String,
+    /// The variables `for each` binds around the effect being checked.
+    for_each_vars: Vec<String>,
+    /// Every name a Link hands on (`~ with {topic: wren}`).
+    link_params: HashSet<String>,
     /// Knowledge bases declared `~ truth`: closed, so `not` may ask them.
     truths: HashSet<String>,
     /// Every `period`, once they are all read: `night`, `new_years_eve.nine`.
@@ -278,7 +282,11 @@ impl Checker {
                 );
                 // The same text may be checked twice (an effect, and the
                 // clause it is in); say it once.
-                if !self.diags.iter().any(|x| x.line == d.line && x.msg == d.msg) {
+                if !self
+                    .diags
+                    .iter()
+                    .any(|x| x.line == d.line && x.msg == d.msg)
+                {
                     self.diags.push(d);
                 }
             }
@@ -527,7 +535,9 @@ impl Checker {
                 let params = t[i + 6..].split('}').next().unwrap_or("");
                 let scope = self.scopes.entry(target.clone()).or_default();
                 for param in params.split(',') {
-                    scope.insert(first_word(param.trim()).to_string());
+                    let name = first_word(param.trim()).trim_end_matches(':').to_string();
+                    scope.insert(name.clone());
+                    self.link_params.insert(name);
                 }
             }
         }
@@ -577,6 +587,11 @@ impl Checker {
             }
         }
         self.locals = self.scope_of(&p.name);
+        // An NPC's reactions see what the pov last did, and its parameters
+        // (`~ when you.did(ask) ~ then assert {{ you asked_about ^topic }}`).
+        if p.has_tag("npc") || p.has_tag("archetype") {
+            self.locals.extend(self.link_params.iter().cloned());
+        }
         self.link_ids.clear();
         self.here = p.name.clone();
         self.here_tags = p.tags.clone();
@@ -1644,6 +1659,8 @@ impl Checker {
             // engine reported since the last action.
             "expect" if rest.starts_with("events") => {
                 for kind in value.split(',').map(str::trim) {
+                    // `not died`: the engine did not report it.
+                    let kind = kind.strip_prefix("not ").unwrap_or(kind).trim();
                     if !crate::engine::CATALOGUE.iter().any(|t| t.name == kind) {
                         let names: Vec<&str> =
                             crate::engine::CATALOGUE.iter().map(|t| t.name).collect();
@@ -1873,7 +1890,10 @@ impl Checker {
         }
         match expr::parse(fact) {
             Ok(e @ expr::Expr::Fact { .. }) => {
-                let vars = crate::resolve::vars(&e);
+                let vars: Vec<String> = crate::resolve::vars(&e)
+                    .into_iter()
+                    .filter(|v| !self.for_each_vars.contains(v))
+                    .collect();
                 if let Some(v) = vars.first() {
                     self.err(
                         line,
@@ -1976,7 +1996,31 @@ impl Checker {
             // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
             "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
             // `assert {{ target guilty }} in findings`: a fact, kept in a base.
-            "assert" | "retract" => self.assert_fact(core, line, col),
+            "assert" | "retract" | "note" => self.assert_fact(core, line, col),
+            // `for each P in all(person, in: here): assert {{ P seen_at here }} in dossier`.
+            "for" => {
+                let rest = core["for".len()..].trim();
+                let shape = "`for each` is written `for each P in list: effect`";
+                let Some(rest) = rest.strip_prefix("each ") else {
+                    return self.err(line, col, shape);
+                };
+                let Some((var, more)) = rest.split_once(" in ") else {
+                    return self.err(line, col, shape);
+                };
+                if !expr::is_var(var.trim()) {
+                    self.err(line, col, "`for each` names a variable, capitalised: `for each P in …`");
+                }
+                let mask = top_mask(more);
+                match more.char_indices().find(|(i, c)| *c == ':' && mask[*i]) {
+                    Some((i, _)) => {
+                        self.expr(more[..i].trim(), line, col);
+                        self.for_each_vars.push(var.trim().to_string());
+                        self.effect(more[i + 1..].trim(), line, col);
+                        self.for_each_vars.pop();
+                    }
+                    None => self.err(line, col, shape),
+                }
+            }
             // `wait until night`: the clock moves on to the next night.
             "wait" => match core.strip_prefix("wait until ") {
                 Some(time) if self.calendar.is_time(time.trim()) => {}
@@ -2468,6 +2512,68 @@ impl Checker {
             "sound" if second == "effect:" => {}
             "ambient" if second == "sound:" => {}
             "accuse" => self.accuse(&c[first.len()..], line, col),
+            // `{known about: covers ~ in notebook ~ with times}`.
+            "known" if second == "about:" => {
+                let mut parts = c["known".len()..].split('~').map(str::trim);
+                let about = parts
+                    .next()
+                    .unwrap_or("")
+                    .trim_start_matches("about:")
+                    .trim();
+                self.expr(about, line, col);
+                for p in parts {
+                    if let Some(base) = p.strip_prefix("in ") {
+                        self.need(base.trim(), &["knowledge"], "knowledge base", line, col);
+                    } else if p != "with times" {
+                        self.err(
+                            line,
+                            col,
+                            "`{known about: x}` takes `~ in base` and `~ with times`",
+                        );
+                    }
+                }
+            }
+            // `{contradictions ~ in notebook}`.
+            "contradictions" => match c.split_once("~ in ") {
+                Some((_, base)) => {
+                    self.need(base.trim(), &["knowledge"], "knowledge base", line, col)
+                }
+                None => self.err(
+                    line,
+                    col,
+                    "`{contradictions}` says of which base: `{contradictions ~ in notebook}`",
+                ),
+            },
+            // `{note who: cover, is: suspect ~ in notebook}`.
+            "note" if second == "who:" => {
+                let shape = "`{note}` is written `{note who: kind, verb: kind ~ in base}`";
+                let Some((args, base)) = c["note".len()..].split_once("~ in ") else {
+                    return self.err(line, col, shape);
+                };
+                let parts = crate::ir::split_args(args.trim());
+                if parts.len() != 2 {
+                    return self.err(line, col, shape);
+                }
+                for (i, part) in parts.iter().enumerate() {
+                    let Some((key, kind)) = part.split_once(':') else {
+                        return self.err(line, col, shape);
+                    };
+                    if i == 1 && !is_ident(key.trim()) {
+                        self.err(line, col, shape);
+                    }
+                    if !self.is_kind_word(kind.trim()) {
+                        self.err(
+                            line,
+                            col,
+                            format!(
+                                "`{}` should name a kind, a tag or an archetype",
+                                kind.trim()
+                            ),
+                        );
+                    }
+                }
+                self.need(base.trim(), &["knowledge"], "knowledge base", line, col);
+            }
             "ballot" => self.ballot(&c[first.len()..], line, col),
             // `{redacted "TEN" until telegram.dry}`.
             "redacted" => {

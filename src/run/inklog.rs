@@ -49,6 +49,10 @@ type Fact = Vec<V>;
 /// Variables bound so far.
 type Bindings = BTreeMap<String, V>;
 
+/// The binding that holds the facts a solution stands on. No variable
+/// can be named this.
+const USED: &str = "#used";
+
 /// How deep bases may read each other before the interpreter stops.
 const MAX_READS: usize = 8;
 
@@ -118,11 +122,18 @@ impl Run {
         let key = self.base_key(base, &owner);
         let mut held = self.kept(&key);
         if !held.iter().any(|h| same_fact(h, &fact)) {
-            held.push(fact);
+            held.push(self.stamped(fact));
         }
         self.vals
             .insert(key, V::List(held.into_iter().map(V::List).collect()));
         Ok(())
+    }
+
+    /// A fact as kept: and the turn it reached the base, after its terms.
+    fn stamped(&self, mut fact: Fact) -> Fact {
+        fact.truncate(4);
+        fact.push(V::Num(f64::from(self.chronon)));
+        fact
     }
 
     /// `retract {{ sky rains }}`: the facts that match go; what rules made
@@ -164,10 +175,16 @@ impl Run {
             terms.push(match key {
                 "verb" => V::Id(t.as_str().unwrap_or("").to_string()),
                 _ if *t == Value::Null => V::Null,
-                _ if t.get("var").is_some() || t.get("any").is_some() => {
-                    return Err("a fact kept names things; it has no variables".into())
+                _ if t.get("any").is_some() => {
+                    return Err("a fact kept names things; it has no `?`".into())
                 }
-                _ => self.term(t, &Bindings::new())?,
+                // A variable `for each` has bound: what it is now.
+                _ => match self.term(t, &Bindings::new())? {
+                    V::Null if t.get("var").is_some() => {
+                        return Err("a fact kept names things; its variables must be bound".into())
+                    }
+                    v => v,
+                },
             });
         }
         terms.push(match f(fact, "at") {
@@ -181,7 +198,14 @@ impl Run {
     /// scope names.
     fn term(&mut self, t: &Value, b: &Bindings) -> R<V> {
         if let Some(v) = t.get("var").and_then(Value::as_str) {
-            return Ok(b.get(v).cloned().unwrap_or(V::Null));
+            // Bound here, or by an enclosing `for each P` or quantifier.
+            return Ok(match b.get(v) {
+                Some(bound) => bound.clone(),
+                None => match self.locals.get(v) {
+                    Some(Local::Value(bound)) => bound.clone(),
+                    _ => V::Null,
+                },
+            });
         }
         match t {
             // A bare word is itself, but for the words that always mean
@@ -312,7 +336,14 @@ impl Run {
                 let pattern = f(e, "fact").clone();
                 let mut out = Vec::new();
                 for fact in &facts {
-                    if let Some(nb) = self.match_fact(&pattern, fact, b)? {
+                    if let Some(mut nb) = self.match_fact(&pattern, fact, b)? {
+                        // Which facts a solution stands on, for a `never`.
+                        let mut used = match nb.remove(USED) {
+                            Some(V::List(u)) => u,
+                            _ => Vec::new(),
+                        };
+                        used.push(V::List(fact.clone()));
+                        nb.insert(USED.to_string(), V::List(used));
                         out.push(nb);
                     }
                 }
@@ -374,7 +405,7 @@ impl Run {
             .keys()
             .map(|k| (k.clone(), self.locals.get(k).cloned()))
             .collect();
-        for (k, v) in b {
+        for (k, v) in b.iter().filter(|(k, _)| *k != USED) {
             self.locals.insert(k.clone(), Local::Value(v.clone()));
         }
         let result = work(self);
@@ -457,6 +488,10 @@ impl Run {
                     .as_str()
                     .is_some_and(|x| self.knows.get(owner).is_some_and(|k| k.contains(x)))
         };
+        // A base that reads what its owner knows runs the rules they know.
+        let reads_knows = super::strs(self.story.field(base, "reads"))
+            .iter()
+            .any(|r| r == "knows");
         self.story
             .rules
             .iter()
@@ -467,9 +502,9 @@ impl Run {
                         || f(rule, "learned_from") != &Value::Null;
                     !gated || base == "world" || knows_it(rule)
                 }
-                Some(_) => false,
+                Some(b) => b == "knows" && reads_knows && knows_it(rule),
                 None if base == "world" => true,
-                None => base == "knows" && knows_it(rule),
+                None => (base == "knows" || reads_knows) && knows_it(rule),
             })
             .cloned()
             .collect()
@@ -498,9 +533,212 @@ impl Run {
     }
 }
 
-/// Two facts the same: term for term.
+impl Run {
+    // ------------------------------------------------- notes and nevers
+
+    /// `note {{ lark is orme }} in notebook`: the Linker writes a fact. A
+    /// `never … ~ on contradiction refuse` it would break keeps it out, and
+    /// says why; one that `flag`s lets it stand, and the base is
+    /// `contradicted` until a note goes.
+    pub(super) fn note_fact(&mut self, fact: &Value, base: &str) -> R<()> {
+        let new = self.fact_of(fact)?;
+        let owner = self.owner_of(base);
+        let key = self.base_key(base, &owner);
+        let held = self.kept(&key);
+        if held.iter().any(|h| same_fact(h, &new)) {
+            return Ok(());
+        }
+        let before = self.broken(base, "refuse")?;
+        let mut with = held.clone();
+        with.push(self.stamped(new.clone()));
+        self.vals.insert(
+            key.clone(),
+            V::List(with.into_iter().map(V::List).collect()),
+        );
+        // Refused: it breaks a `never` that held before it was written.
+        for (label, facts) in self.broken(base, "refuse")? {
+            let new_break = !before.iter().any(|(l, f)| {
+                *l == label
+                    && f.len() == facts.len()
+                    && f.iter().all(|x| facts.iter().any(|y| same_fact(x, y)))
+            });
+            if new_break {
+                self.vals
+                    .insert(key, V::List(held.into_iter().map(V::List).collect()));
+                let why = if label.is_empty() {
+                    String::from(
+                        "(You can’t write that: it can’t be true with what you have written.)",
+                    )
+                } else {
+                    format!("(You can’t write that. {label})")
+                };
+                self.output.push(why.as_str().into());
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// Every `never` of a base, of this kind (`refuse` or `flag`), that
+    /// what it holds breaks: its text, and the facts written there that
+    /// break it.
+    fn broken(&mut self, base: &str, how: &str) -> R<Vec<(String, Vec<Fact>)>> {
+        let story = Arc::clone(&self.story);
+        let owner = self.owner_of(base);
+        let facts = self.closure(base, &owner, 0)?;
+        let kept = self.kept(&self.base_key(base, &owner));
+        let mut out: Vec<(String, Vec<Fact>)> = Vec::new();
+        for never in story.nevers.iter().filter(|n| {
+            f(n, "in").as_str() == Some(base) && f(n, "on_contradiction").as_str() == Some(how)
+        }) {
+            let label = match f(never, "label") {
+                Value::Null => String::new(),
+                text => self.text_of(text)?,
+            };
+            for b in self.solve(f(never, "never"), &Bindings::new(), Some(&facts))? {
+                let mut used: Vec<Fact> = match b.get(USED) {
+                    Some(V::List(u)) => u
+                        .iter()
+                        .filter_map(|f| match f {
+                            V::List(t) => Some(t.clone()),
+                            _ => None,
+                        })
+                        .filter(|f| kept.iter().any(|k| same_fact(k, f)))
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                used.dedup_by(|a, b| same_fact(a, b));
+                let seen = out.iter().any(|(l, u)| {
+                    *l == label
+                        && u.len() == used.len()
+                        && u.iter().all(|x| used.iter().any(|y| same_fact(x, y)))
+                });
+                if !seen {
+                    out.push((label.clone(), used));
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// `notebook.contradicted`: a `never ~ on contradiction flag` is broken.
+    pub(super) fn contradicted(&mut self, base: &str) -> R<bool> {
+        Ok(!self.broken(base, "flag")?.is_empty())
+    }
+
+    /// `{contradictions ~ in notebook}`: one line each: why, and the notes.
+    pub(super) fn contradiction_lines(&mut self, base: &str) -> R<Vec<String>> {
+        let mut lines = Vec::new();
+        for (label, facts) in self.broken(base, "flag")? {
+            let notes: Vec<String> = facts.iter().map(|f| self.fact_text(f)).collect();
+            lines.push(if label.is_empty() {
+                notes.join("; ")
+            } else {
+                format!("{label} {}", notes.join("; "))
+            });
+        }
+        Ok(lines)
+    }
+
+    /// `{known about: covers ~ in notebook ~ with times}`: every fact the
+    /// base holds about any of them, a line each; with times, when each
+    /// reached it.
+    pub(super) fn known_about(&mut self, about: &Value, base: &str, times: bool) -> R<Vec<String>> {
+        let who: Vec<String> = match self.eval(about)? {
+            V::Id(list) if self.lists.contains_key(&list) => {
+                self.lists[&list].iter().map(|e| e.id.clone()).collect()
+            }
+            V::List(items) => items
+                .iter()
+                .filter_map(|i| i.name().map(str::to_string))
+                .collect(),
+            one => one.name().map(str::to_string).into_iter().collect(),
+        };
+        let owner = self.owner_of(base);
+        let facts = self.closure(base, &owner, 0)?;
+        let mut lines = Vec::new();
+        for fact in facts {
+            let names = |t: &V| t.name().is_some_and(|n| who.iter().any(|w| w == n));
+            if !(names(&fact[0]) || names(&fact[2])) {
+                continue;
+            }
+            let text = self.fact_text(&fact);
+            match (times, fact.get(4).and_then(V::num)) {
+                (true, Some(turn)) => {
+                    let when = self.turn_name(turn as u32);
+                    lines.push(format!("{when}: {text}"));
+                }
+                _ => lines.push(text),
+            }
+        }
+        Ok(lines)
+    }
+
+    /// A turn by its innermost period's name (`ten`), or its number.
+    fn turn_name(&self, turn: u32) -> String {
+        match self.story.calendar.at(turn).last() {
+            Some((_, name)) => name.clone(),
+            None => format!("turn {turn}"),
+        }
+    }
+
+    /// A fact as a sentence: "The cloakroom attendant seen at office."
+    pub(super) fn fact_text(&self, fact: &Fact) -> String {
+        let term = |t: &V| match t {
+            V::Id(id) if self.story.kind(id).is_some() => self.label(id),
+            V::Id(id) => id.replace('_', " "),
+            other => self.show(other),
+        };
+        let mut words = vec![term(&fact[0]), term(&fact[1])];
+        if fact[2] != V::Null {
+            words.push(term(&fact[2]));
+        }
+        if let V::Str(at) = &fact[3] {
+            words.push(format!("({})", at.rsplit('.').next().unwrap_or(at)));
+        }
+        let text = words.join(" ");
+        let mut chars = text.chars();
+        match chars.next() {
+            Some(c) => format!("{}{}.", c.to_uppercase(), chars.as_str()),
+            None => text,
+        }
+    }
+
+    /// `for each P in all(person, in: here): …`: the effect once for each,
+    /// `P` bound to it.
+    pub(super) fn for_each(&mut self, e: &Value) -> R<()> {
+        let var = f(e, "var").as_str().unwrap_or("").to_string();
+        let items = match self.eval(f(e, "in"))? {
+            V::List(items) => items,
+            V::Null => Vec::new(),
+            one => vec![one],
+        };
+        let then = f(e, "then").clone();
+        let saved = self.locals.get(&var).cloned();
+        for item in items {
+            self.locals.insert(var.clone(), Local::Value(item));
+            if let Err(err) = self.apply(&then, &[]) {
+                self.restore_local(&var, saved);
+                return Err(err);
+            }
+        }
+        self.restore_local(&var, saved);
+        Ok(())
+    }
+
+    /// A Link's parameter: a fact (`{story: {{ you leaving @ … }}}`) is
+    /// kept as one, its terms worked out now.
+    pub(super) fn param_value(&mut self, v: &Value) -> R<V> {
+        match v.get("fact") {
+            Some(fact) => Ok(V::List(self.fact_of(&fact.clone())?)),
+            None => Ok(self.constant(v)),
+        }
+    }
+}
+
+/// Two facts the same: term for term (not when each was kept).
 fn same_fact(a: &Fact, b: &Fact) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.same(y))
+    a.len() >= 4 && b.len() >= 4 && a.iter().zip(b).take(4).all(|(x, y)| x.same(y))
 }
 
 /// A fact held as a value (`story`, a Link's parameter), as a pattern.

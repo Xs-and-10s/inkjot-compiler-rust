@@ -280,6 +280,7 @@ repeats, lists extend and objects merge.
 | `switch freely`, `lead X`, `order each other within earshot` | `switch`, `lead`, `order_within` |
 | `timed 40ms`, `beat 1s`, `shows visited` | `timed`, `beat`, `shows` |
 | `on death in X`, `keeps a, b`, `resets a, b` | `on_death_in`, `keeps`, `resets` |
+| `on death`, `each hour` (a checkpoint) | `on_death`: `true`, `each`: `"hour"` |
 | `to X` / `to a for x, b for y` | `to`: a string / an object keyed by who |
 | `unseen by X` | `unseen_by` |
 | a stat or resource and a value: `wits 4`, `hp 2` | `stats`: `{"wits": 4, "hp": 2}` |
@@ -382,6 +383,15 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 22b: a fact's term may be `{"lookup": expr}` (`^target`); a
+  bare word is the word. The effect `{"do": "note", "fact": fact, "in":
+  base}`; `{"do": "for each", "var": "P", "in": expr, "then": effect}`.
+  Inserts `{"insert": "note", "who": kind, "verb": word, "what": kind,
+  "in": base}`, `{"insert": "contradictions", "in": base}` and `{"insert":
+  "known about", "about": expr, "in": base, "with_times": bool}`. A Link's
+  `with` may hold `{"fact": fact}`. A checkpoint may have `on_death: true`
+  (any death) in place of `on_death_in`, and `each: period`; one with no
+  `resets` resets everything. `refill: "turn"` means `"chronon"`.
 - Milestone 22a: Inklog. In expressions, a fact `{"fact": {"subject",
   "verb", "object", "at"}}`, with `"in": base` when it is asked of one;
   a term may be `{"var": "P"}` or `{"any": true}`, and a time a string

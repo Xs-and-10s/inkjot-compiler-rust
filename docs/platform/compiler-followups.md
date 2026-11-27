@@ -214,3 +214,17 @@ The compiler's side is in the draft (milestone 21a). The platform's:
   views. Persist the log as before: it holds the `{:as, …}` tuples.
 - Ex 7 needs a lobby that seats 5 to 12, a name input per seat, and (for
   the Storyteller) a seat for `storyteller`.
+
+## 15. Ex 6 on the platform (milestone 22b, 27 Nov)
+
+- A `{note}` comes in `asks` with `kind: "note"`, `options` (whom: the
+  first kind's things) and `methods` (what: the second's). It is answered
+  with `Answer([whom, what])`. A refused note is not an error: the view's
+  text says why, and nothing is kept.
+- A base `~ per linker` (Ex 6's notebook) is the Linker's: it survives a
+  death's fall-back and a rewind. If the platform ever keeps Linkers'
+  things across readings, this is where to look first.
+- A death caught by a checkpoint reports `died`, then `rewound` with
+  `cause: "death"` and the checkpoint's name; the clock may go back.
+- `~ track` on a base (Ex 6's dossier) reports it in `changes` as a list
+  of facts, before and after.

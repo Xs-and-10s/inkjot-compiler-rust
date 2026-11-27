@@ -145,6 +145,11 @@ impl Run {
 
     fn move_npc(&mut self, npc: &str, agenda: &Agenda) -> R<()> {
         let here = self.location(npc);
+        // What the pov did this turn, and with what: `you.did(ask)`, and
+        // the Link's `~ with {topic: wren}` as `topic`.
+        for (k, v) in self.did_with.clone() {
+            self.locals.insert(k, Local::Value(v));
+        }
         self.locals
             .insert("self".into(), Local::Value(V::Id(npc.to_string())));
         self.locals

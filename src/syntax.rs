@@ -177,6 +177,9 @@ pub(crate) const EFFECTS: &[&str] = &[
     // `assert {{ target guilty }} in findings`: a fact, kept; `retract`, let go.
     "assert",
     "retract",
+    // `note {{ … }} in notebook`: the Linker writes it; `for each P in …: e`.
+    "note",
+    "for",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by

@@ -204,11 +204,15 @@ impl Run {
                 self.drop_everything(&who, &place);
                 continue;
             }
-            let caught = self.story.checkpoints.iter().find(|cp| {
-                f(cp, "on_death_in")
-                    .as_str()
-                    .is_some_and(|region| self.inside(&place, region))
-            });
+            // `on death in prison`, or `on death`, anywhere.
+            let caught =
+                self.story
+                    .checkpoints
+                    .iter()
+                    .find(|cp| match f(cp, "on_death_in").as_str() {
+                        Some(region) => self.inside(&place, region),
+                        None => *f(cp, "on_death") == Value::Bool(true),
+                    });
             if let Some(cp) = caught.cloned() {
                 self.fall_back(&cp, &who)?;
                 continue;
@@ -252,7 +256,13 @@ impl Run {
         let resets = strs(f(cp, "resets"));
         let keeps = strs(f(cp, "keeps"));
         let current = self.snapshot();
-        let mut now = current.clone();
+        // A checkpoint that names nothing to reset resets everything: the
+        // world as it was, the clock too.
+        let mut now = if resets.is_empty() {
+            saved.clone()
+        } else {
+            current.clone()
+        };
         self.merge(&mut now, &saved, &resets);
         // What it keeps wins over what it resets, and so does a fact that
         // `survives death` (Ex 2's `fact deaths: 0 ~ survives death`).
@@ -263,6 +273,7 @@ impl Run {
                 now.vals.insert(key.clone(), value.clone());
             }
         }
+        self.keep_linker_bases(&current, &mut now);
         self.restore(now);
         for c in self.story.ids_of("character") {
             self.vals.remove(&format!("{c}.dead"));
@@ -290,6 +301,38 @@ impl Run {
             self.enter(&at, BTreeMap::new())?;
         }
         self.sit(&served)
+    }
+
+    /// A base `~ per linker` is the Linker's own, not the story's: Ex 6's
+    /// notebook goes back in time with whoever wrote it.
+    fn keep_linker_bases(&self, current: &Snapshot, into: &mut Snapshot) {
+        for base in self.story.ids_of("knowledge") {
+            if self.story.field(&base, "per").as_str() != Some("linker") {
+                continue;
+            }
+            let suffix = format!(".{base}");
+            for (key, value) in &current.vals {
+                if key.ends_with(&suffix) {
+                    into.vals.insert(key.clone(), value.clone());
+                }
+            }
+            into.vals
+                .retain(|k, _| !k.ends_with(&suffix) || current.vals.contains_key(k));
+        }
+    }
+
+    /// `checkpoint hour ~ each hour`: reached as each hour begins.
+    pub(super) fn reach_each(&mut self, period: &str) {
+        let names: Vec<String> = self
+            .story
+            .checkpoints
+            .iter()
+            .filter(|cp| f(cp, "each").as_str() == Some(period))
+            .filter_map(|cp| f(cp, "checkpoint").as_str().map(str::to_string))
+            .collect();
+        for name in names {
+            self.reach_checkpoint(&name);
+        }
     }
 
     /// Resources that refill on this occasion: `~ refill on checkpoint`.
@@ -432,7 +475,8 @@ impl Run {
                 .find(|s| s.chronon == n)
                 .map(|s| (**s).clone())
         };
-        let snap = snap.ok_or_else(|| format!("there is no time `{to}` to go back to"))?;
+        let mut snap = snap.ok_or_else(|| format!("there is no time `{to}` to go back to"))?;
+        self.keep_linker_bases(&self.snapshot(), &mut snap);
         self.note_rewound(&who, snap.chronon, checkpoint, false, "rewind");
         self.undo(snap)
     }
