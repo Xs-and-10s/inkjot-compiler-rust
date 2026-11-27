@@ -262,6 +262,27 @@ impl Checker {
 
     /// Report every name in `e` that refers to nothing.
     fn resolve(&mut self, e: &expr::Expr, src: &str, line: usize, col: usize) {
+        // `{{ arrow hit target }}` where `target` is in scope: the atom, which
+        // may not be what was meant.
+        for (name, at) in resolve::fact_atoms(e) {
+            // (A test's `expect:` has no Link's `target`.)
+            let testing = self.here_tags.iter().any(|t| t == "test");
+            let in_scope = self.locals.contains(&name)
+                || self.globals.contains(&name)
+                || (!testing && ["target", "actor"].contains(&name.as_str()));
+            if in_scope {
+                let d = Diag::notice(
+                    line,
+                    col + cols(&src[..at.min(src.len())]),
+                    format!("`{name}` in a fact is the word itself; for what `{name}` names here, write `^{name}`"),
+                );
+                // The same text may be checked twice (an effect, and the
+                // clause it is in); say it once.
+                if !self.diags.iter().any(|x| x.line == d.line && x.msg == d.msg) {
+                    self.diags.push(d);
+                }
+            }
+        }
         for Problem { at, name, want } in resolve::unresolved(e, self) {
             let (what, candidates) = match want {
                 Want::Value => (

@@ -171,7 +171,7 @@ reaction report
 
 reaction overhear
 ~ when you.did(ask) and you.in(here)
-~ then assert {{ you asked_about topic }} in dossier
+~ then assert {{ you asked_about ^topic }} in dossier
 
 reaction gossip
 ~ when you.did(plant) and you.in(here)

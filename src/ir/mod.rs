@@ -452,6 +452,8 @@ pub fn lower(e: &Expr) -> Value {
         // `index`, not `at`: `me.at(lectern)` is a method named `at`.
         Expr::Index(target, index) => one("index", vec![lower(target), lower(index)]),
         Expr::List(items) => one("list", items.iter().map(lower).collect()),
+        // `^thug`, in a fact: what `thug` names.
+        Expr::Unary("^", operand) => Value::obj([("lookup", lower(operand))]),
         Expr::Unary(op, operand) => {
             Value::obj([(if *op == "-" { "neg" } else { *op }, lower(operand))])
         }

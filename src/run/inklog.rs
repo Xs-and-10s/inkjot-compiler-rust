@@ -184,19 +184,18 @@ impl Run {
             return Ok(b.get(v).cloned().unwrap_or(V::Null));
         }
         match t {
-            Value::Str(name) => {
-                let in_scope = self.locals.contains_key(name)
-                    || matches!(
-                        name.as_str(),
-                        "me" | "here" | "self" | "it" | "target" | "actor" | "nothing" | "nobody"
-                    );
-                if in_scope {
-                    self.eval(t)
-                } else {
-                    Ok(V::Id(name.clone()))
-                }
-            }
-            other => self.eval(other),
+            // A bare word is itself, but for the words that always mean
+            // someone: `you`, `here`, `self`, `it`.
+            Value::Str(name) => match name.as_str() {
+                "me" | "here" | "self" | "it" => self.eval(t),
+                "nothing" | "nobody" => Ok(V::Null),
+                _ => Ok(V::Id(name.clone())),
+            },
+            // `^thug`: what it names.
+            other => match other.get("lookup") {
+                Some(e) => self.eval(&e.clone()),
+                None => self.eval(other),
+            },
         }
     }
 
