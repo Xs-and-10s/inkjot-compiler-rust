@@ -240,7 +240,17 @@ impl Run {
 
     /// What a `{choose input}` chooses from: the entries of a list
     /// (`from: moderators`), or everything of a kind (`from: cantrip`).
-    fn options(&self, args: &Value) -> R<Vec<String>> {
+    fn options(&mut self, args: &Value) -> R<Vec<String>> {
+        // `from: all(seed, where: me.holds(it))`: a list worked out now.
+        if let from @ Value::Obj(_) = f(args, "from") {
+            return Ok(match self.eval(&from.clone())? {
+                V::List(items) => items
+                    .iter()
+                    .filter_map(|i| i.name().map(str::to_string))
+                    .collect(),
+                one => one.name().map(str::to_string).into_iter().collect(),
+            });
+        }
         let kind = f(args, "from").as_str().unwrap_or("");
         if self.story.kind(kind) == Some("list") {
             return Ok(self

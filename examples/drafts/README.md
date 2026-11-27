@@ -21,43 +21,52 @@ Harvest Fair after nine months. The story is one fragment for each gnome who
 comes to trust you.
 
 **Two truths.** Every fact's meaning (`~ means {{ … }}`) holds in the
-garden from the start, and in your almanac once you learn the fact. Rules
-hold in the garden always, and in your almanac once known (`~ known`,
-`~ learned from pip_lore`). `~ world only` and `~ almanac only` narrow a rule
-to one side.
+garden from the start, and in your almanac (what you know, `knows`) once
+you learn the fact. Rules hold in the garden always, and in your almanac
+once known (`~ known`, `~ learned from pip_lore`). `~ in world` and `~ in
+knows` narrow a rule to one side.
 
 **Negation.** `not` is stratified: a rule may say `not {{ B shaded }}` only
 if everything that concludes `shaded` sits in an earlier layer, so nothing
-depends on its own negation; and every variable in a `not` also appears in
-a positive condition. Only `world only` rules may say `not`. The almanac
-deals in observed opposites instead (`observe {{ here gets ? }}`), which
-makes it overconfident on purpose: its `hopes` rule knows nothing of slugs
-until Old Sorrel teaches `slug_risk`.
+depends on its own negation. Only `~ in world` rules may say `not`: what you
+don't know isn't false. The almanac deals in what you have seen instead
+(`observe {{ here gets ? }}`), which makes it overconfident on purpose: its
+`hopes` rule knows nothing of slugs until Old Sorrel teaches `slug_risk`.
 
-What it asks of v0.6, beyond Ex 4's list:
+What it uses, as written since milestone 22c:
 
 | Construct | Example |
 |---|---|
-| Rules, and where they hold | `rule sunny: … and not {{ B shaded }} => {{ B gets sun }} ~ world only` |
+| Rules, and where they hold | `rule sunny: … and not {{ B shaded }} => {{ B gets sun }} ~ in world` |
 | Learnable rules | `rule mirror: … ~ learned from pip_lore` |
-| One value per subject | `verb gets ~ one value`, so `observe` replaces what it replaces |
-| Changing the garden | `assert {{ here composted }}`, `retract {{ here soil ? }}`, `assert … until next chronon` |
-| Asking each truth | `{{ c blessed }}` (the garden), `me.knows {{ P suits here }}` (the almanac), `some P: you.know {{ P thrives }} and not {{ P thrives }}` |
-| Showing the almanac | `{known about: here}` |
-| Seasons | `clock: 0..=8 ~ season 3 ~ seasons spring, summer, autumn`, `on season summer`, `clock.season` |
+| One value per subject | `verb soil ~ one value`, so digging in compost replaces the soil |
+| Changing the garden | `assert {{ here composted }}`, `retract {{ ? watered }}` |
+| Seeing | `observe {{ here gets ? }}`: forget what you knew, know what is |
+| Asking each truth | `{{ c blessed }}` (the garden), `{{ ^sown.grows suits here }} in knows` (the almanac), `some P. {{ P thrives }} in knows and not {{ P thrives }}` |
+| Showing the almanac | `{known about: here}`, `{known about: garden}` |
+| Seasons | `period season: spring 3, summer 3, autumn 3`, `on season begins summer`, `clock.season` |
 | The moments of a turn | `on turn begins` (after the NPCs move), `on turn ends` (before) |
 | Making things | `recipe lantern: jam_jar, candle_end ~ make` |
 | A margin for rules | `:: garden_rules [rules]` |
-| A relation with every member of a kind | `relation trust: gardener, each gnome`, `trust with self` |
-| Picking a place by a rule | `one(bed, unwatched, where: {{ it has plant }})` |
+| A relation with every member of a kind | `relation trust: gardener, each gnome`, `self.trust` |
+| Picking a place by a rule | `one(all(bed, where: not it.watched and {{ it has plant }}))` |
+| The garden's shape, as facts | `fact layout: "…" ~ known ~ means {{ nw next_to n }}, …` |
 
 **Decided 16 Nov 2026** and applied here: the rules language is Inklog;
 quantifiers are `some`, `every`, `no`; `on turn begins` / `on turn ends`;
 `where:` in kind filters; `you` is a reserved name for the pov.
 
-**Found while writing it.** `inkjot check` 0.5 reads `{{ P in B }}` in a
-margin as an insert, and `{one {{ ? prizewinning }}}` cannot be read at all.
-v0.6 needs `{{` and `}}` as tokens of their own, lexed before inserts.
+**Brought up to date in milestone 22c**, and now it runs:
+`tests/ex5_play.rs` checks it clean, runs its own `[test]` passages, and
+plays 32 random years, every one of which ends. Three things changed in
+the story, to make the whole of it reachable:
+
+- The beds have paths between them (`route: nw - n - ne`, …): a `map` is
+  a layout, not a set of ways. `beside` comes from a `layout` fact.
+- The gnomes live under the thistle (`~ in c`).
+- A gnome carries an offering back to Hester's dresser rather than keeping
+  it, so the same honey can be left again: trust 2 (lore) and 3 (the
+  blessing, the thistle) were out of reach with one offering each.
 
 ## Ex 7: Mafia, by Lamplight (`ex7-mafia.twee`)
 

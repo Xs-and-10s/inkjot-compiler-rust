@@ -648,6 +648,11 @@ and `ballot.done` holds; a tie is drawn by lot (`ballot.drawn`), or with
 `ties: hung` left undecided (`ballot.hung`). Met on a later turn, it is a
 new ballot.
 
+**One value for each.** `relation trust: gardener, each gnome ~ 0..=3`
+keeps one value for each gnome: `sorrel.trust`, `raise self.trust 1`,
+`lower all(gnome).trust 1`, `count(gnome, where: it.trust == 3)`. A
+relation between two (Ex 2's `trust: roland, eldric`) keeps one, `trust`.
+
 **Around the table.** `relation seat: each guest ~ ring ~ in order joined`
 seats the table in a ring, in the order they joined; `spreads 1 from
 all(guest, where: it.heard) to nearest(guest, where: not it.heard) ~ along
@@ -738,6 +743,43 @@ Rules may be kept in a passage tagged `[rules]`, as in the config.
 {{ it is P }} in notebook`, `no B. {{ B slugged }}`, `some B, S. {{ B
 soil S }} and S != clay`. (`no guest where: …`, without a dot, counts a
 kind; see "Votes at a table".)
+
+### Truth, seeing, and one value
+
+```text
+verb soil ~ one value
+fact soil_w: "The west bed is clay, cold and slow." ~ means {{ w soil clay }}
+fact rose_wants: "Rose: loam, full sun, regular water." ~ known ~ means {{ rose likes loam }}
+:: bed_work:observe [act]
+observe {{ here gets ? }}
+```
+
+**What a fact means is true.** The meanings of every declared fact are
+kept in the world from the start: `{{ w soil clay }}` holds there whether
+or not anyone has learned `soil_w`. A character's `knows` holds them once
+they learn the fact. A fact `~ known` is known by every character from the
+start (Ex 5's seed packets).
+
+**`verb soil ~ one value`**: a subject has one at a time. Asserting `{{ w
+soil loam }}` lets go of `{{ w soil clay }}` (at the same `@` time, if the
+fact has one).
+
+**`observe {{ here gets ? }}`**: what the pov knew that matches is
+forgotten, and what matches in the world now, rules and all, is known
+instead. `observe … in base` does the same to another base of the pov's.
+What was seen in spring may be wrong by summer, until it is looked at
+again: Ex 5's almanac.
+
+**A fact's terms.** `one({{ ? prizewinning }}).subject` is the subject of
+one of the facts that match; `.verb`, `.object` and `.at` likewise.
+
+**`{known about: garden}`** names a map: what is known about each place
+in it.
+
+Inklog remembers what it worked out, and works it out again only when a
+base's facts, or what someone knows, has changed: Ex 5's gnomes ask the
+garden dozens of questions a night. A rule whose body looks something up
+(`you`, `^x`, `x.y`) is worked out again whenever anything changes.
 
 ### What the Linker writes
 
@@ -972,7 +1014,7 @@ Links, until it is answered (Ex 2's mouth hears three cantrips, then decides).
 | Input | Answer | Kept as |
 |---|---|---|
 | `{name input for: me.name, max: 24}` | text, not empty, at most `max` letters | text; `{me.name}` shows it, and a `custom` character's name is empty until then |
-| `{choose input for: words, from: cantrip, length: 3}` | that many of the things of that kind (or entries of a list, `from: moderators`), in order | a list: `words == [gust, spark, hush]`; with `length: 1`, the one chosen |
+| `{choose input for: words, from: cantrip, length: 3}` | that many of the things of that kind (or entries of a list, `from: moderators`, or a list worked out when it is asked, `from: all(seed, where: me.holds(it))`), in order | a list: `words == [gust, spark, hush]`; with `length: 1`, the one chosen |
 | `{text input for: report, max: 600}` | any text, at most `max` characters | text |
 | `{ballot for: chosen_special, from: specials, voters: all(guest), ties: draw}` | one of the list's entries, once each voter | the most chosen, when every voter has answered; see "Votes at a table" |
 
@@ -1022,7 +1064,9 @@ dice pick at the start, so the culprit can change from run to run.
 
 **The finale.** When the clock runs out, the last stop offers `Stay`, and when
 everyone has moved, they all go to the `[finale]` passage no Link leads to
-(Ex 1's `terminus`, not its `verdict`).
+(Ex 1's `terminus`, not its `verdict`). In a world without stops, the turn
+that ends at the clock's last stop goes there: Ex 5's Harvest Fair, after
+the ninth month.
 
 A `[finale]` is an ending, and its name is the ending's id. An Inklink may
 have many, reached by Links (Ex 2's three, Ex 1's `verdict`) or by the clock

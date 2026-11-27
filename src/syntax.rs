@@ -23,6 +23,8 @@ pub(crate) const DECLS: &[&str] = &[
     "period",
     // `knowledge findings ~ per character`: a base of facts.
     "knowledge",
+    // `verb soil ~ one value`: a verb with a rule of its own.
+    "verb",
     "threat",
     "deck",
     "pile",
@@ -95,7 +97,6 @@ pub(crate) const SETTINGS: &[&str] = &[
     "dialogue",
     "next",
     "hint",
-    "observe",
     "timeout",
     "param",
     "title",
@@ -180,6 +181,8 @@ pub(crate) const EFFECTS: &[&str] = &[
     // `note {{ … }} in notebook`: the Linker writes it; `for each P in …: e`.
     "note",
     "for",
+    // `observe {{ here gets ? }}`: forget what you knew of it; see what is.
+    "observe",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by

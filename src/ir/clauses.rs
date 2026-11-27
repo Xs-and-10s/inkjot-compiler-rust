@@ -100,6 +100,8 @@ const PATTERNS: &[Pattern] = &[
     p(&["means"], "means", Shape::Facts),
     p(&["starts", "with"], "starts_with", Shape::Facts),
     p(&["reads"], "reads", Shape::Ids),
+    // `verb soil ~ one value`: a subject has one at a time.
+    p(&["one", "value"], "one_value", Shape::Flag),
     // `~ pronouns she`, or `chosen` by the Linker.
     p(&["pronouns"], "pronouns", Shape::Token),
     p(&["else"], "else", Shape::Token),

@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Milestone 22c: Ex 5 brought up to date
+
+- What a declared fact means is true in the world from the start, as kept
+  facts; a fact `~ known` is known by every character from the start.
+  (Ex 6's epilogue can now count the notes that were true.)
+- `verb soil ~ one value`; `observe {{ … }}` (what you knew is forgotten,
+  what is true now is known); a fact's `.subject`, `.verb`, `.object` and
+  `.at`; `{known about: map}`.
+- `relation trust: gardener, each gnome`: one value for each, `x.trust`.
+- `from:` on `{choose input}` and `{ballot}` may be a list worked out when
+  asked: `all(seed, where: me.holds(it))`.
+- A clock with a last stop runs out into its finale in any world, not only
+  a world of stops.
+- In an NPC's agenda, `take` is the NPC's; `teach you self.lore` reads the
+  name.
+- Inklog remembers what it worked out until a base's facts or someone's
+  knowledge changes, and matches facts more cheaply: about ten times
+  faster on Ex 5.
+- Ex 5 checks clean, passes its own tests (soil, the almanac and the
+  garden, the seasons' shade, gnomes and trust, the Fair), and every random
+  year ends. Its beds now have paths and a `layout` fact, the gnomes live
+  under the thistle, and they carry offerings back to the dresser.
+
 ### Milestone 22b: Ex 6 runs
 
 - `^name` in a fact looks the name up; a bare word is always the word,

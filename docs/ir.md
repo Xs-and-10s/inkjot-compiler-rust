@@ -383,6 +383,13 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 22c: `{"declare": "verb", "id": "soil", "one_value": true}`.
+  The effect `{"do": "observe", "fact": fact, "in": base}`, `"in"` being
+  `"knows"` when not said. A `relation`'s `between` may hold `"each
+  gnome"`: one value for each. The `from:` of a `{choose input}` or a
+  `{ballot}` may be an expression (`all(seed, where: me.holds(it))`) as
+  well as a name. What a declared fact `means` is kept in the world from
+  the start; a fact tagged `known` is known by every character.
 - Milestone 22b: a fact's term may be `{"lookup": expr}` (`^target`); a
   bare word is the word. The effect `{"do": "note", "fact": fact, "in":
   base}`; `{"do": "for each", "var": "P", "in": expr, "then": effect}`.

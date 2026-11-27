@@ -507,6 +507,16 @@ do: "Tell the Inspector: Anton Keller is WREN"
 expect: proofs_given == 2
 expect: named == keller
 
+:: a_true_note_is_held [test]
+(((
+What a fact means is true in the world, so a note that matches it holds.
+)))
+start: cloakroom
+given: note {{ lark is keller }} in notebook
+given: note {{ organist is orme }} in notebook
+expect: {{ lark held }} and not {{ organist held }}
+expect: count({{ ? held }}) == 1
+
 :: dying_keeps_the_notebook [test]
 start: cloakroom
 given: note {{ lark is keller }} in notebook

@@ -792,6 +792,11 @@ pub struct Run {
     /// A `finale when:` that has come to hold: everyone goes there once the
     /// action is done.
     finale_now: Option<String>,
+    /// What Inklog last worked out for each base and owner, and the world
+    /// it worked it out in (`inklog.rs`).
+    closures: BTreeMap<(String, String), Arc<inklog::Worked>>,
+    /// While a `never` is checked: note which facts each solution used.
+    tracing: bool,
     /// A Link `~ for cohort` brings the table to a passage whose header has
     /// run once, for the one who took it: the others arrive with its `let`s
     /// as they were, and its effects are not done again.
@@ -899,6 +904,8 @@ impl Run {
             near: None,
             go_to: None,
             finale_now: None,
+            closures: BTreeMap::new(),
+            tracing: false,
             table_arrival: None,
             votes: BTreeMap::new(),
             chose: BTreeSet::new(),
@@ -951,6 +958,15 @@ impl Run {
                 "character" | "npc" => {
                     for clue in strs(field("knows")) {
                         self.knows.entry(id.clone()).or_default().insert(clue);
+                    }
+                    // `fact rose_wants: "…" ~ known`: printed on the packet;
+                    // every character knows it from the start.
+                    if d.kind == "character" {
+                        for fact in story.ids_of("fact") {
+                            if story.has_tag(&fact, "known") {
+                                self.knows.entry(id.clone()).or_default().insert(fact);
+                            }
+                        }
                     }
                     if let Value::Obj(stats) = field("stats") {
                         for (stat, v) in stats {
@@ -1041,12 +1057,26 @@ impl Run {
                         self.vals.insert(id.clone(), v);
                     }
                 }
+                // `relation trust: gardener, each gnome`: one for each of
+                // them, `sorrel.trust`; between two, one value, `trust`.
                 "relation" => {
                     let lo = match self.constant(field("range")) {
                         V::Range { lo, .. } => V::Num(lo.unwrap_or(0.0)),
                         _ => V::Num(0.0),
                     };
-                    self.vals.insert(id.clone(), lo);
+                    let each = strs(field("between"))
+                        .iter()
+                        .find_map(|b| b.strip_prefix("each ").map(str::to_string));
+                    match each {
+                        Some(kind) => {
+                            for who in self.things(&kind, None) {
+                                self.vals.insert(format!("{who}.{id}"), lo.clone());
+                            }
+                        }
+                        None => {
+                            self.vals.insert(id.clone(), lo);
+                        }
+                    }
                 }
                 "fuse" => {
                     self.vals
@@ -1824,10 +1854,10 @@ impl Run {
     /// A scene or an ending an effect played outside any action (a test's
     /// `given:`, time passing): arrive there now.
     pub(crate) fn arrive_pending(&mut self) -> R<()> {
-        match self.go_to.take() {
-            Some(p) => self.enter(&p, BTreeMap::new()),
-            None => Ok(()),
+        if let Some(p) = self.go_to.take() {
+            self.enter(&p, BTreeMap::new())?;
         }
+        self.enter_finale()
     }
 
     /// `finale when: no guest where: it.alive and it.team != town`: at the
@@ -2176,6 +2206,10 @@ impl Run {
         if moved {
             self.periods_begin()?;
             self.check_finales()?;
+        } else if self.finale_now.is_none() && self.last_stop().is_some() {
+            // The clock has run out: its finale, if it has one (Ex 5's
+            // Harvest Fair, after the last month).
+            self.finale_now = self.finale();
         }
         // What was waiting on the clock.
         self.run_timers()?;
@@ -3254,9 +3288,20 @@ impl Run {
                     })?;
                 }
             }
+            // `teach you self.lore`: a fact by name, or a name for one.
             "teach" => {
                 let who = self.who(&args[0])?;
-                self.knows.entry(who).or_default().insert(word(1));
+                let what = match args.get(1).and_then(Value::as_str) {
+                    Some(name) if !self.locals.contains_key(name) => name.to_string(),
+                    _ => self
+                        .eval(args.get(1).unwrap_or(&Value::Null))?
+                        .name()
+                        .unwrap_or("")
+                        .to_string(),
+                };
+                if !what.is_empty() {
+                    self.knows.entry(who).or_default().insert(what);
+                }
             }
             // `gain salt 2`: a resource. `gain stave 2`: that many of a
             // counted item. `gain tally`: an item.
@@ -3417,9 +3462,14 @@ impl Run {
                 self.counter(f(e, "do").as_str().unwrap_or(""), &args)?
             }
             // `take heart`: whoever acts, in a threat the opponent.
+            // `take nearest(offering, …)`: by the opponent in an encounter,
+            // the NPC in its own agenda, else the pov.
             "take" => {
-                let taker = match self.locals.get("actor") {
-                    Some(Local::Value(V::Id(a))) => a.clone(),
+                let taker = match (self.locals.get("actor"), self.locals.get("self")) {
+                    (Some(Local::Value(V::Id(a))), _) => a.clone(),
+                    (_, Some(Local::Value(V::Id(npc)))) if self.story.kind(npc) == Some("npc") => {
+                        npc.clone()
+                    }
                     _ => pov.clone(),
                 };
                 for item in self.items_named(args.first().unwrap_or(&Value::Null))? {
@@ -3523,6 +3573,7 @@ impl Run {
             // `assert {{ target guilty }} in findings`: kept (`knowledge.rs`).
             "assert" => self.assert_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
             "retract" => self.retract_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
+            "observe" => self.observe_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("knows"))?,
             "note" => self.note_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or(""))?,
             "for each" => self.for_each(e)?,
             // `draw syndicate vampires`: that row, as if it had been drawn.
@@ -4347,6 +4398,9 @@ impl Run {
         let id = match v {
             V::Id(id) => id.clone(),
             V::List(items) if m == "count" => return Ok(V::Num(items.len() as f64)),
+            V::List(fact) if Self::fact_member(fact, m).is_some() => {
+                return Ok(Self::fact_member(fact, m).unwrap_or(V::Null))
+            }
             // `all(guest, …).loot`: everyone's pile, together.
             V::List(items) if self.story.kind(m) == Some("pile") => {
                 let mut all = Vec::new();

@@ -11,11 +11,11 @@ Thistledown
 
 :: Inklink [config]
 (((
-Ex 5: a solo story-game, written to test v0.6's rules. A draft: it uses
-structured facts and rules, stratified `not`, two sets of truth (the
-garden and your almanac), rules you learn, seasons, a grid, `recipe`,
-`assert` / `retract`, and `{known about}`, none of which `inkjot check`
-0.5 accepts.
+Ex 5: a solo story-game, written to test v0.6's rules: structured facts
+and rules, stratified `not`, two sets of truth (the garden, and your
+almanac, which is what you know), rules you learn, seasons, a grid,
+`recipe`, `assert` / `retract` / `observe`, and `{known about}`. Written
+before Inklog was; milestone 22c brought it up to date, and it runs.
 
 The garden runs on every rule, applied to what is true. Your almanac runs
 only on the rules you know, applied only to what you have seen. You plant
@@ -31,10 +31,12 @@ tags: cozy ~ garden ~ deduction ~ folklore
 ages: 9..
 mode: solo
 pov: gardener
+period season: spring 3, summer 3, autumn 3
 clock: 0..=8 ~ shown as "month"
-~ season 3 ~ seasons spring, summer, autumn
+~ turn ends when me.spent or me.passed
 start: cottage
 default moves: walk
+default cost: daylight
 
 character gardener: "the new gardener" ~ selectable ~ custom
 resource daylight: 6 ~ per character ~ refill each chronon ~ shown as "hours of daylight"
@@ -57,6 +59,12 @@ place cottage: "the cottage"
 place shed: "the potting shed"
 place hedge: "the gap in the hedge"
 place lane: "the lane to Underwick"
+route: nw - n - ne
+route: w - c - e
+route: sw - s - se
+route: nw - w - sw
+route: n - c - s
+route: ne - e - se
 way back_door: cottage - s
 way shed_door: shed - sw
 way hedge_gap: hedge - e
@@ -81,9 +89,10 @@ state offering_taken: no
 (((
 The truth of the garden, as facts. Every fact's meaning holds in the
 garden from the start; it holds in your almanac only once you learn it.
+A bed has one soil: asserting another replaces it.
 )))
+knowledge world ~ truth
 verb soil ~ one value
-verb gets ~ one value
 
 fact soil_nw: "The north-west bed is sandy, and drains before you have finished watering it." ~ means {{ nw soil sand }}
 fact soil_n: "The north bed is good dark loam." ~ means {{ n soil loam }}
@@ -99,6 +108,8 @@ fact oak_east: "Mr. Lowe’s oak hangs over the hedge onto the east beds." ~ mea
 fact oak_ne: "The oak reaches the north-east bed too." ~ means {{ oak shades ne }}
 fact oak_se: "And the south-east, when it’s in full leaf." ~ means {{ oak shades se }}
 fact red_sky: "A red sky at evening means rain next month." ~ means {{ red_sky warns rain }}
+fact layout: "Nine beds in three rows of three, each touching the beds beside it." ~ known
+~ means {{ nw next_to n }}, {{ n next_to ne }}, {{ w next_to c }}, {{ c next_to e }}, {{ sw next_to s }}, {{ s next_to se }}, {{ nw next_to w }}, {{ w next_to sw }}, {{ n next_to c }}, {{ c next_to s }}, {{ ne next_to e }}, {{ e next_to se }}
 
 (((
 What each plant wants. Printed on the seed packets, so known from the start.
@@ -111,18 +122,19 @@ fact pumpkin_wants: "Pumpkin: loam, sun, a great deal of water." ~ known ~ means
 
 (((
 Your almanac shows what it knows about a bed with `{known about: here}`:
-the facts you have learned, and what the rules you know derive from them.
+the facts you have learned or seen, and what the rules you know derive
+from them.
 )))
 
-item rose_seed: "a twist of rose seed" ~ seed ~ held by gardener ~ grows rose
-item lavender_seed: "a paper of lavender seed" ~ seed ~ held by gardener ~ grows lavender
-item foxglove_seed: "a pinch of foxglove seed" ~ seed ~ held by gardener ~ grows foxglove
-item marigold_seed: "an envelope of marigold seed" ~ seed ~ held by gardener ~ grows marigold
-item pumpkin_seed: "three fat pumpkin seeds" ~ seed ~ held by gardener ~ grows pumpkin
-item mirror_lily_seed: "a seed like a pearl" ~ seed ~ held by pip ~ grows mirror_lily
-item shadebell_seed: "a seed like a drop of ink" ~ seed ~ held by sorrel ~ grows shadebell
-item thundercap_seed: "a pinch of grey spores in a walnut shell" ~ seed ~ held by mallow ~ grows thundercap
-item moonbloom_seed: "a seed that is cold to the touch" ~ seed ~ grows moonbloom
+item rose_seed: "a twist of rose seed" ~ seed ~ held by gardener ~ with grows: rose
+item lavender_seed: "a paper of lavender seed" ~ seed ~ held by gardener ~ with grows: lavender
+item foxglove_seed: "a pinch of foxglove seed" ~ seed ~ held by gardener ~ with grows: foxglove
+item marigold_seed: "an envelope of marigold seed" ~ seed ~ held by gardener ~ with grows: marigold
+item pumpkin_seed: "three fat pumpkin seeds" ~ seed ~ held by gardener ~ with grows: pumpkin
+item mirror_lily_seed: "a seed like a pearl" ~ seed ~ held by pip ~ with grows: mirror_lily
+item shadebell_seed: "a seed like a drop of ink" ~ seed ~ held by sorrel ~ with grows: shadebell
+item thundercap_seed: "a pinch of grey spores in a walnut shell" ~ seed ~ held by mallow ~ with grows: thundercap
+item moonbloom_seed: "a seed that is cold to the touch" ~ seed ~ with grows: moonbloom
 item watering_can: "a dented watering can" ~ tool ~ held by gardener
 item mattock: "Hester’s mattock" ~ tool ~ in shed
 item compost: "a barrow of black compost" ~ in shed
@@ -138,14 +150,14 @@ item thistle: "a thistle taller than you are" ~ fixed ~ in c ~ watches here ~ me
 
 recipe lantern: jam_jar, candle_end ~ make ~ "A jar, a candle stub, a bit of wire for a handle."
 
-npc sorrel: "Old Sorrel" ~ like gnome ~ tender ~ likes honey ~ aka "Hester"
-~ lore sorrel_lore ~ fragment frag_sorrel ~ gift shadebell_seed
-npc pip: "Pip" ~ like gnome ~ tender ~ likes buttons
-~ lore pip_lore ~ fragment frag_pip ~ gift mirror_lily_seed
-npc mallow: "Mallow" ~ like gnome ~ nibbler ~ likes crusts
-~ lore mallow_lore ~ fragment frag_mallow ~ gift thundercap_seed
-npc nettle: "Nettle" ~ like gnome ~ nibbler ~ likes thimble
-~ lore nettle_lore ~ fragment frag_nettle
+npc sorrel: "Old Sorrel" ~ like gnome ~ tender ~ in c ~ aka "Hester"
+~ with likes: honey ~ with lore: sorrel_lore ~ with fragment: frag_sorrel ~ with gift: shadebell_seed
+npc pip: "Pip" ~ like gnome ~ tender ~ in c
+~ with likes: buttons ~ with lore: pip_lore ~ with fragment: frag_pip ~ with gift: mirror_lily_seed
+npc mallow: "Mallow" ~ like gnome ~ nibbler ~ in c
+~ with likes: crusts ~ with lore: mallow_lore ~ with fragment: frag_mallow ~ with gift: thundercap_seed
+npc nettle: "Nettle" ~ like gnome ~ nibbler ~ in c
+~ with likes: thimble ~ with lore: nettle_lore ~ with fragment: frag_nettle ~ with gift: nothing
 npc lowe: "Mr. Crispin Lowe" ~ rival ~ in hedge ~ moves none
 npc marmalade: "Marmalade, Mr. Lowe’s cat" ~ like cat
 
@@ -162,15 +174,15 @@ fact frag_sorrel: "“My name,” says Old Sorrel, “was Hester Pell. I blew on
 
 objective learn: "Learn the garden from the gnomes"
 ~ done when me.knows.pip_lore and me.knows.sorrel_lore and me.knows.mallow_lore and me.knows.nettle_lore
-objective fair: "Win something at the Harvest Fair" ~ done when count {{ ? prizewinning }} >= 1
-objective gnomes: "Earn the trust of every gnome" ~ hidden until me.knows.frag_pip ~ done when count(gnome, trust: 3) == 4
+objective fair: "Win something at the Harvest Fair" ~ done when count({{ ? prizewinning }}) >= 1
+objective gnomes: "Earn the trust of every gnome" ~ hidden until me.knows.frag_pip ~ done when count(gnome, where: it.trust == 3) == 4
 
 (((
-Seasons and weather. `on season` fires as the clock enters each one.
+Seasons and weather. `on season begins` fires as the clock enters each one.
 )))
-on season summer
+on season begins summer
 ~ then assert {{ oak in_leaf }}
-on season autumn
+on season begins autumn
 ~ then gain moonbloom_seed when {{ moonbloom seeds }}
 
 (((
@@ -178,6 +190,7 @@ Weather: a red sky one month is rain the next. Watch the sky at evening
 and you can plan for it.
 )))
 on turn ends
+~ then retract {{ ? watered }}
 ~ then retract {{ sky rains }}
 ~ then assert {{ sky rains }} when {{ sky reddens }}
 ~ then retract {{ sky reddens }}
@@ -197,17 +210,19 @@ table weather: roll d6
 ~ 4..=6: then assert {{ sky reddens }}
 
 on loud
-~ then lower trust with each gnome 1
+~ then lower all(gnome).trust 1
 ~ then say sorrel "(from somewhere under the leaves) Must you?"
 
 :: garden_rules [rules]
 (((
-The garden's rules. A rule tagged `world only` holds in the garden and
-never in your almanac; those are the only rules that may say `not`
+The garden's rules. A rule `~ in world` holds in the garden and never in
+your almanac (what you know); those are the only rules that may say `not`
 (stratified: `shaded` is finished before `gets sun` asks about it). Every
 other rule holds in the garden always, and in your almanac once known.
 )))
 rule bed: {{ B soil S }} => {{ B is bed }} ~ known
+rule beside: {{ A next_to B }} => {{ A beside B }} ~ known
+rule beside_back: {{ A next_to B }} => {{ B beside A }} ~ known
 rule planted: {{ P in B }} and {{ B is bed }} => {{ B has plant }} ~ known
 rule suits: {{ P likes S }} and {{ B soil S }} and {{ P wants L }} and {{ B gets L }} => {{ P suits B }} ~ known
 rule fed: {{ P in B }} and {{ B composted }} => {{ P fed }} ~ known
@@ -221,21 +236,21 @@ rule thunder_here: {{ thundercap in B }} => {{ B watered }} ~ learned from mallo
 rule rain: {{ sky rains }} and {{ B is bed }} => {{ B watered }} ~ known
 rule lit: {{ B lit }} => {{ B gets sun }} ~ known
 
-rule sunny: {{ B is bed }} and not {{ B shaded }} => {{ B gets sun }} ~ world only
-rule shady: {{ B shaded }} and not {{ B lit }} => {{ B gets shade }} ~ world only
+rule sunny: {{ B is bed }} and not {{ B shaded }} => {{ B gets sun }} ~ in world
+rule shady: {{ B shaded }} and not {{ B lit }} => {{ B gets shade }} ~ in world
 
 rule marigold: {{ marigold in A }} and {{ A beside B }} => {{ B guarded }} ~ learned from pip_lore
-rule slugs: {{ sky rains }} and {{ B soil clay }} and not {{ B guarded }} => {{ B slugged }} ~ world only
+rule slugs: {{ sky rains }} and {{ B soil clay }} and not {{ B guarded }} => {{ B slugged }} ~ in world
 
-rule thrives: {{ P in B }} and {{ P likes S }} and {{ B soil S }} and {{ P wants L }} and {{ B gets L }} and {{ B watered }} and not {{ B slugged }} => {{ P thrives }} ~ world only
+rule thrives: {{ P in B }} and {{ P likes S }} and {{ B soil S }} and {{ P wants L }} and {{ B gets L }} and {{ B watered }} and not {{ B slugged }} => {{ P thrives }} ~ in world
 (((
 Your almanac's version of `thrives` knows nothing of slugs, because it
-cannot say `not`. It is overconfident on purpose: a clay bed in a wet
+cannot say `not`: what you don't know isn't false. It is overconfident on purpose: a clay bed in a wet
 month will fool it until Old Sorrel teaches you `slug_risk`.
 )))
 
-rule hopes: {{ P in B }} and {{ P likes S }} and {{ B soil S }} and {{ P wants L }} and {{ B gets L }} and {{ B watered }} => {{ P thrives }} ~ almanac only ~ known
-rule slug_risk: {{ sky rains }} and {{ B soil clay }} and {{ P in B }} => {{ P at_risk }} ~ almanac only ~ learned from sorrel_lore
+rule hopes: {{ P in B }} and {{ P likes S }} and {{ B soil S }} and {{ P wants L }} and {{ B gets L }} and {{ B watered }} => {{ P thrives }} ~ in knows ~ known
+rule slug_risk: {{ sky rains }} and {{ B soil clay }} and {{ P in B }} => {{ P at_risk }} ~ in knows ~ learned from sorrel_lore
 
 rule moon: {{ moonbloom in B }} and {{ B blessed }} and {{ B gets shade }} => {{ moonbloom thrives }} ~ learned from nettle_lore
 
@@ -262,44 +277,45 @@ goal pounce
 (((
 Gnomes walk at night (the end of each month), and only where nothing is
 watching. A lit lantern keeps every gnome off its bed, tenders too: that
-is the cost of a lantern.
+is the cost of a lantern. They live under the thistle, and they carry an
+offering back to Hester's dresser, as they did for her: what counts is
+that it was left.
 )))
 --
 moves: 2 per chronon
 
 goal fetch
-~ toward nearest(offering, liked by: self)
+~ toward nearest(offering, where: it == self.likes)
 ~ weight 3
 ~ when not self.watched
-~ then take nearest(offering, liked by: self)
-~ then raise trust with self 1
+~ then move nearest(offering, where: it == self.likes) to cottage
+~ then raise self.trust 1
 ~ then set offering_taken: yes
 
 goal tend
-~ toward one(bed, unwatched, where: {{ it has plant }})
+~ toward one(all(bed, where: not it.watched and {{ it has plant }}))
 ~ weight 2
-~ when self.is(tender) and trust with self >= 1
+~ when self.is(tender) and self.trust >= 1
 ~ then assert {{ here watered }}
 
 goal nibble
-~ toward one(bed, unwatched, where: {{ it has plant }})
+~ toward one(all(bed, where: not it.watched and {{ it has plant }}))
 ~ weight 2
-~ when self.is(nibbler) and trust with self <= 1
-~ then set nibbled: one {{ ? in here }}
+~ when self.is(nibbler) and self.trust <= 1
+~ then set nibbled: one({{ ? in here }}).subject
 ~ then retract {{ ? in here }}
 
 goal bless
 ~ toward c
 ~ weight 4
-~ when self.is(sorrel) and trust with self == 3
+~ when self.is(sorrel) and self.trust == 3 and not {{ c blessed }}
 ~ then assert {{ c blessed }}
-~ once
 
 reaction teach
-~ when trust with self >= 2 and not you.knows(self.lore)
+~ when self.trust >= 2 and not you.knows(self.lore)
 ~ then teach you self.lore
 ~ then teach you self.fragment
-~ then give self.gift to you
+~ then give self.gift to you when self.gift != nothing
 
 (((
 Mallow can be turned: at trust 2 a nibbler stops nibbling. Nettle turns
@@ -359,14 +375,14 @@ Every bed embeds this. `here` is the bed.
 )))
 > [[Look closely at the soil->bed_work:examine]] ~ examine ~ id examine_bed
 > [[Watch the light here for an hour->bed_work:observe]] ~ observe ~ id observe_light
-> [[Sow something->bed_work:sow]] ~ sow ~ when not {{ here has plant }} ~ id sow
+> [[Sow something->bed_work:sow]] ~ sow ~ when not {{ here has plant }} and me.holds.any(seed) ~ id sow
 > [[Water it->bed_work:water]] ~ water ~ requires watering_can ~ id water
 > [[Leave an offering here->bed_work:leave]] ~ leave ~ when me.holds.any(offering) ~ id leave_offering
 > [[Set the lantern here->bed_work:lantern]] ~ leave ~ requires lantern ~ then move lantern to here ~ then set lantern_lit: yes ~ id set_lantern
 > [[Dig in compost->bed_work:dig]] ~ dig ~ requires mattock, compost ~ id dig_compost
 
 :: bed_work:examine [act]
-learn all {{ here soil ? }}
+observe {{ here soil ? }}
 --
 You kneel and crumble a handful.
 {known about: here}
@@ -390,9 +406,9 @@ oak comes into leaf. Your almanac will not know until you look again.
 )))
 
 :: bed_work:sow [act]
-{choose input for: sown, from: me.holds.any(seed)}
-let sure: me.knows {{ sown.grows suits here }}
-assert {{ sown.grows in here }}
+{choose input for: sown, from: all(seed, where: me.holds(it)), length: 1}
+let sure: {{ ^sown.grows suits here }} in knows
+assert {{ ^sown.grows in here }}
 lose sown
 raise green_thumb 1 when sure
 --
@@ -401,18 +417,18 @@ You sow {sown} and firm the soil over it.
 [if sure]
 Your almanac is sure of this one.
 
-[if me.knows {{ sown.grows at_risk }}; append]
+[if {{ ^sown.grows at_risk }} in knows; append]
 Though Old Sorrel’s note in the margin says to watch for slugs.
 
 [end]
 
 :: bed_work:water [act]
-assert {{ here watered }} until next chronon
+assert {{ here watered }}
 --
 You water it. The can is dented and leaks down your leg.
 
 :: bed_work:leave [act]
-{choose input for: gift, from: me.holds.any(offering)}
+{choose input for: gift, from: all(offering, where: me.holds(it)), length: 1}
 move gift to here
 --
 You set {gift} down at the edge of the bed, feeling foolish, and go in.
@@ -422,7 +438,6 @@ You set {gift} down at the edge of the bed, feeling foolish, and go in.
 You set the lantern down and light it. It watches the bed all night: no cat will come, and nothing else either.
 
 :: bed_work:dig [act]
-retract {{ here soil ? }}
 assert {{ here soil loam }}
 assert {{ here composted }}
 --
@@ -466,7 +481,7 @@ You know now what the thistle is. You don’t touch it.
 
 [end]
 {embed nib: "bed_work"}
-> [[Blow on the thistle->ending_small]] ~ when me.knows.frag_sorrel and count(gnome, trust: 3) == 4 ~ id blow_on_the_thistle
+> [[Blow on the thistle->ending_small]] ~ when me.knows.frag_sorrel and count(gnome, where: it.trust == 3) == 4 ~ id blow_on_the_thistle
 
 :: e [bed card:E]
 hint: "Anything here will be in shade come summer." ~ green_thumb ..=2
@@ -550,12 +565,12 @@ The oak next door has come into full leaf overnight. Its shadow lies across the 
 It rains all month. The almanac says that is good for everything.
 
 [if offering_taken]
-The offering you left is gone. In its place, in the soil, the print of a very small boot.
+The offering you left is gone. In its place, in the soil, the print of a very small boot; and it is back on Hester’s dresser, as if it had never left.
 
 [if nibbled != nothing]
 Something has been at the {nibbled}. Nibbled to the stalk.
 
-[if some P: you.know {{ P thrives }} and not {{ P thrives }}]
+[if some P. {{ P thrives }} in knows and not {{ P thrives }}]
 Your almanac said something here would thrive. It hasn’t. The almanac is wrong, somewhere, and you are going to have to find out where.
 
 [end]
@@ -567,20 +582,20 @@ Comes when the clock passes the last month, as Ex 1's terminus does.
 )))
 The Underwick Harvest Fair, on the green, under bunting. Mr. Lowe has entered a pumpkin the size of a sheep.
 
-[if count {{ ? prizewinning }} >= 1]
+[if count({{ ? prizewinning }}) >= 1]
 The judges stop at your table and stay there a long time. One of them takes off his hat.
 
 [else]
 The judges pass your table politely, as one passes a neighbour’s new baby.
 
 [end]
-> [[Go home to Thistledown->ending_fair]] ~ when count {{ ? prizewinning }} >= 1 ~ id won_the_fair
-> [[Go home to Thistledown->ending_sold]] ~ when count {{ ? prizewinning }} == 0 and count(gnome, trust: 3) < 2 ~ id lost_the_fair
-> [[Go home to Thistledown->ending_wild]] ~ when count {{ ? prizewinning }} == 0 and count(gnome, trust: 3) >= 2 ~ id the_garden_keeps_you
+> [[Go home to Thistledown->ending_fair]] ~ when count({{ ? prizewinning }}) >= 1 ~ id won_the_fair
+> [[Go home to Thistledown->ending_sold]] ~ when count({{ ? prizewinning }}) == 0 and count(gnome, where: it.trust == 3) < 2 ~ id lost_the_fair
+> [[Go home to Thistledown->ending_wild]] ~ when count({{ ? prizewinning }}) == 0 and count(gnome, where: it.trust == 3) >= 2 ~ id the_garden_keeps_you
 
 :: ending_fair [ending]
 --
-They give you a rosette for the {one {{ ? prizewinning }}}, and the judges write the name of the garden in the book: *Thistledown*. Mr. Lowe shakes your hand and does not make his offer.
+They give you a rosette for the {one({{ ? prizewinning }}).subject}, and the judges write the name of the garden in the book: *Thistledown*. Mr. Lowe shakes your hand and does not make his offer.
 
 [if me.knows.frag_sorrel]
 That night you leave the rosette in the middle bed, at the foot of the thistle. In the morning it is gone, and in its place, in the soil, are the prints of four pairs of very small boots, and a fifth pair, a little larger, that walked round and round the thistle as if dancing.
@@ -616,3 +631,96 @@ You blow.
 The thistledown goes up around you like snow falling the wrong way, and the garden gets very large very quickly: the brick edge a wall, the leaves a roof, the thistle stalk a tower. And at the foot of it, in a pointed hat, an old woman with a small slanting smile is holding out a spoon of honey.
 
 “Welcome to Thistledown,” says Hester Pell. “Mind Nettle. She bites.”
+
+:: examining_learns_the_soil [test]
+start: nw
+expect: not {{ nw soil sand }} in knows
+do: "Look closely at the soil"
+expect: {{ nw soil sand }} in knows
+expect: {{ nw is bed }} in knows
+expect: not {{ w soil clay }} in knows
+
+:: watering_lasts_the_month [test]
+start: s
+do: "Water it"
+expect: {{ s watered }}
+do: "Go to the cottage"
+do: "Sleep until next month"
+expect: not {{ s watered }} or {{ sky rains }}
+
+:: digging_replaces_the_soil [test]
+start: w
+given: gain mattock
+given: gain compost
+do: "Dig in compost"
+expect: {{ w soil loam }} and not {{ w soil clay }}
+expect: count({{ w soil ? }}) == 1
+
+:: the_almanac_is_overconfident [test]
+start: w
+given: assert {{ marigold in w }}
+given: assert {{ sky rains }}
+expect: {{ w slugged }} and not {{ marigold thrives }}
+given: observe {{ w soil ? }}
+given: observe {{ w gets ? }}
+given: observe {{ sky rains }}
+given: observe {{ marigold in w }}
+(((
+The seed packet (known), what you saw, and the rules you know: the almanac
+says it will thrive. It knows nothing of slugs.
+)))
+expect: {{ marigold likes clay }} in knows and {{ w watered }} in knows
+expect: {{ marigold thrives }} in knows
+
+:: summer_brings_the_shade [test]
+start: ne
+do: "Watch the light here for an hour"
+expect: {{ ne gets sun }} in knows
+given: wait until summer
+expect: {{ ne gets shade }} and not {{ ne gets sun }}
+expect: {{ ne gets sun }} in knows ~ ((the almanac has not looked again))
+do: "Watch the light here for an hour"
+expect: {{ ne gets shade }} in knows and not {{ ne gets sun }} in knows
+
+:: a_gnome_comes_for_honey [test]
+start: cottage
+given: move honey to n
+do: "Sleep until next month"
+expect: sorrel.trust == 1
+expect: honey.in(cottage)
+
+:: a_trusted_gnome_teaches [test]
+start: cottage
+given: set sorrel.trust: 2
+do: "Sleep until next month"
+expect: you.knows.sorrel_lore and you.knows.frag_sorrel
+expect: you.holds(shadebell_seed)
+
+:: the_year_ends_at_the_fair [test]
+start: cottage
+given: wait until autumn
+given: assert {{ thundercap in e }}
+given: learn fair_notice
+do: "Sleep until next month"
+do: "Sleep until next month"
+do: "Sleep until next month"
+expect at: harvest_fair
+
+:: a_marvel_wins_the_fair [test]
+start: cottage
+given: wait until autumn
+(((
+A thundercap waters its neighbours, so the mirror-lily beside it thrives
+whatever the weather; loam brings no slugs.
+)))
+given: assert {{ thundercap in n }}
+given: assert {{ mirror_lily in c }}
+expect: {{ mirror_lily thrives }} and {{ mirror_lily prizewinning }}
+expect: count({{ ? prizewinning }}) == 1
+do: "Sleep until next month"
+do: "Sleep until next month"
+do: "Sleep until next month"
+expect at: harvest_fair
+do: "Go home to Thistledown"
+expect at: ending_fair
+expect text: "a rosette for the mirror"

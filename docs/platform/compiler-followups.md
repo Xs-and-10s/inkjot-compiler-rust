@@ -228,3 +228,14 @@ The compiler's side is in the draft (milestone 21a). The platform's:
   `cause: "death"` and the checkpoint's name; the clock may go back.
 - `~ track` on a base (Ex 6's dossier) reports it in `changes` as a list
   of facts, before and after.
+
+## 16. Ex 5 on the platform (milestone 22c, 27 Nov)
+
+- A `{choose input}` may list options worked out when it is asked (the
+  seeds you hold): `asks[].options` is what to show, as before. Answer one
+  with `Answer([option])`; with `length: 1` it is kept as one value.
+- A clock with a last stop ends the reading at its `[finale]` in any
+  world, so Ex 5's Fair arrives after the ninth month's `pass`, with no
+  Link to it. Nothing new in the view: `ending_reached` as usual.
+- Inklog now remembers its closures inside a `Run`; a `Run` is still
+  `Clone`, and the memory travels with it, so nothing changes for the NIF.

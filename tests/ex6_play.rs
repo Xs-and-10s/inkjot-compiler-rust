@@ -65,7 +65,10 @@ fn random_game(seed: u64, picks: &[u16], limit: usize) -> Result<String, String>
         }
         let asks = run.asks()?;
         let choices = run.choices()?;
-        if let Some(ask) = asks.iter().find(|_| next(3) == 0) {
+        // An open input is answered now and then, and always when it is
+        // all there is to do.
+        let answering = !asks.is_empty() && (choices.is_empty() || next(3) == 0);
+        if let Some(ask) = asks.first().filter(|_| answering) {
             let done = match ask.kind.as_str() {
                 "note" => run.answer(&[
                     ask.options[next(ask.options.len())].clone(),
