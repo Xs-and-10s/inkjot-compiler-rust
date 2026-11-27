@@ -1498,10 +1498,12 @@ pub(crate) fn effect(text: &str) -> Value {
             pairs.push(("in".into(), Value::str(base.trim())));
         }
         // `assert {{ target guilty }} in findings`, `retract {{ sky rains }}`;
-        // with no `in`, the world.
-        "assert" | "retract" => {
+        // with no `in`, the world. `observe {{ here gets ? }}`: with no
+        // `in`, what the pov knows.
+        "assert" | "retract" | "observe" => {
             let (fact, base) = match rest.rsplit_once(" in ") {
                 Some((f, b)) if !b.contains("}}") => (f, b.trim()),
+                _ if verb == "observe" => (rest, "knows"),
                 _ => (rest, "world"),
             };
             pairs.push(("fact".into(), fact_value(fact)));

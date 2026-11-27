@@ -101,6 +101,14 @@ impl Run {
     /// facts, at the start of a run.
     pub(super) fn start_bases(&mut self) -> R<()> {
         let story = Arc::clone(&self.story);
+        // What a declared fact means is true: it holds in the world from the
+        // start, as kept facts (so a `verb … ~ one value`, or a `retract`,
+        // may change it), and in a character's `knows` once they learn it.
+        for id in story.ids_of("fact") {
+            for m in story.field(&id, "means").as_arr().unwrap_or(&[]).to_vec() {
+                self.assert_fact(&m, "world")?;
+            }
+        }
         for base in story.ids_of("knowledge") {
             let facts = story
                 .field(&base, "starts_with")
@@ -121,12 +129,57 @@ impl Run {
         let owner = self.owner_of(base);
         let key = self.base_key(base, &owner);
         let mut held = self.kept(&key);
+        // `verb soil ~ one value`: a bed has one soil, so a new one
+        // replaces the old (at the same time, if the fact has one).
+        if let Some(verb) = fact[1].name() {
+            if self.story.kind(verb) == Some("verb")
+                && *self.story.field(verb, "one_value") == Value::Bool(true)
+            {
+                held.retain(|h| {
+                    !(h[0].same(&fact[0]) && h[1].same(&fact[1]) && h[3].same(&fact[3]))
+                });
+            }
+        }
         if !held.iter().any(|h| same_fact(h, &fact)) {
             held.push(self.stamped(fact));
         }
         self.vals
             .insert(key, V::List(held.into_iter().map(V::List).collect()));
         Ok(())
+    }
+
+    /// `observe {{ here gets ? }}`: what the pov knew that matches is
+    /// forgotten, and what matches in the world now is known instead, rules
+    /// and all. What was seen in spring may be wrong by summer.
+    pub(super) fn observe_fact(&mut self, pattern: &Value, base: &str) -> R<()> {
+        self.retract_fact(pattern, base)?;
+        let world = self.closure("world", &self.pov.clone(), 0)?;
+        let b = self.bound_vars();
+        let mut seen = Vec::new();
+        for fact in world {
+            if self.match_fact(pattern, &fact, &b)?.is_some() {
+                seen.push(fact);
+            }
+        }
+        let owner = self.owner_of(base);
+        let key = self.base_key(base, &owner);
+        let mut held = self.kept(&key);
+        for fact in seen {
+            if !held.iter().any(|h| same_fact(h, &fact)) {
+                held.push(self.stamped(fact));
+            }
+        }
+        self.vals
+            .insert(key, V::List(held.into_iter().map(V::List).collect()));
+        Ok(())
+    }
+
+    /// `one({{ ? prizewinning }}).subject`: a term of a fact.
+    pub(super) fn fact_member(fact: &[V], m: &str) -> Option<V> {
+        let i = ["subject", "verb", "object", "at"]
+            .iter()
+            .position(|t| *t == m)?;
+        (fact.len() >= 4).then(|| fact[i].clone())
     }
 
     /// A fact as kept: and the turn it reached the base, after its terms.
@@ -266,6 +319,10 @@ impl Run {
 
     /// Does `fact` fit `pattern`, given `b`? The bindings it adds.
     fn match_fact(&mut self, pattern: &Value, fact: &Fact, b: &Bindings) -> R<Option<Bindings>> {
+        // The verb first: most facts fail there, before anything is copied.
+        if fact.len() < 4 || fact[1].name() != f(pattern, "verb").as_str() {
+            return Ok(None);
+        }
         let mut b = b.clone();
         for (i, key) in ["subject", "verb", "object", "at"].iter().enumerate() {
             let t = f(pattern, key);
@@ -325,25 +382,29 @@ impl Run {
         let op = pairs.first().map(|(k, _)| k.as_str()).unwrap_or("");
         match op {
             "fact" => {
-                let facts = match (f(e, "in").as_str(), here) {
-                    (None, Some(facts)) => facts.to_vec(),
+                let asked;
+                let facts: &[Fact] = match (f(e, "in").as_str(), here) {
+                    (None, Some(facts)) => facts,
                     (base, _) => {
                         let base = base.unwrap_or("world").to_string();
                         let owner = self.owner_of(&base);
-                        self.closure(&base, &owner, 0)?
+                        asked = self.closure(&base, &owner, 0)?;
+                        &asked
                     }
                 };
                 let pattern = f(e, "fact").clone();
                 let mut out = Vec::new();
-                for fact in &facts {
+                for fact in facts {
                     if let Some(mut nb) = self.match_fact(&pattern, fact, b)? {
                         // Which facts a solution stands on, for a `never`.
-                        let mut used = match nb.remove(USED) {
-                            Some(V::List(u)) => u,
-                            _ => Vec::new(),
-                        };
-                        used.push(V::List(fact.clone()));
-                        nb.insert(USED.to_string(), V::List(used));
+                        if self.tracing {
+                            let mut used = match nb.remove(USED) {
+                                Some(V::List(u)) => u,
+                                _ => Vec::new(),
+                            };
+                            used.push(V::List(fact.clone()));
+                            nb.insert(USED.to_string(), V::List(used));
+                        }
                         out.push(nb);
                     }
                 }
@@ -419,7 +480,59 @@ impl Run {
 
     /// Everything true in a base for its owner: what it keeps, what it
     /// reads, and what the rules that hold there make of them.
+    /// `closure_of`, remembered: asked again in the same world, it is not
+    /// worked out again. The gnomes of Ex 5 ask the garden dozens of
+    /// questions a night. What a closure depends on is the facts the bases
+    /// keep and what each character knows; and, if a rule's body looks
+    /// anything up (`you`, `^x`, `x.y`), everything, names in scope too.
     fn closure(&mut self, base: &str, owner: &str, depth: usize) -> R<Vec<Fact>> {
+        let key = (base.to_string(), owner.to_string());
+        let pure = self.story.rules.iter().all(|r| pure(f(r, "body")));
+        let kept: Vec<(String, V)> = self
+            .vals
+            .iter()
+            .filter(|(k, v)| !pure || self.is_base_key(k, v))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let scope = if pure {
+            String::new()
+        } else {
+            format!("{:?}{:?}{:?}", self.locals, self.holder, self.place)
+        };
+        if let Some(w) = self.closures.get(&key) {
+            if w.chronon == self.chronon
+                && w.pov == self.pov
+                && w.scope == scope
+                && w.knows == self.knows
+                && w.kept == kept
+            {
+                return Ok(w.facts.clone());
+            }
+        }
+        let facts = self.closure_of(base, owner, depth)?;
+        let worked = Worked {
+            chronon: self.chronon,
+            pov: self.pov.clone(),
+            scope,
+            knows: self.knows.clone(),
+            kept,
+            facts: facts.clone(),
+        };
+        self.closures.insert(key, Arc::new(worked));
+        Ok(facts)
+    }
+
+    /// Is this stored value a base's facts: `world`, `ann.knows`,
+    /// `keller.dossier`?
+    fn is_base_key(&self, key: &str, v: &V) -> bool {
+        if !matches!(v, V::List(_)) {
+            return false;
+        }
+        let name = key.rsplit('.').next().unwrap_or(key);
+        name == "world" || name == "knows" || self.story.kind(name) == Some("knowledge")
+    }
+
+    fn closure_of(&mut self, base: &str, owner: &str, depth: usize) -> R<Vec<Fact>> {
         if depth > MAX_READS {
             return Err(format!(
                 "knowledge bases read each other more than {MAX_READS} deep, through `{base}`"
@@ -595,7 +708,10 @@ impl Run {
                 Value::Null => String::new(),
                 text => self.text_of(text)?,
             };
-            for b in self.solve(f(never, "never"), &Bindings::new(), Some(&facts))? {
+            self.tracing = true;
+            let found = self.solve(f(never, "never"), &Bindings::new(), Some(&facts));
+            self.tracing = false;
+            for b in found? {
                 let mut used: Vec<Fact> = match b.get(USED) {
                     Some(V::List(u)) => u
                         .iter()
@@ -648,6 +764,16 @@ impl Run {
             V::Id(list) if self.lists.contains_key(&list) => {
                 self.lists[&list].iter().map(|e| e.id.clone()).collect()
             }
+            // `{known about: garden}`: every place in the map.
+            V::Id(map) if self.story.kind(&map) == Some("map") => self
+                .story
+                .field(&map, "rows")
+                .as_arr()
+                .unwrap_or(&[])
+                .iter()
+                .flat_map(|r| r.as_arr().unwrap_or(&[]).to_vec())
+                .filter_map(|c| c.as_str().map(str::to_string))
+                .collect(),
             V::List(items) => items
                 .iter()
                 .filter_map(|i| i.name().map(str::to_string))
@@ -737,6 +863,31 @@ impl Run {
 }
 
 /// Two facts the same: term for term (not when each was kept).
+/// A base's facts as worked out, and everything they could have depended on.
+#[derive(Debug)]
+pub(crate) struct Worked {
+    chronon: u32,
+    pov: String,
+    scope: String,
+    knows: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    /// The bases' kept facts; with an impure rule, every stored value.
+    kept: Vec<(String, V)>,
+    facts: Vec<Fact>,
+}
+
+/// Does a rule's body ask only facts and compare their terms? Variables,
+/// `?` and bare words, but no lookup: `^x`, `x.y`, `you`, `here`.
+fn pure(body: &Value) -> bool {
+    match body {
+        Value::Str(s) => !matches!(s.as_str(), "you" | "me" | "i" | "here" | "self" | "it"),
+        Value::Arr(items) => items.iter().all(pure),
+        Value::Obj(pairs) => pairs
+            .iter()
+            .all(|(k, v)| !matches!(k.as_str(), "get" | "lookup" | "call") && pure(v)),
+        _ => true,
+    }
+}
+
 fn same_fact(a: &Fact, b: &Fact) -> bool {
     a.len() >= 4 && b.len() >= 4 && a.iter().zip(b).take(4).all(|(x, y)| x.same(y))
 }

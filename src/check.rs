@@ -1996,7 +1996,7 @@ impl Checker {
             // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
             "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
             // `assert {{ target guilty }} in findings`: a fact, kept in a base.
-            "assert" | "retract" | "note" => self.assert_fact(core, line, col),
+            "assert" | "retract" | "note" | "observe" => self.assert_fact(core, line, col),
             // `for each P in all(person, in: here): assert {{ P seen_at here }} in dossier`.
             "for" => {
                 let rest = core["for".len()..].trim();
@@ -2703,6 +2703,8 @@ impl Checker {
             seen.push(key.to_string());
             match key {
                 "for" => self.expression_in(value, line, col),
+                // `from: all(seed, where: me.holds(it))`: a list, worked out.
+                "from" if value.contains('(') => self.expr(value, line, col),
                 "from" => {
                     if !self.is_kind_word(value) && !self.has(value, &["list"]) {
                         self.err(
@@ -2762,13 +2764,15 @@ impl Checker {
             let (key, value) = (key.trim(), value.trim());
             match key {
                 "for" => has_for = true,
+                // `from: all(seed, where: me.holds(it))`: a list, worked out.
+                "from" if value.contains('(') => self.expr(value, line, col),
                 "from" => {
                     if !self.is_kind_word(value) && !self.has(value, &["list"]) {
                         self.err(
                             line,
                             col,
                             format!(
-                                "`from: {value}` should name a kind, a tag, an archetype or a list"
+                                "`from: {value}` should name a kind, a tag, an archetype or a list, or be one: `all(seed, where: me.holds(it))`"
                             ),
                         );
                     }
