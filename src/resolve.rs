@@ -288,9 +288,8 @@ fn walk(e: &Expr, lookup: &dyn Lookup, out: &mut Vec<Problem>) {
             }
         }
         Expr::Var(_) | Expr::Any => {}
-        // A fact's terms are atoms: a bare name is itself (`{{ sky rains }}`)
-        // unless it is in scope (`target`, `you`). Only what is worked out
-        // (`target.owner`) must resolve.
+        // A fact's terms are atoms: a bare name is itself (`{{ sky rains }}`).
+        // Only what is worked out (`^thug`, `target.owner`) must resolve.
         Expr::Fact {
             subject, object, ..
         } => {
@@ -302,6 +301,39 @@ fn walk(e: &Expr, lookup: &dyn Lookup, out: &mut Vec<Problem>) {
         }
         Expr::Quant(_, _, body) => walk(body, lookup, out),
     }
+}
+
+/// The bare words a fact uses as atoms, with where each starts: `thug` in
+/// `{{ john tailed_by thug }}`.
+pub fn fact_atoms(e: &Expr) -> Vec<(String, usize)> {
+    fn go(e: &Expr, out: &mut Vec<(String, usize)>) {
+        match e {
+            Expr::Fact {
+                subject, object, ..
+            } => {
+                for t in std::iter::once(subject).chain(object) {
+                    if let Expr::Name(n, at) = t.as_ref() {
+                        out.push((n.clone(), at.0));
+                    }
+                }
+            }
+            Expr::Binary(_, a, b) | Expr::Index(a, b) => {
+                go(a, out);
+                go(b, out);
+            }
+            Expr::Unary(_, a) | Expr::Member(a, _) | Expr::Quant(_, _, a) => go(a, out),
+            Expr::Call(t, args) => {
+                go(t, out);
+                args.iter().for_each(|a| go(&a.value, out));
+            }
+            Expr::If(c, a, b) => [c, a, b].into_iter().for_each(|e| go(e, out)),
+            Expr::List(items) => items.iter().for_each(|i| go(i, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    go(e, &mut out);
+    out
 }
 
 /// A bare word, or a list of bare words: `hold`, `[flame, frost]`.

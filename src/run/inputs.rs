@@ -70,7 +70,7 @@ pub(super) struct Ballot {
 pub(super) fn is_input(v: &Value) -> bool {
     f(v, "insert")
         .as_str()
-        .is_some_and(|i| i == "accuse" || i == "ballot" || i.ends_with(" input"))
+        .is_some_and(|i| i == "accuse" || i == "ballot" || i == "note" || i.ends_with(" input"))
 }
 
 impl Run {
@@ -103,6 +103,11 @@ impl Run {
             }
             let (options, methods) = match kind.as_str() {
                 "choose input" | "ballot" => (self.options(&args)?, Vec::new()),
+                // `{note who: cover, is: suspect}`: whom, and what.
+                "note" => (
+                    self.of_kind(f(&input, "who")),
+                    self.of_kind(f(&input, "what")),
+                ),
                 "accuse" => (self.suspects(&args)?, self.methods(&args)?),
                 _ => (Vec::new(), Vec::new()),
             };
@@ -159,6 +164,24 @@ impl Run {
                 Some(max) => format!("(Write it, up to {max} characters.)"),
                 None => String::from("(Write it.)"),
             },
+            "note" => {
+                let verb = f(input, "verb").as_str().unwrap_or("").replace('_', " ");
+                let who: Vec<String> = self
+                    .of_kind(f(input, "who"))
+                    .iter()
+                    .map(|w| self.label(w))
+                    .collect();
+                let what: Vec<String> = self
+                    .of_kind(f(input, "what"))
+                    .iter()
+                    .map(|w| self.label(w))
+                    .collect();
+                format!(
+                    "(Write a note: one of {} {verb} one of {}.)",
+                    or_list(&who),
+                    or_list(&what)
+                )
+            }
             "ballot" => {
                 if self.vals.get("ballot.done").is_some_and(V::truthy) {
                     return Ok(String::new());
@@ -289,6 +312,26 @@ impl Run {
         let args = f(&input, "args").clone();
         if f(&input, "insert").as_str() == Some("ballot") {
             return self.ballot_vote(&args, words);
+        }
+        // `{note who: cover, is: suspect ~ in notebook}`: [whom, what].
+        if f(&input, "insert").as_str() == Some("note") {
+            let [who, what] = words else {
+                return Err("a note is two answers: whom, and what".into());
+            };
+            for (word, key) in [(who, "who"), (what, "what")] {
+                if !self.of_kind(f(&input, key)).contains(word) {
+                    return Err(format!("`{word}` is not one this note may name"));
+                }
+            }
+            let fact = Value::obj([
+                ("subject", Value::str(who)),
+                ("verb", f(&input, "verb").clone()),
+                ("object", Value::str(what)),
+                ("at", Value::Null),
+            ]);
+            let base = f(&input, "in").as_str().unwrap_or("").to_string();
+            self.note_fact(&fact, &base)?;
+            return self.relist();
         }
         let value = match f(&input, "insert").as_str().unwrap_or("") {
             "name input" => {
@@ -429,6 +472,20 @@ impl Run {
         let voters = Vec::new();
         self.tally_with(args, &voters)?;
         self.prompt(input)
+    }
+
+    /// Everything of a kind, by name: `cover`, `suspect`.
+    fn of_kind(&self, kind: &Value) -> Vec<String> {
+        let kind = kind.as_str().unwrap_or("");
+        let mut ids: Vec<String> = self
+            .story
+            .decls
+            .keys()
+            .filter(|id| self.is_kind(id, kind))
+            .cloned()
+            .collect();
+        ids.sort();
+        ids
     }
 
     /// Who sits on this jury or votes in this ballot: `voters:` worked out

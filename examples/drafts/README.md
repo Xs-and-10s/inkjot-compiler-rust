@@ -267,6 +267,11 @@ is asked, quantifiers, speech cues, Link targets, tested labels, comment
 placement), with mutation properties that check the lint catches each
 kind of slip anywhere in the file.
 
+Since milestone 22b it also runs: `tests/ex6_play.rs` checks it clean,
+runs its own `[test]` passages, and plays random evenings (32 of them,
+notes and all), every one of which ends: at midnight, or in Keller's
+notes. `retell` is still the stretch it was.
+
 ## Ex 2's duel, four ways (`ex2-duel-*.twee`)
 
 The duel of Ex 2 rewritten for the encounter milestone: once in general

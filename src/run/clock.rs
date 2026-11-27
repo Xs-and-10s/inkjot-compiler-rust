@@ -58,6 +58,7 @@ impl Run {
     pub(super) fn periods_begin(&mut self) -> R<()> {
         let story = Arc::clone(&self.story);
         for (period, name) in story.calendar.begins(self.chronon) {
+            self.reach_each(&period);
             self.fire_period("begins", &period, &name)?;
         }
         let actor = self.pov.clone();
@@ -208,6 +209,7 @@ impl Run {
             }
         }
         self.seat(&served)?;
+        self.arrive_pending()?;
         self.enter_finale()
     }
 

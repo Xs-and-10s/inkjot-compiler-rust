@@ -428,7 +428,7 @@ replacement the Doctor stops does not use it up.
 > [[Sit up with {target}->night:done]] ~ at guest where: it.alive and it != me and it != me.saved_last ~ when syndicate.special == cult ~ then set saved: target ~ then set me.saved_last: target
 
 > ~ for guest where: it.alive and it.role == detective
-> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ target guilty }} in findings when target.team != town ~ then assert {{ target innocent }} in findings when target.team == town ~ then raise finds 1 when target.team != town
+> [[Look into {target}->night:looked]] ~ at guest where: it.alive and it != me ~ then assert {{ ^target guilty }} in findings when target.team != town ~ then assert {{ ^target innocent }} in findings when target.team == town ~ then raise finds 1 when target.team != town
 
 > [[Sleep->night:done]] ~ for guest where: it.alive and it.role == townsfolk
 > [[Wait for morning->night:done]] ~ for guest where: not it.alive or it.is(storyteller)

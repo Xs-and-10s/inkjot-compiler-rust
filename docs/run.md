@@ -36,7 +36,7 @@ expect text: "I told you it was good."
 | `seed: n` | Seed the dice and shuffles. First line only; the default is 1 |
 | `start: passage` | Begin at a passage. Add `~ as who` to say whose eyes |
 | `as: who` | Look through someone else from here on |
-| `given: effect` | Change the state directly: `given: learn two_hands` |
+| `given: effect` | Change the state directly: `given: learn two_hands`. If it sends the pov somewhere (a scene played as turns pass), they arrive |
 | `do: "label"` | Take the available Link with this label |
 | `do: hall#2` | Take a Link by its id |
 | `do: wait 5m` | Real time passes: a Link timed `~ after 5m` is taken by itself |
@@ -50,7 +50,7 @@ expect text: "I told you it was good."
 | `answer: "Mara"` | Answer the first open input with text |
 | `answer: gust, spark, hush` | …or with the things chosen |
 | `vote: vell ~ how device ~ proof cufflink` | Cast a ballot for the jury, citing proof |
-| `expect events: ending_reached, died` | The engine reported these since the last action (`docs/engine.md`, Events) |
+| `expect events: ending_reached, died` | The engine reported these since the last action (`docs/engine.md`, Events); `not died`: it did not |
 | `expect fork: "Suppose …" ~ for "Say …"` | An Inquest here would offer this fork, standing in for that Link |
 | `take fork: "Suppose …"` | Take a fork, as an Inquest would. The Inquest itself is the platform's to spend |
 
@@ -353,6 +353,11 @@ takes one move. Dead, detained and `fix`ed NPCs sit it out.
    `moves N per chronon` says (`moves none`: never). Each step fires `leave`,
    `enter` and `move`. On arriving it runs the goal's `then`.
 
+`play` of a passage usually shows it where the pov stands. A passage of a
+place that has Links of its own is a scene instead: the pov goes there,
+once the action (or the turn) is done, as to an ending, and its Links are
+what is offered. Keller's `then play cloakroom:dark` puts the lights out.
+
 A goal may also say how it goes:
 
 ```text
@@ -494,7 +499,9 @@ rather than on each `pass`. A `pass` says the pov is done for the turn
 (`me.passed`, until the turn ends); `x.spent` says x has none left of what
 Links cost (`default cost: vults`). In Ex 2, the turn ends when both heroes
 have passed, or both have spent their vults. A Link `~ ends turn` still
-ends it at once.
+ends it at once. In Ex 6, `turn ends when me.spent` ends each turn once the
+attendant's four quarter-hours are gone; `refill each turn` (the same as
+`refill each chronon`) fills them again.
 
 **Real time.** A Link `~ after 5m` (or `30s`, `400ms`, `2h`) is timed: it
 is offered, with the time it has left, but cannot be taken; when its time
@@ -690,10 +697,13 @@ rule hopes: {{ B soil S }} => {{ B hoped }} ~ in knows ~ learned from beds
 
 **Facts.** A fact is a subject, a verb (one word), perhaps an object, and
 perhaps a time after `@`: `{{ hale is ashe }}`, `{{ lark at room_nine @
-new_years_eve.ten }}`. Its terms are atoms: a bare name is itself (`{{
-sky rains }}`), unless it is in scope (`target`, `you`, `here`, a `let`),
-when it is what that names. A capitalised name is a variable (`P`); `?`
-is anything.
+new_years_eve.ten }}`. Its terms are atoms: a bare word is itself (`{{
+sky rains }}`, `{{ arrow hit target }}`), even when the same name is in
+scope. `^name` is what a name in scope names: `{{ arrow hit ^target }}`
+is the NPC the Link was aimed at. `you`, `me`, `here`, `self` and `it` are
+always what they name, without `^`. A capitalised name is a variable
+(`P`); `?` is anything. The checker gives a notice for a bare word that is
+also in scope, in case `^` was meant.
 
 **Bases.** `world` (the truth, shared) and `knows` (what each character
 knows: the meanings, `~ means`, of every fact they have learned, and any
@@ -729,7 +739,59 @@ Rules may be kept in a passage tagged `[rules]`, as in the config.
 soil S }} and S != clay`. (`no guest where: …`, without a dot, counts a
 kind; see "Votes at a table".)
 
-## Encounters## Encounters
+### What the Linker writes
+
+```text
+knowledge notebook ~ per linker ~ manual ~ reads knows
+never {{ N is A }} and {{ N is B }} and A != B ~ in notebook ~ on contradiction refuse
+~ "A name is worn by one person."
+never {{ P at A @ W }} and {{ P at B @ W }} and A != B ~ in notebook ~ on contradiction flag
+~ "Nobody is in two places in one hour."
+
+:: notebook
+{note who: cover, is: suspect ~ in notebook}
+[if notebook.contradicted]
+{contradictions ~ in notebook}
+[end]
+{known about: covers ~ in notebook}
+```
+
+**`never`** says what a base may not hold at once: a body, as a rule's,
+that must have no solution, and a line saying why. It reads the base as
+its rules (and, with `~ reads knows`, its owner's knowledge and the rules
+they know) make it.
+
+**`note {{ … }} in base`** is the Linker writing a fact, where `assert` is
+the story keeping one. A note that would break a `never ~ on
+contradiction refuse` that held before is not kept, and the Linker is told
+why: "(You can’t write that. A name is worn by one person.)". One that
+breaks a `~ on contradiction flag` is kept: `notebook.contradicted` holds,
+and `{contradictions ~ in notebook}` shows each broken `never`, with the
+notes that break it.
+
+**`{note who: cover, is: suspect ~ in notebook}`** asks the Linker for a
+note: whom (anything of the first kind) and what (anything of the second,
+with the verb between). Its ask is kind `"note"` (see `docs/engine.md`).
+
+**`{known about: covers ~ in notebook}`** shows the facts a base holds
+about each thing named, one line each; `~ with times` adds when each was
+learned (`at nine`).
+
+**`for each P in all(person, in: here, where: it != self): assert {{ P
+seen_at here }} in dossier`** runs an effect once for each thing in a list,
+with the variable as that thing.
+
+**What the pov did.** In an NPC's or archetype's reactions, `you.did(ask)`
+holds when the pov's last action this turn was that act, and the Link's
+parameters are names (`~ with {topic: orme}` gives `^topic`). A parameter
+may be a fact: `~ with {story: {{ you leaving @ new_years_eve.eleven }}}`,
+which `assert story in dossier` keeps.
+
+**A base `~ per linker`** belongs to whoever plays, not to the story: a
+checkpoint's fall-back and a rewind leave it as it is. Ex 6's notebook
+comes back from a death with everything written in it.
+
+## Encounters
 
 An encounter is a fight, a chase, a standoff: an opponent who does
 something each round, and Linkers who answer it.
@@ -972,7 +1034,8 @@ passage may be both (Ex 3's `the_list`).
 
 The interpreter keeps a log, as the paper Conductor did: a snapshot of the
 whole world at the start of every turn, and one for each checkpoint (taken
-at the start, and again whenever a passage says `checkpoint name`).
+at the start, and again whenever a passage says `checkpoint name`, or, for
+`checkpoint hour ~ each hour`, as each name of that period begins).
 
 A state marked `survives death` (`state deaths: 0 ~ survives death`) is
 never reset by a checkpoint.
@@ -980,10 +1043,12 @@ never reset by a checkpoint.
 **A death** is settled after the Link that caused it:
 
 1. If a checkpoint covers the place (`checkpoint cells ~ on death in
-   prison`), the world falls back. What it `resets` comes from the
-   checkpoint's snapshot; what it `keeps` stays, and keeps win over resets.
-   The dead come back, resources that `refill on checkpoint` refill, and
-   everyone goes where `to` says.
+   prison`, or `~ on death`, anywhere), the world falls back. What it
+   `resets` comes from the checkpoint's snapshot; what it `keeps` stays,
+   and keeps win over resets. A checkpoint that names nothing to reset
+   resets everything, the clock too. The dead come back, resources that
+   `refill on checkpoint` refill, and everyone goes where `to` says. The
+   event is `rewound`, with `cause: "death"`.
 2. Otherwise, a Linker with a charge left (`me.rewinds > 0`) is pulled back:
    the charge is spent and they re-live the stop they died in, as an echo.
 3. Otherwise they stay dead.
@@ -1071,6 +1136,6 @@ It says so, by name, if a story needs one of these. It never guesses.
 - `span` and `quiet` on handlers (reserved).
 - `plus 2s when hinted` on an encounter (encounters are v0.6).
 - The rest of the input family: `pick`, `rank`, `allocate`, `number`,
-  `target`, `secret`, `roll`, `note`, `act`.
+  `target`, `secret`, `roll`, `act`.
 - `retell`.
 

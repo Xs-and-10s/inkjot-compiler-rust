@@ -8,7 +8,7 @@ pub enum Severity {
 
 /// One finding. `line` and `col` are 1-based; `col` counts characters, not bytes.
 /// `line == 0` means the finding is about the file as a whole.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diag {
     pub severity: Severity,
     pub line: usize,

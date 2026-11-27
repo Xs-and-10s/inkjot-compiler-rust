@@ -158,6 +158,9 @@ impl fmt::Display for Expr {
                     write!(f, "not ")?;
                 } else if *op == "top" {
                     write!(f, "top of ")?;
+                } else if *op == "^" {
+                    write!(f, "^")?;
+                    return operand.fmt_at(f, 9);
                 } else {
                     write!(f, "{op}")?;
                 }
@@ -242,7 +245,7 @@ enum Tok {
 
 const OPS: &[&str] = &[
     "{{", "}}", "..=", "..<", "..", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/", "(", ")",
-    "[", "]", ",", ".", ":", "?", "@",
+    "[", "]", ",", ".", ":", "?", "@", "^",
 ];
 
 fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
@@ -723,9 +726,13 @@ impl Parser {
 
     /// The inside of `{{ … }}`, and its end.
     fn fact(&mut self) -> Result<Expr, ParseError> {
+        // `?` is anything; `^thug` is what `thug` names; a bare word is
+        // itself.
         let term = |p: &mut Self| -> Result<Expr, ParseError> {
             if p.eat_op("?") {
                 Ok(Expr::Any)
+            } else if p.eat_op("^") {
+                Ok(Expr::Unary("^", Box::new(p.postfix()?)))
             } else {
                 p.postfix()
             }

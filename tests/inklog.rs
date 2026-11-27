@@ -42,6 +42,9 @@ The garden.
 > [[Write it down->garden]] ~ then assert {{ hale is ashe }} in notebook
 > [[File two names->garden]] ~ then assert {{ hale is ashe }} in record ~ then assert {{ hale is lark }} in record
 
+:: range
+> [[Shoot at {target}->range]] ~ at npc ~ then assert {{ arrow hit ^target }} ~ then assert {{ arrow hit target }}
+
 :: rules_make_facts [test]
 start: garden
 expect: not {{ nw watered }}
@@ -90,6 +93,12 @@ start: garden
 expect: {{ you harmless }} in dossier
 expect: {{ ? harmless }} in dossier
 
+:: a_bare_word_is_itself_and_a_caret_looks_it_up [test]
+start: range
+do: "Shoot at Hale"
+expect: {{ arrow hit hale }} and {{ arrow hit target }}
+expect: count({{ arrow hit ? }}) == 2
+
 :: rules_in_a_declared_base [test]
 start: garden
 do: "File two names"
@@ -123,6 +132,22 @@ fn its_tests_pass() {
             o.transcript.join("\n")
         );
     }
+}
+
+/// A bare word in a fact that is also in scope is the word: the checker
+/// says so, and how to look it up.
+#[test]
+fn a_bare_word_in_scope_is_noticed() {
+    let notices: Vec<String> = inkjot::check(GARDEN)
+        .diags
+        .into_iter()
+        .filter(|d| d.severity == inkjot::Severity::Notice)
+        .map(|d| d.msg)
+        .collect();
+    assert_eq!(
+        notices,
+        ["`target` in a fact is the word itself; for what `target` names here, write `^target`"]
+    );
 }
 
 #[test]
