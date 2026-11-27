@@ -688,8 +688,8 @@ fn a_reserved_word_cannot_name_a_thing() {
 fn a_statement_from_later_in_v06_says_so() {
     assert_broken_elsewhere(
         "act examine: cost 1",
-        "act examine: cost 1\nrule x: y",
-        "`rule` is reserved for a part of Inkjot v0.6 that is not built yet",
+        "act examine: cost 1\nbetween x: y",
+        "`between` is reserved for a part of Inkjot v0.6 that is not built yet",
     );
 }
 
@@ -728,4 +728,18 @@ fn fix_is_an_authors_note() {
     assert!(errors(&src).is_empty(), "{:?}", errors(&src));
     let ir = inkjot::build(&src).unwrap().to_string();
     assert!(!ir.contains("A rough line."));
+}
+
+/// `~ then x ~ when c` on a Link: the `when` is the Link's, which reads as
+/// the effect's. A notice, not an error: it means what it always meant.
+#[test]
+fn a_when_after_a_then_is_noticed() {
+    let src = format!("{BASE}\n:: porch\n> [[Lock up->hall]] ~ then set stair_clear: no ~ when stair_clear\n> [[Leave->hall]] ~ when stair_clear ~ then set stair_clear: no\n");
+    let notices: Vec<usize> = check(&src)
+        .diags
+        .into_iter()
+        .filter(|d| d.severity == Severity::Notice && d.msg.contains("is the Link's condition"))
+        .map(|d| d.line)
+        .collect();
+    assert_eq!(notices.len(), 1, "{notices:?}");
 }

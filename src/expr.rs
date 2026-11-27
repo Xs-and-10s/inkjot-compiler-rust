@@ -27,6 +27,20 @@ pub enum Expr {
         hi: Option<Box<Expr>>,
         op: &'static str,
     },
+    /// An Inklog variable: a capitalised name, `P`.
+    Var(String),
+    /// `?`, in a fact: anything.
+    Any,
+    /// `{{ hale is ashe @ monday.evening }}`: a subject, a verb, perhaps an
+    /// object, perhaps a time (a path of period names, or a variable).
+    Fact {
+        subject: Box<Expr>,
+        verb: String,
+        object: Option<Box<Expr>>,
+        at: Option<Box<Expr>>,
+    },
+    /// `some P. …`, `no P, Q. …`: Inklog's quantifiers, ending with a dot.
+    Quant(&'static str, Vec<String>, Box<Expr>),
 }
 
 /// A byte offset into the source text.
@@ -60,7 +74,7 @@ impl Expr {
                 "+" | "-" => 6,
                 _ => 7, // * / mod
             },
-            Expr::If(..) => 0,
+            Expr::If(..) | Expr::Quant(..) => 0,
             Expr::Unary("not", _) => 3,
             Expr::Range { .. } => 5,
             Expr::Unary(..) => 8, // unary minus
@@ -167,6 +181,32 @@ impl fmt::Display for Expr {
                 }
                 Ok(())
             }
+            Expr::Var(v) => write!(f, "{v}"),
+            Expr::Any => write!(f, "?"),
+            Expr::Fact {
+                subject,
+                verb,
+                object,
+                at,
+            } => {
+                write!(f, "{{{{ ")?;
+                subject.fmt_at(f, 9)?;
+                write!(f, " {verb} ")?;
+                if let Some(o) = object {
+                    o.fmt_at(f, 9)?;
+                    write!(f, " ")?;
+                }
+                if let Some(at) = at {
+                    write!(f, "@ ")?;
+                    at.fmt_at(f, 9)?;
+                    write!(f, " ")?;
+                }
+                write!(f, "}}}}")
+            }
+            Expr::Quant(q, vars, body) => {
+                write!(f, "{q} {}. ", vars.join(", "))?;
+                body.fmt_at(f, 0)
+            }
         }
     }
 }
@@ -184,6 +224,11 @@ pub struct Arg {
     pub value: Expr,
 }
 
+/// An Inklog variable is a capitalised name: `P`, `Who`.
+pub fn is_var(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_uppercase())
+}
+
 /// A parse failure: byte offset into the source text, and what went wrong.
 pub type ParseError = (usize, String);
 
@@ -196,8 +241,8 @@ enum Tok {
 }
 
 const OPS: &[&str] = &[
-    "..=", "..<", "..", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/", "(", ")", "[", "]",
-    ",", ".", ":",
+    "{{", "}}", "..=", "..<", "..", "==", "!=", ">=", "<=", ">", "<", "+", "-", "*", "/", "(", ")",
+    "[", "]", ",", ".", ":", "?", "@",
 ];
 
 fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
@@ -422,12 +467,48 @@ impl Parser {
         if let Some(q) = self.quantifier() {
             return self.nested(|p| p.quantified(q));
         }
+        if let Some((q, vars, after)) = self.dotted_quantifier() {
+            self.pos = after;
+            return self.nested(|p| Ok(Expr::Quant(q, vars, Box::new(p.or()?))));
+        }
         self.cmp()
+    }
+
+    /// `some P. …`, `no P, Q. …`, `every R. …`: the quantifier, its
+    /// variables, and where its body starts. The dot must be followed by a
+    /// space, which tells it from `P.name`.
+    fn dotted_quantifier(&self) -> Option<(&'static str, Vec<String>, usize)> {
+        let q = match self.peek() {
+            Some(Tok::Ident(s)) if s == "some" => "some",
+            Some(Tok::Ident(s)) if s == "no" => "no",
+            Some(Tok::Ident(s)) if s == "every" => "every",
+            _ => return None,
+        };
+        let mut i = self.pos + 1;
+        let mut vars = Vec::new();
+        loop {
+            match self.toks.get(i) {
+                Some((_, Tok::Ident(v))) if is_var(v) => vars.push(v.clone()),
+                _ => return None,
+            }
+            i += 1;
+            match self.toks.get(i) {
+                Some((_, Tok::Op(","))) => i += 1,
+                Some((at, Tok::Op("."))) => {
+                    let next = self.toks.get(i + 1).map_or(self.len, |(n, _)| *n);
+                    return (next > at + 1).then_some((q, vars, i + 1));
+                }
+                _ => return None,
+            }
+        }
     }
 
     /// `no guest where: …`, `some guest where: …`, `every guest where: …`:
     /// the quantifier, if one starts here.
     fn quantifier(&self) -> Option<&'static str> {
+        if self.dotted_quantifier().is_some() {
+            return None;
+        }
         let q = match self.peek() {
             Some(Tok::Ident(s)) if s == "no" => "no",
             Some(Tok::Ident(s)) if s == "some" => "some",
@@ -640,6 +721,50 @@ impl Parser {
         Ok(e)
     }
 
+    /// The inside of `{{ … }}`, and its end.
+    fn fact(&mut self) -> Result<Expr, ParseError> {
+        let term = |p: &mut Self| -> Result<Expr, ParseError> {
+            if p.eat_op("?") {
+                Ok(Expr::Any)
+            } else {
+                p.postfix()
+            }
+        };
+        let subject = term(self)?;
+        let verb = match self.peek().cloned() {
+            Some(Tok::Ident(v)) if !is_var(&v) => {
+                self.pos += 1;
+                v
+            }
+            _ => {
+                return Err((
+                    self.at(),
+                    "a fact's second word is its verb, one word: `{{ hale is ashe }}`".into(),
+                ))
+            }
+        };
+        let object = if self.op("}}") || self.op("@") {
+            None
+        } else {
+            Some(Box::new(term(self)?))
+        };
+        let at = if self.eat_op("@") {
+            Some(Box::new(self.postfix()?))
+        } else {
+            None
+        };
+        self.expect_op(
+            "}}",
+            "to close the fact: a fact has two terms or three, then perhaps `@ time`",
+        )?;
+        Ok(Expr::Fact {
+            subject: Box::new(subject),
+            verb,
+            object,
+            at,
+        })
+    }
+
     fn arg(&mut self) -> Result<Arg, ParseError> {
         // `key: value`, where the key may be any word (`in: here`).
         if let (Some((_, Tok::Ident(k))), Some((_, Tok::Op(":")))) =
@@ -668,6 +793,19 @@ impl Parser {
             Some(Tok::Str(s)) => {
                 self.pos += 1;
                 text(&s, at + 1)
+            }
+            // `{{ hale is ashe @ monday.evening }}`.
+            Some(Tok::Op("{{")) => {
+                self.pos += 1;
+                self.nested(|p| p.fact())
+            }
+            Some(Tok::Op("?")) => Err((
+                at,
+                "`?` stands for anything inside a fact: `{{ ? is ashe }}`".into(),
+            )),
+            Some(Tok::Ident(s)) if is_var(&s) => {
+                self.pos += 1;
+                Ok(Expr::Var(s))
             }
             Some(Tok::Ident(s)) if s == "if" => {
                 self.pos += 1;

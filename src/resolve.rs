@@ -117,7 +117,50 @@ fn collect(e: &Expr, out: &mut Vec<String>) {
         Expr::List(items) => items.iter().for_each(|i| collect(i, out)),
         Expr::Unary(_, a) => collect(a, out),
         Expr::Range { lo, hi, .. } => [lo, hi].into_iter().flatten().for_each(|b| collect(b, out)),
+        Expr::Var(_) | Expr::Any => {}
+        Expr::Fact {
+            subject, object, ..
+        } => {
+            for t in std::iter::once(subject).chain(object) {
+                collect(t, out);
+            }
+        }
+        Expr::Quant(_, _, body) => collect(body, out),
     }
+}
+
+/// The Inklog variables an expression uses, in order, once each.
+pub fn vars(e: &Expr) -> Vec<String> {
+    fn go(e: &Expr, out: &mut Vec<String>) {
+        match e {
+            Expr::Var(v) if !out.contains(v) => out.push(v.clone()),
+            Expr::Fact {
+                subject,
+                object,
+                at,
+                ..
+            } => {
+                for t in std::iter::once(subject).chain(object).chain(at) {
+                    go(t, out);
+                }
+            }
+            Expr::Binary(_, a, b) | Expr::Index(a, b) => {
+                go(a, out);
+                go(b, out);
+            }
+            Expr::Unary(_, a) | Expr::Member(a, _) => go(a, out),
+            Expr::Quant(_, _, body) => go(body, out),
+            Expr::Call(t, args) => {
+                go(t, out);
+                args.iter().for_each(|a| go(&a.value, out));
+            }
+            Expr::List(items) => items.iter().for_each(|i| go(i, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    go(e, &mut out);
+    out
 }
 
 /// Every name in `e` that does not resolve.
@@ -219,6 +262,20 @@ fn walk(e: &Expr, lookup: &dyn Lookup, out: &mut Vec<Problem>) {
             // `me.treat == hold`: the right side of a comparison may be a bare
             // word that is simply a value, declared nowhere. That is allowed
             // unless the left side is a literal, where it would mean nothing.
+            // `{{ … }} in dossier`: a knowledge base.
+            if *op == "in" && matches!(lhs.as_ref(), Expr::Fact { .. }) {
+                walk(lhs, lookup, out);
+                if let Expr::Name(base, at) = rhs.as_ref() {
+                    if !lookup.is_kind(base, "knowledge") {
+                        out.push(Problem {
+                            at: at.0,
+                            name: base.clone(),
+                            want: Want::Kind("knowledge"),
+                        });
+                    }
+                }
+                return;
+            }
             let compares = matches!(*op, "==" | "!=" | "in");
             let lhs_is_literal = matches!(lhs.as_ref(), Expr::Num(_) | Expr::Str(_));
             if !(compares && !lhs_is_literal && is_symbolic(rhs)) {
@@ -230,6 +287,20 @@ fn walk(e: &Expr, lookup: &dyn Lookup, out: &mut Vec<Problem>) {
                 walk(bound, lookup, out);
             }
         }
+        Expr::Var(_) | Expr::Any => {}
+        // A fact's terms are atoms: a bare name is itself (`{{ sky rains }}`)
+        // unless it is in scope (`target`, `you`). Only what is worked out
+        // (`target.owner`) must resolve.
+        Expr::Fact {
+            subject, object, ..
+        } => {
+            for t in std::iter::once(subject).chain(object) {
+                if !matches!(t.as_ref(), Expr::Name(..) | Expr::Var(_) | Expr::Any) {
+                    walk(t, lookup, out);
+                }
+            }
+        }
+        Expr::Quant(_, _, body) => walk(body, lookup, out),
     }
 }
 

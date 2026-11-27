@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Milestone 22a: Inklog's core
+
+- Facts in expressions (`{{ hale is ashe }} in notebook`, `?`, variables,
+  `@ time`), asked of a base (the world when it says none) as the list
+  that matches; quantifiers with a dot (`some P. …`, `no P. …`).
+- `rule`, run to a fixed point in the bases it holds in, with joins,
+  comparisons, other bases asked by name, and stratified `not` in closed
+  bases; `~ known` and `~ learned from fact` for what each character
+  knows; the `[rules]` margin.
+- `world` and `knows` built in (`knows`: the meanings, `~ means`, of every
+  fact learned); bases `~ for` someone, `~ starts with`, `~ reads`;
+  `assert` with no `in` keeps a fact in the world; `retract`.
+- A notice for `~ when` straight after `~ then` on a Link: that `when` is
+  the Link's, not the effect's.
+- `rule`, `never` and `retract` are no longer reserved.
+
 ### Milestone 21e: the table, through the engine; knowledge kept
 
 - The engine seats a table: `Start.seats`, `Action::As { seat, action }`,

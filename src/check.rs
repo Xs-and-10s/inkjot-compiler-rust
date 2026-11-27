@@ -131,6 +131,11 @@ struct Checker {
     /// chain, a `[quote …]` or a `[redacted until …]`, and where. `[end]`
     /// closes the innermost.
     blocks: Vec<(&'static str, usize, usize)>,
+    /// The word of the last clause seen on the Link being checked, for the
+    /// notice about a `~ when` straight after a `~ then`.
+    last_link_clause: String,
+    /// Knowledge bases declared `~ truth`: closed, so `not` may ask them.
+    truths: HashSet<String>,
     /// Every `period`, once they are all read: `night`, `new_years_eve.nine`.
     calendar: crate::period::Calendar,
 }
@@ -336,6 +341,14 @@ impl Checker {
         for act in BUILTIN_ACTS {
             self.decls.entry(act.to_string()).or_default().insert("act");
         }
+        // Inklog's built-in bases: the truth of the world, and what each
+        // character knows.
+        for base in ["world", "knows"] {
+            self.decls
+                .entry(base.to_string())
+                .or_default()
+                .insert("knowledge");
+        }
         for tag in BUILTIN_TAGS {
             self.tags.insert(tag.to_string());
         }
@@ -404,6 +417,9 @@ impl Checker {
                                 .insert("row");
                         }
                     }
+                }
+                if kind == "knowledge" && s.clauses[1..].iter().any(|c| c.text == "truth") {
+                    self.truths.insert(name.to_string());
                 }
                 // A period's names are times: `night`, `clock.phase == day`.
                 if kind == "period" {
@@ -1400,6 +1416,10 @@ impl Checker {
                     self.expr(to, line, rest_col);
                 }
             }
+            // `rule wears: {{ N is P }} and … => {{ P at A @ W }} ~ known`.
+            "rule" => self.rule(s, rest, rest_col),
+            // `never {{ N is A }} and {{ N is B }} and A != B ~ in notebook`.
+            "never" => self.never(s, rest, rest_col),
             // `finale when: …`: in a `[finale]` passage, when the game ends there.
             "finale" => {
                 if !rest.trim_start().starts_with("when:") || value.is_empty() {
@@ -1716,46 +1736,136 @@ impl Checker {
         }
     }
 
-    /// `assert {{ s verb o }} in base`: two or three terms, the verb a word,
-    /// the base a declared `knowledge`. Variables are Inklog's (milestone 22).
-    fn assert_fact(&mut self, core: &str, line: usize, col: usize) {
-        let rest = core["assert".len()..].trim();
-        let shape = "`assert` is written `assert {{ subject verb }} in base`, or with an object: `{{ hale is ashe }}`";
-        let Some((fact, base)) = rest.rsplit_once(" in ") else {
+    /// A rule: a name, a body of facts and comparisons, `=>`, one fact.
+    /// `not` only where the world is closed: `~ in world`, or a base `~ truth`.
+    fn rule(&mut self, s: &Stmt, rest: &str, col: usize) {
+        let line = s.clauses[0].line;
+        let shape = "a rule is written `rule name: {{ … }} and {{ … }} => {{ … }}`";
+        let Some((name, def)) = rest.split_once(':') else {
             return self.err(line, col, shape);
         };
-        let Some(inner) = fact
-            .trim()
-            .strip_prefix("{{")
-            .and_then(|f| f.strip_suffix("}}"))
-        else {
+        let Some((body, head)) = def.split_once("=>") else {
             return self.err(line, col, shape);
         };
-        let inner = inner.split(" @ ").next().unwrap_or("").trim();
-        let terms: Vec<&str> = inner.split_whitespace().collect();
-        if !(2..=3).contains(&terms.len()) {
+        if !is_ident(name.trim()) {
+            self.err(line, col, shape);
+        }
+        let body_col = col + cols(name) + 1;
+        self.inklog_expr(body.trim(), line, body_col);
+        match expr::parse(head.trim()) {
+            Ok(expr::Expr::Fact { .. }) => {}
+            _ => self.err(
+                line,
+                col,
+                "a rule ends `=> {{ … }}`, the one fact it makes true",
+            ),
+        }
+        let mut base = "world".to_string();
+        for c in &s.clauses[1..] {
+            let t = c.text.trim();
+            if let Some(b) = t.strip_prefix("in ") {
+                base = b.trim().to_string();
+                self.need(&base, &["knowledge"], "knowledge base", c.line, c.col + 3);
+            } else if let Some(fact) = t.strip_prefix("learned from ") {
+                self.need(fact.trim(), &["fact"], "fact", c.line, c.col + 13);
+            } else if t == "known" {
+            } else if t == "world only" || t == "almanac only" {
+                self.err(
+                    c.line,
+                    c.col,
+                    format!("`~ {t}` is now `~ in` a base: `~ in world`, `~ in almanac`"),
+                );
+            }
+        }
+        if body.contains("not {{") && !self.truth_base(&base) {
             self.err(
                 line,
                 col,
-                "a fact has two terms or three: `{{ you curious }}`, `{{ hale is ashe }}`",
+                format!("`not` is for a base whose every fact is known, the world or one `~ truth`; `{base}` is not"),
             );
         }
-        for (i, t) in terms.iter().enumerate() {
-            if i == 1 {
-                if !is_ident(t) {
-                    self.err(line, col, format!("`{t}`: a fact's verb is one word"));
-                }
-            } else if t.starts_with(|c: char| c.is_ascii_uppercase()) {
-                self.err(
-                    line,
-                    col,
-                    format!("`{t}` is an Inklog variable; facts with variables come with rules, in milestone 22"),
+    }
+
+    /// A base where what is not there is false: the world, or `~ truth`.
+    fn truth_base(&self, base: &str) -> bool {
+        base == "world" || self.truths.contains(base)
+    }
+
+    /// `never body ~ in base ~ on contradiction refuse | flag ~ "why"`.
+    fn never(&mut self, s: &Stmt, rest: &str, col: usize) {
+        let line = s.clauses[0].line;
+        self.inklog_expr(rest.trim(), line, col);
+        let mut has_base = false;
+        for c in &s.clauses[1..] {
+            let t = c.text.trim();
+            if let Some(b) = t.strip_prefix("in ") {
+                has_base = true;
+                self.need(
+                    b.trim(),
+                    &["knowledge"],
+                    "knowledge base",
+                    c.line,
+                    c.col + 3,
                 );
-            } else {
-                self.expr(t, line, col);
+            } else if let Some(how) = t.strip_prefix("on contradiction ") {
+                if !["refuse", "flag"].contains(&how.trim()) {
+                    self.err(c.line, c.col, "`on contradiction` is `refuse` or `flag`");
+                }
+            } else if t.starts_with('"') {
+                self.strings(t, c.line, c.col);
             }
         }
-        self.need(base.trim(), &["knowledge"], "knowledge base", line, col);
+        if !has_base {
+            self.err(
+                line,
+                col,
+                "a `never` says which base it keeps: `~ in notebook`",
+            );
+        }
+    }
+
+    /// An Inklog body: facts, comparisons and `not`, with variables.
+    fn inklog_expr(&mut self, text: &str, line: usize, col: usize) {
+        match expr::parse(text) {
+            Ok(e) => self.resolve(&e, text, line, col),
+            Err((off, msg)) => self.err(line, col + cols(&text[..off.min(text.len())]), msg),
+        }
+    }
+
+    /// `assert {{ s verb o }} in base`, or `retract`: a fact (two or three
+    /// terms, the verb a word, no variables) or a value that holds one
+    /// (`assert story in dossier`), into a declared base; with no `in`,
+    /// the world.
+    fn assert_fact(&mut self, core: &str, line: usize, col: usize) {
+        let verb = first_word(core);
+        let rest = core[verb.len()..].trim();
+        let (fact, base) = match rest.rsplit_once(" in ") {
+            Some((f, b)) if !b.contains("}}") => (f.trim(), b.trim()),
+            _ => (rest, "world"),
+        };
+        if fact.is_empty() {
+            return self.err(
+                line,
+                col,
+                format!("`{verb}` is written `{verb} {{{{ subject verb }}}} in base`, or with an object: `{{{{ hale is ashe }}}}`"),
+            );
+        }
+        match expr::parse(fact) {
+            Ok(e @ expr::Expr::Fact { .. }) => {
+                let vars = crate::resolve::vars(&e);
+                if let Some(v) = vars.first() {
+                    self.err(
+                        line,
+                        col,
+                        format!("`{v}` is a variable, and an asserted fact names things; variables are for rules and questions"),
+                    );
+                }
+                self.resolve(&e, fact, line, col);
+            }
+            Ok(e) => self.resolve(&e, fact, line, col),
+            Err((off, msg)) => self.err(line, col + cols(&fact[..off.min(fact.len())]), msg),
+        }
+        self.need(base, &["knowledge"], "knowledge base", line, col);
     }
 
     /// `on phase begins night`: a declared period (or the turn), and one of
@@ -1845,7 +1955,7 @@ impl Checker {
             // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
             "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
             // `assert {{ target guilty }} in findings`: a fact, kept in a base.
-            "assert" => self.assert_fact(core, line, col),
+            "assert" | "retract" => self.assert_fact(core, line, col),
             // `wait until night`: the clock moves on to the next night.
             "wait" => match core.strip_prefix("wait until ") {
                 Some(time) if self.calendar.is_time(time.trim()) => {}
@@ -1963,6 +2073,7 @@ impl Checker {
             if t.is_empty() {
                 last = Last::Nothing;
             } else if t.starts_with('>') && !t.contains("[[") {
+                self.last_link_clause.clear();
                 // A Link group: its clauses go to every Link below it.
                 let rest = t.trim_start_matches('>').trim_start();
                 if !rest.starts_with('~') {
@@ -1979,6 +2090,7 @@ impl Checker {
                 }
                 last = Last::Fork;
             } else if t.starts_with('>') {
+                self.last_link_clause.clear();
                 self.fork(l, col);
                 last = Last::Fork;
             } else if let Some(more) = t.strip_prefix('~') {
@@ -2082,6 +2194,16 @@ impl Checker {
 
     fn link_clause(&mut self, c: &Clause) {
         let word = first_word(&c.text);
+        // `~ then set x: no ~ when c`: the `when` is the Link's, not the
+        // effect's, which reads otherwise.
+        if word == "when" && self.last_link_clause == "then" {
+            self.diags.push(Diag::notice(
+                c.line,
+                c.col,
+                "this `~ when` is the Link's condition, not the effect's before it: for the effect's, write `~ then … when …`; for the Link's, put it before the `~ then`s",
+            ));
+        }
+        self.last_link_clause = word.to_string();
         if !LINK_CLAUSES.contains(&word) && !self.has(word, &["act", "combo"]) {
             let shown = if word.is_empty() {
                 c.text.as_str()
