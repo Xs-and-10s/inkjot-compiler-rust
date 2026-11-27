@@ -674,26 +674,62 @@ pronouns chosen` is the Linker's to set); `set x.shown_as: …` gives x a face
 to be shown by, while `x.name` stays theirs. Whole numbers divide into a
 whole number, rounded down (`players / 4`).
 
-## Knowledge kept
+## Inklog: facts, bases and rules
 
 ```text
-knowledge findings ~ per character ~ learned
-> [[Look into {target}->night:looked]] ~ then assert {{ target guilty }} in findings when target.team != town
+knowledge world ~ truth
+~ starts with {{ nw soil clay }}, {{ e soil sand }}
+knowledge notebook ~ per character ~ manual ~ reads knows
+fact beds: "…" ~ means {{ nw soil clay }}, {{ e soil sand }}
+rule wet: {{ sky rains }} and {{ B soil S }} => {{ B watered }}
+rule slugs: {{ B watered }} and {{ B soil clay }} and not {{ B guarded }} => {{ B slugged }} ~ in world
+rule hopes: {{ B soil S }} => {{ B hoped }} ~ in knows ~ learned from beds
+> [[Rain->garden]] ~ then assert {{ sky rains }}
+[if some B. {{ B slugged }}]
 ```
 
-Milestone 21e builds a place to keep facts; Inklog (milestone 22) adds
-rules and questions. A base `~ per character` (or `~ per linker`) is one
-for each: `assert … in findings` keeps the fact in the base of whoever
-does it, so the Detective's findings are hers alone. A base with no `per`
-is the story's. A fact has two terms or three, the verb one word, and may
-say when (`{{ hale seen @ monday.evening }}`); its terms are worked out
-as it is kept (`target`, the guest it names). A fact the base holds
-already is not kept twice. `me.findings` is the list of facts, each a list
-of its terms; `count(record)` counts a shared base's. They are part of
-the world: a rewind puts them back. A fact with a variable (`{{ P is ashe
-}}`) needs rules, and waits for milestone 22.
+**Facts.** A fact is a subject, a verb (one word), perhaps an object, and
+perhaps a time after `@`: `{{ hale is ashe }}`, `{{ lark at room_nine @
+new_years_eve.ten }}`. Its terms are atoms: a bare name is itself (`{{
+sky rains }}`), unless it is in scope (`target`, `you`, `here`, a `let`),
+when it is what that names. A capitalised name is a variable (`P`); `?`
+is anything.
 
-## Encounters
+**Bases.** `world` (the truth, shared) and `knows` (what each character
+knows: the meanings, `~ means`, of every fact they have learned, and any
+fact asserted into it) are built in. A declared base is the story's, one
+each (`~ per character`, `~ per linker`), or someone's (`~ for keller`).
+`~ starts with {{ … }}, …` gives it facts at the start; `~ reads knows`
+lets it see what its owner knows. `~ truth` closes it: what it does not
+hold is false, so `not` may ask it. `learned` and `manual` say how facts
+come in (by the story, or written by the Linker).
+
+**Keeping.** `assert {{ … }} in base` keeps a fact (once), in whoever's
+base it is: the pov's, for one each; `retract {{ … }} in base` lets go of
+every fact that matches. With no `in`, the world. `assert story in
+dossier` keeps a fact a value holds.
+
+**Asking.** `{{ … }} in base` (with no `in`, the world) is the list of
+facts that match, so it holds when there are any, and `count(…)` counts
+them. `me.findings` is the list a base of the pov's keeps.
+
+**Rules** make facts from facts in the bases they hold in: `~ in base`;
+with no `in`, the world, and each character's `knows` once they know the
+rule (`~ known`: from the start; `~ learned from fact`: once they know
+that fact). A body joins facts by their variables, compares (`P != Q`),
+and may ask another base (`{{ N is P }} in notebook`). `not {{ … }}` is
+only for a closed base: the world, or one `~ truth`. Rules run to a fixed
+point, those that ask `not` of a verb after every rule that makes it (a
+loop through `not` is refused). What rules make is worked out when asked,
+never kept, so retracting a fact takes what followed from it with it.
+Rules may be kept in a passage tagged `[rules]`, as in the config.
+
+**Quantifiers** end with a dot, the dot followed by a space: `some P.
+{{ it is P }} in notebook`, `no B. {{ B slugged }}`, `some B, S. {{ B
+soil S }} and S != clay`. (`no guest where: …`, without a dot, counts a
+kind; see "Votes at a table".)
+
+## Encounters## Encounters
 
 An encounter is a fight, a chase, a standoff: an opponent who does
 something each round, and Linkers who answer it.

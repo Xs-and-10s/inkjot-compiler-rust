@@ -13,8 +13,8 @@ mod cohort;
 mod encounter;
 mod events;
 mod hints;
+mod inklog;
 mod inputs;
-mod knowledge;
 mod limits;
 mod making;
 mod map;
@@ -106,6 +106,9 @@ pub struct Story {
     tables: BTreeMap<String, Value>,
     /// `cohort: 5..=12`: the fewest and most at a table.
     cohort: Option<(u32, Option<u32>)>,
+    /// Every Inklog `rule` and `never`, in source order (`inklog.rs`).
+    rules: Vec<Value>,
+    nevers: Vec<Value>,
 }
 
 /// `5m`, `30s`, `400ms`: a real time, in milliseconds.
@@ -250,6 +253,8 @@ impl Story {
             rows: BTreeMap::new(),
             tables: BTreeMap::new(),
             cohort: None,
+            rules: Vec::new(),
+            nevers: Vec::new(),
         };
         let config = ir
             .get("config")
@@ -392,6 +397,12 @@ impl Story {
         for s in stmts {
             if s.get("on").is_some() {
                 self.handlers.push((s.clone(), home.map(str::to_string)));
+            }
+            if s.get("rule").is_some() {
+                self.rules.push(s.clone());
+            }
+            if s.get("never").is_some() {
+                self.nevers.push(s.clone());
             }
             // `checkpoint cells ~ on death in prison …` declares one;
             // `checkpoint threshold` in a passage reaches it.
@@ -1105,6 +1116,8 @@ impl Run {
         };
         if !self.started {
             self.started = true;
+            // `~ starts with {{ … }}`: each base's first facts.
+            self.start_bases()?;
             let actor = self.pov.clone();
             self.fire(Event {
                 on: "start",
@@ -3438,7 +3451,8 @@ impl Run {
             }
             "roll" => self.roll_table(&word(0))?,
             // `assert {{ target guilty }} in findings`: kept (`knowledge.rs`).
-            "assert" => self.assert_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or(""))?,
+            "assert" => self.assert_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
+            "retract" => self.retract_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or("world"))?,
             // `draw syndicate vampires`: that row, as if it had been drawn.
             "draw" => {
                 let table = f(e, "table").as_str().unwrap_or("").to_string();
@@ -3761,6 +3775,14 @@ impl Run {
         let items = x.as_arr().unwrap_or(&[]);
         let named = |key: &str| f(f(e, "with"), key);
         Ok(match op.as_str() {
+            // `{{ ? is ashe }} in notebook`, `some P. …`: Inklog (`inklog.rs`).
+            "fact" => self.ask_fact(e)?,
+            "quant" => self.quantified(e)?,
+            // A variable bound by a rule or a quantifier, kept as a name.
+            "var" => match x.as_str().and_then(|v| self.locals.get(v)).cloned() {
+                Some(Local::Value(v)) => v,
+                _ => V::Null,
+            },
             "str" => V::Str(x.as_str().unwrap_or("").to_string()),
             // `"Keeper of {here}"`: worked out now, each part shown as text.
             "text" => V::Str(self.text_para(e)?.plain()),

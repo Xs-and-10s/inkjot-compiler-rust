@@ -455,10 +455,47 @@ pub fn lower(e: &Expr) -> Value {
         Expr::Unary(op, operand) => {
             Value::obj([(if *op == "-" { "neg" } else { *op }, lower(operand))])
         }
+        // `{{ … }} in dossier`: a question for that base.
+        Expr::Binary("in", lhs, rhs) if matches!(lhs.as_ref(), Expr::Fact { .. }) => {
+            let mut q = lower(lhs);
+            if let (Value::Obj(pairs), Expr::Name(base, _)) = (&mut q, rhs.as_ref()) {
+                pairs.push(("in".into(), Value::str(base)));
+            }
+            q
+        }
         Expr::Binary(op, lhs, rhs) => one(
             if *op == "in" { "within" } else { op },
             vec![lower(lhs), lower(rhs)],
         ),
+        Expr::Var(v) => Value::obj([("var", Value::str(v))]),
+        Expr::Any => Value::obj([("any", Value::Bool(true))]),
+        Expr::Fact {
+            subject,
+            verb,
+            object,
+            at,
+        } => {
+            // A time is a path of period names, or a variable.
+            let at = match at.as_deref() {
+                None => Value::Null,
+                Some(Expr::Var(v)) => Value::obj([("var", Value::str(v))]),
+                Some(e) => Value::Str(e.to_string()),
+            };
+            Value::obj([(
+                "fact",
+                Value::obj([
+                    ("subject", lower(subject)),
+                    ("verb", Value::str(verb)),
+                    ("object", object.as_deref().map_or(Value::Null, lower)),
+                    ("at", at),
+                ]),
+            )])
+        }
+        Expr::Quant(q, vars, body) => Value::obj([
+            ("quant", Value::str(*q)),
+            ("vars", Value::Arr(vars.iter().map(Value::str).collect())),
+            ("body", lower(body)),
+        ]),
         Expr::Range { lo, hi, op } => {
             let bound = |b: &Option<Box<Expr>>| b.as_deref().map_or(Value::Null, lower);
             Value::obj([
@@ -871,6 +908,12 @@ impl Builder {
                 return Value::Obj(f.into_pairs());
             }
             // `measure nights: nights` → `{"measure": "nights", "value": …}`.
+            // `rule wears: {{ N is P }} and {{ N at A @ W }} => {{ P at A @ W }}
+            // ~ known`.
+            "rule" => return rule(s, rest),
+            // `never {{ N is A }} and {{ N is B }} and A != B ~ in notebook ~
+            // on contradiction refuse ~ "A name is worn by one person."`
+            "never" => return never(s, rest),
             // `finale when: no guest where: …`: the game ends here when it holds.
             "finale" => {
                 let cond = rest.trim().strip_prefix("when:").unwrap_or(rest).trim();
@@ -1422,11 +1465,15 @@ pub(crate) fn effect(text: &str) -> Value {
             pairs.push(("args".into(), Value::Arr(vec![Value::str(table.trim())])));
             pairs.push(("where".into(), expression(cond.trim())));
         }
-        // `assert {{ target guilty }} in findings`.
-        "assert" => {
-            let (fact, base) = rest.rsplit_once(" in ").unwrap_or((rest, ""));
+        // `assert {{ target guilty }} in findings`, `retract {{ sky rains }}`;
+        // with no `in`, the world.
+        "assert" | "retract" => {
+            let (fact, base) = match rest.rsplit_once(" in ") {
+                Some((f, b)) if !b.contains("}}") => (f, b.trim()),
+                _ => (rest, "world"),
+            };
             pairs.push(("fact".into(), fact_value(fact)));
-            pairs.push(("in".into(), Value::str(base.trim())));
+            pairs.push(("in".into(), Value::str(base)));
         }
         // `draw syndicate vampires`: a table's row, chosen (in tests).
         "draw" => {
@@ -1457,6 +1504,57 @@ pub(crate) fn effect(text: &str) -> Value {
     Value::Obj(pairs)
 }
 
+/// `rule name: body => head ~ in base ~ known ~ learned from fact`.
+fn rule(s: &Stmt, rest: &str) -> Value {
+    let (name, def) = rest.split_once(':').unwrap_or((rest, ""));
+    let (body, head) = def.split_once("=>").unwrap_or((def, ""));
+    let mut pairs = vec![
+        ("rule".to_string(), Value::str(name.trim())),
+        ("body".to_string(), expression(body.trim())),
+        ("head".to_string(), fact_value(head.trim())),
+    ];
+    let mut base = Value::Null;
+    let mut known = false;
+    let mut learned = Value::Null;
+    for c in &s.clauses[1..] {
+        let t = c.text.trim();
+        if let Some(b) = t.strip_prefix("in ") {
+            base = Value::str(b.trim());
+        } else if t == "known" {
+            known = true;
+        } else if let Some(f) = t.strip_prefix("learned from ") {
+            learned = Value::str(f.trim());
+        }
+    }
+    pairs.push(("in".into(), base));
+    pairs.push(("known".into(), Value::Bool(known)));
+    pairs.push(("learned_from".into(), learned));
+    Value::Obj(pairs)
+}
+
+/// `never body ~ in base ~ on contradiction refuse | flag ~ "why"`.
+fn never(s: &Stmt, rest: &str) -> Value {
+    let mut base = Value::Null;
+    let mut on = Value::str("refuse");
+    let mut label = Value::Null;
+    for c in &s.clauses[1..] {
+        let t = c.text.trim();
+        if let Some(b) = t.strip_prefix("in ") {
+            base = Value::str(b.trim());
+        } else if let Some(how) = t.strip_prefix("on contradiction ") {
+            on = Value::str(how.trim());
+        } else if t.starts_with('"') {
+            label = quoted_styled(t).unwrap_or(Value::str(t));
+        }
+    }
+    Value::obj([
+        ("never", expression(rest.trim())),
+        ("in", base),
+        ("on_contradiction", on),
+        ("label", label),
+    ])
+}
+
 /// `{{ hale is ashe @ monday.evening }}` → `{"subject": "hale", "verb":
 /// "is", "object": "ashe", "at": "monday.evening"}`. The subject and object
 /// are expressions, worked out when the fact is kept (`{{ target guilty }}`
@@ -1464,29 +1562,23 @@ pub(crate) fn effect(text: &str) -> Value {
 /// variable, `{"var": "P"}`. The verb is a word. A fact has two terms or
 /// three; `object` and `at` are null when it has none.
 pub(crate) fn fact_value(text: &str) -> Value {
-    let inner = text
-        .trim()
-        .trim_start_matches("{{")
-        .trim_end_matches("}}")
-        .trim();
-    let (terms, at) = match inner.split_once(" @ ") {
-        Some((t, a)) => (t, Value::str(a.trim())),
-        None => (inner, Value::Null),
-    };
-    let term = |t: &str| {
-        if t.starts_with(|c: char| c.is_ascii_uppercase()) {
-            Value::obj([("var", Value::str(t))])
-        } else {
-            expression(t)
+    match expr::parse(text.trim()) {
+        Ok(e @ Expr::Fact { .. }) => {
+            let lowered = lower(&e);
+            f_get(&lowered, "fact")
         }
-    };
-    let words: Vec<&str> = terms.split_whitespace().collect();
-    Value::obj([
-        ("subject", words.first().map_or(Value::Null, |t| term(t))),
-        ("verb", words.get(1).map_or(Value::Null, |v| Value::str(*v))),
-        ("object", words.get(2).map_or(Value::Null, |t| term(t))),
-        ("at", at),
-    ])
+        // Not a fact as written (the checker says so): a value that holds
+        // one, `assert story in dossier`.
+        Ok(e) => Value::obj([("value", lower(&e))]),
+        Err((_, why)) => Value::obj([
+            ("unparsed", Value::str(text.trim())),
+            ("why", Value::str(why)),
+        ]),
+    }
+}
+
+fn f_get(v: &Value, key: &str) -> Value {
+    v.get(key).cloned().unwrap_or(Value::Null)
 }
 
 /// A `~` clause on a declaration or setting.

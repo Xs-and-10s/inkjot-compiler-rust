@@ -56,6 +56,8 @@ enum Shape {
     Cards,
     /// `oubliette for roland, chapel for eldric`, or a single word.
     PerWho,
+    /// `means {{ wren is keller }}, {{ lark is keller }}`: Inklog facts.
+    Facts,
 }
 
 /// One phrase of the vocabulary: its leading words, the field it fills, and
@@ -93,6 +95,11 @@ const PATTERNS: &[Pattern] = &[
     p(&["formally"], "formally", Shape::Text),
     p(&["aka"], "aka", Shape::Aka),
     p(&["pick"], "aka_pick", Shape::Token),
+    // Inklog: what a fact means, what a base starts with, whose it is, and
+    // what it reads.
+    p(&["means"], "means", Shape::Facts),
+    p(&["starts", "with"], "starts_with", Shape::Facts),
+    p(&["reads"], "reads", Shape::Ids),
     // `~ pronouns she`, or `chosen` by the Linker.
     p(&["pronouns"], "pronouns", Shape::Token),
     p(&["else"], "else", Shape::Token),
@@ -406,6 +413,12 @@ impl<'a> Fields<'a> {
             Shape::Flag => Value::Bool(true),
             Shape::Id => Value::str(rest),
             Shape::Ids => ids(rest),
+            Shape::Facts => Value::Arr(
+                super::split_args(rest)
+                    .iter()
+                    .map(|f| super::fact_value(f))
+                    .collect(),
+            ),
             Shape::Text => quoted_text(rest).unwrap_or(Value::str(rest)),
             Shape::Expr => expression(rest),
             Shape::Token => token(rest),

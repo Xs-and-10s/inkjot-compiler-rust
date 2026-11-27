@@ -382,6 +382,18 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 22a: Inklog. In expressions, a fact `{"fact": {"subject",
+  "verb", "object", "at"}}`, with `"in": base` when it is asked of one;
+  a term may be `{"var": "P"}` or `{"any": true}`, and a time a string
+  (`"new_years_eve.ten"`) or a variable. Quantifiers `{"quant": "some" |
+  "no" | "every", "vars": ["P"], "body": expr}`. Statements `{"rule":
+  name, "body": expr, "head": fact, "in": base | null, "known": bool,
+  "learned_from": fact | null}` and `{"never": expr, "in": base,
+  "on_contradiction": "refuse" | "flag", "label": text}`; the effect
+  `retract` (as `assert`, `"in"` the world when not said); `means` on a
+  fact, `starts_with` (facts) and `reads` (bases) on a `knowledge`. The
+  `[rules]` tag. An assert's fact may be `{"value": expr}`, a value that
+  holds one.
 - Milestone 21e: `knowledge` declarations (`per`, and the tags `learned`
   or `manual`); the effect `{"do": "assert", "fact": {"subject", "verb",
   "object", "at"}, "in": "base"}`. The fact's shape is the one Inklog

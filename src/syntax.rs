@@ -7,8 +7,15 @@ use crate::twee::{Line, Passage};
 /// Passages whose whole content is statements, on both sides of `--`.
 /// Passages whose every line is a statement. A `[test]` passage is a script
 /// of statements too: `start:`, `given:`, `do:`, `expect:`.
-pub(crate) const MARGIN_TAGS: &[&str] =
-    &["config", "npc", "character", "place", "archetype", "test"];
+pub(crate) const MARGIN_TAGS: &[&str] = &[
+    "config",
+    "npc",
+    "character",
+    "place",
+    "archetype",
+    "test",
+    "rules",
+];
 
 /// Statements that declare an id.
 pub(crate) const DECLS: &[&str] = &[
@@ -100,6 +107,9 @@ pub(crate) const SETTINGS: &[&str] = &[
     "measure",
     // `finale when: …`, in a `[finale]` passage.
     "finale",
+    // Inklog: `rule wears: … => {{ … }} ~ known`, `never … ~ in notebook`.
+    "rule",
+    "never",
     // Making things: `recipe pawl: horseshoe ~ using hammer ~ make`.
     "recipe",
     // `spreads 1 from ablaze to nearest(place, where: …) ~ along way`.
@@ -164,8 +174,9 @@ pub(crate) const EFFECTS: &[&str] = &[
     "deal",
     // `draw syndicate vampires`: a table's row, chosen.
     "draw",
-    // `assert {{ target guilty }} in findings`: a fact, kept.
+    // `assert {{ target guilty }} in findings`: a fact, kept; `retract`, let go.
     "assert",
+    "retract",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -300,7 +311,7 @@ pub(crate) const POV_NAMES: &[&str] = &["i", "me", "you", "myself", "yourself"];
 
 /// Words reserved now for v0.6 features built later, so that no id written
 /// today collides with them.
-pub(crate) const RESERVED_LATER: &[&str] = &["rule", "never", "retract", "between"];
+pub(crate) const RESERVED_LATER: &[&str] = &["between"];
 
 /// Words that can never be declared as an id.
 pub(crate) const RESERVED: &[&str] = &[

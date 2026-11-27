@@ -1,5 +1,5 @@
 //! Milestone 21e's slice of knowledge bases: declared, and facts kept.
-//! Inklog's rules and questions are milestone 22's.
+//! Inklog's rules and questions (milestone 22) are in `tests/inklog.rs`.
 
 use inkjot::run::test::run_all;
 
@@ -29,7 +29,7 @@ start: desk
 do: "Write it down"
 do: "Write it down"
 expect: count(ann.notebook) == 1
-expect: first(first(ann.notebook)) == hale and last(first(ann.notebook)) == ashe
+expect: first(first(ann.notebook)) == hale and first(ann.notebook)[2] == ashe
 do: "File it"
 expect: count(record) == 1
 expect: count(hale.notebook) == 0
@@ -86,10 +86,10 @@ fn mistakes_are_refused() {
         "{{ hale is ashe now }}",
         "two terms or three",
     );
-    says("{{ hale is ashe }}", "{{ P is ashe }}", "Inklog variable");
+    says("{{ hale is ashe }}", "{{ P is ashe }}", "`P` is a variable");
     says(
         "assert {{ hale is ashe }} in notebook",
-        "assert hale is ashe",
+        "assert",
         "`assert` is written",
     );
 }
