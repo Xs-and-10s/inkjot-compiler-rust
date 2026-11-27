@@ -35,6 +35,7 @@ fn starts() -> Vec<(usize, Start)> {
         nib: nib.map(str::to_string),
         pov: pov.map(str::to_string),
         hints: true,
+        seats: Vec::new(),
     };
     vec![
         (0, at(Some("cast"), None)),

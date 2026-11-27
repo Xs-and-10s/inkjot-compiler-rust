@@ -14,6 +14,8 @@ pub(crate) const MARGIN_TAGS: &[&str] =
 pub(crate) const DECLS: &[&str] = &[
     // `period phase: night 1, day 1`: named stretches of the clock.
     "period",
+    // `knowledge findings ~ per character`: a base of facts.
+    "knowledge",
     "threat",
     "deck",
     "pile",
@@ -162,6 +164,8 @@ pub(crate) const EFFECTS: &[&str] = &[
     "deal",
     // `draw syndicate vampires`: a table's row, chosen.
     "draw",
+    // `assert {{ target guilty }} in findings`: a fact, kept.
+    "assert",
 ];
 
 /// Is this statement an effect? `reveal` is also a setting, `reveal: by
@@ -296,8 +300,7 @@ pub(crate) const POV_NAMES: &[&str] = &["i", "me", "you", "myself", "yourself"];
 
 /// Words reserved now for v0.6 features built later, so that no id written
 /// today collides with them.
-pub(crate) const RESERVED_LATER: &[&str] =
-    &["knowledge", "rule", "never", "assert", "retract", "between"];
+pub(crate) const RESERVED_LATER: &[&str] = &["rule", "never", "retract", "between"];
 
 /// Words that can never be declared as an id.
 pub(crate) const RESERVED: &[&str] = &[

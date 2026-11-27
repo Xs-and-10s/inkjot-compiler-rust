@@ -46,6 +46,9 @@ assert_eq!(again.view(), state.view());
 | `state.answer(words)` | `State` | Only while `view.asks` has an input that is not the jury. |
 | `state.wait(ms)` | `State` | Real time passes: each Link timed `~ after 5m` whose time has come is taken by itself. |
 | `state.act(&action)` | `State` | Any `Action`; the four above are shorthands. |
+| `state.act_as(seat, &action)` | `State` | At a table: `Action::As`. |
+| `state.seats()` | `&[String]` | The seats, in the order they joined (`guest_1`, …); empty alone. |
+| `state.view_of(seat)` | `Option<&View>` | What the Linker in that seat sees. |
 | `inklink.replay(seed, &start, &actions, upto)` | `State` | The state after the first `upto` actions, or all. A refused action has its index in `Refused.at`. |
 | `inklink.replay_all(seed, &start, &actions)` | `Vec<State>` | Every state on the way: the start, then one per action. For going back, and for checking a log's engine events. |
 | `state.events()` | `&[Event]` | What the action that made this state caused (below). |
@@ -67,13 +70,17 @@ one indexed story.
 `povs` (the `pov:` setting, default first), `selectable` (characters marked
 `~ selectable`, for a lobby), `tags` (the Inker's), `engine`, `inquests` (the
 `inquests` resource when the Inklink declares it and hides a fork; else
-none).
+none), `cohort` (`cohort: 5..=12` as `(5, Some(12))`: how many a table
+seats; else none).
 
 **`Start`**: `nib` (a Nib to start at), `pov` (a character from `povs` or
-`selectable`), `hints` (offer hints; a Linker may turn them off).
+`selectable`), `hints` (offer hints; a Linker may turn them off), `seats`
+(a table: the character each Linker plays, `guest` for a character `~ one
+per linker`; empty for one Linker).
 
 **`Action`**: `TakeLink(id)`, `Answer(words)`, `Vote { who, how, proof }`,
-`TakeFork { fork, from }`, `Wait(ms)`. A `Wait` is part of the log like any
+`TakeFork { fork, from }`, `Wait(ms)`, `As { seat, action }` (at a table:
+the Linker in `seat` does `action`). A `Wait` is part of the log like any
 other action, so a replay takes timed Links where the reading did: the
 platform logs one when a timed Link's time runs out (or whenever it likes;
 time that has passed is only ever counted once).
@@ -305,9 +312,34 @@ The platform's stub engine can serve as an oracle: run its Ex 3 scenarios
 against `Inkjot.Engine`, and compare the two engines' views over random
 readings.
 
+## A table
+
+`Start { seats: vec!["guest"; 7], .. }` seats seven Linkers at Ex 7's
+table, each a seat of `guest` (`guest_1` to `guest_7`), refused if the
+Inklink's `cohort:` does not allow that many or a seat is no one a Linker
+may play. Then:
+
+- Every action is someone's: `Action::As { seat, action }`. A bare action
+  is refused (`not_offered`), except `Wait`, which is the table's.
+- Each seat has its own view, `state.view_of(seat)`, worked out after
+  every action; `state.view()` is the one who acted. A seat the action
+  showed nothing new to, at the same Nib, keeps the text it was reading.
+- A Link `~ for cohort` moves everyone; a consensus or a ballot waits for
+  the others (`run.md`, Votes at a table). Forks and Inquests are solo.
+- The events are the actor's: `nib_shown` is the Nib in front of the one
+  who acted. The other seats' views say where they are.
+- The log is the actions, `As` and all; a replay seats the same table and
+  plays them, every seat seeing what it saw.
+
+In Elixir: `start(inklink, seed, %{seats: List.duplicate("guest", 7)})`,
+`act(state, {:as, "guest_2", {:take_link, id}})`, `view(state, "guest_2")`
+(`{:ok, view}` or `{:error, :no_seat}`), `seats(state)`.
+
 ## Not yet
 
-- **Cohort play**: seats, shared acts and stops, through the engine.
+- **Stops through the engine**: Ex 1's table of stops (everyone commits a
+  move, then the stop resolves) is played by the interpreter and `inkjot
+  test`; its claims and stops are not yet tested through `As`.
 - **`snapshot`/`restore`**, once readings get long enough to need them.
 - **Precompiled NIFs** (`rustler_precompiled`), so the platform's build
   needs no Rust toolchain.

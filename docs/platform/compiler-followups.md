@@ -200,3 +200,17 @@ The compiler's side is in the draft (milestone 21a). The platform's:
   the morning, as §11 asks.
 - A `~ for cohort` Link moves the whole table; the platform shows each seat
   its own view of the passage. The engine is still solo (21e).
+
+## 14. A table through the engine (milestone 21e, 27 Nov)
+
+- `start(inklink, seed, %{seats: List.duplicate("guest", n)})` seats a
+  table; `meta.cohort` (`{5, 12}`) says how many it may seat, and a table
+  outside it is refused (`story_error`). Seats are `guest_1` … in the
+  order given.
+- Every action is `{:as, seat, action}`, except `{:wait, ms}`, the table's.
+  `view(state, seat)` is each Linker's view; `view(state)` the actor's.
+  Send each Linker their own view after every action.
+- The engine's events are the actor's; other seats' moves show in their
+  views. Persist the log as before: it holds the `{:as, …}` tuples.
+- Ex 7 needs a lobby that seats 5 to 12, a name input per seat, and (for
+  the Storyteller) a seat for `storyteller`.

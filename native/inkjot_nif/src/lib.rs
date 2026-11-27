@@ -30,6 +30,9 @@ mod atoms {
         take_link,
         take_fork,
         wait,
+        r#as = "as",
+        seats,
+        no_seat,
         answer,
         vote,
         nib,
@@ -223,6 +226,7 @@ fn action_term<'a>(env: Env<'a>, a: &Action) -> Term<'a> {
         Action::Vote { who, how, proof } => (atoms::vote(), who, how, proof).encode(env),
         Action::TakeFork { fork, from } => (atoms::take_fork(), fork, from).encode(env),
         Action::Wait(ms) => (atoms::wait(), ms).encode(env),
+        Action::As { seat, action } => (atoms::r#as(), seat, action_term(env, action)).encode(env),
     }
 }
 
@@ -241,6 +245,9 @@ fn decode_start(t: Term) -> NifResult<Start> {
     if let Some(hints) = get(atoms::hints()) {
         start.hints = hints.decode()?;
     }
+    if let Some(seats) = get(atoms::seats()) {
+        start.seats = seats.decode()?;
+    }
     Ok(start)
 }
 
@@ -253,6 +260,10 @@ fn decode_action(t: Term) -> NifResult<Action> {
         (2, a) if a == atoms::take_link() => Ok(Action::TakeLink(parts[1].decode()?)),
         (2, a) if a == atoms::answer() => Ok(Action::Answer(parts[1].decode()?)),
         (2, a) if a == atoms::wait() => Ok(Action::Wait(parts[1].decode()?)),
+        (3, a) if a == atoms::r#as() => Ok(Action::As {
+            seat: parts[1].decode()?,
+            action: Box::new(decode_action(parts[2])?),
+        }),
         (2, a) if a == atoms::take_fork() => Ok(Action::TakeFork {
             fork: parts[1].decode()?,
             from: None,
@@ -339,6 +350,7 @@ fn meta<'a>(env: Env<'a>, inklink: InklinkRef) -> Term<'a> {
             ("tags", m.tags.encode(env)),
             ("engine", m.engine.encode(env)),
             ("inquests", m.inquests.encode(env)),
+            ("cohort", m.cohort.encode(env)),
         ],
     )
 }
@@ -410,6 +422,22 @@ fn state_result<'a>(env: Env<'a>, result: Result<State, Refused>) -> Term<'a> {
 #[rustler::nif]
 fn view<'a>(env: Env<'a>, state: StateRef) -> Term<'a> {
     view_term(env, state.0.view())
+}
+
+/// At a table, what the Linker in `seat` sees: `{:ok, view}`, or
+/// `{:error, :no_seat}`.
+#[rustler::nif]
+fn view_of<'a>(env: Env<'a>, state: StateRef, seat: String) -> Term<'a> {
+    match state.0.view_of(&seat) {
+        Some(v) => ok(env, view_term(env, v)),
+        None => (atoms::error(), atoms::no_seat()).encode(env),
+    }
+}
+
+/// The seats at a table, in the order they joined; `[]` alone.
+#[rustler::nif]
+fn seats(state: StateRef) -> Vec<String> {
+    state.0.seats().to_vec()
 }
 
 /// The engine's events from the action that made this state.

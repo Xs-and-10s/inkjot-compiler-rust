@@ -674,6 +674,25 @@ pronouns chosen` is the Linker's to set); `set x.shown_as: …` gives x a face
 to be shown by, while `x.name` stays theirs. Whole numbers divide into a
 whole number, rounded down (`players / 4`).
 
+## Knowledge kept
+
+```text
+knowledge findings ~ per character ~ learned
+> [[Look into {target}->night:looked]] ~ then assert {{ target guilty }} in findings when target.team != town
+```
+
+Milestone 21e builds a place to keep facts; Inklog (milestone 22) adds
+rules and questions. A base `~ per character` (or `~ per linker`) is one
+for each: `assert … in findings` keeps the fact in the base of whoever
+does it, so the Detective's findings are hers alone. A base with no `per`
+is the story's. A fact has two terms or three, the verb one word, and may
+say when (`{{ hale seen @ monday.evening }}`); its terms are worked out
+as it is kept (`target`, the guest it names). A fact the base holds
+already is not kept twice. `me.findings` is the list of facts, each a list
+of its terms; `count(record)` counts a shared base's. They are part of
+the world: a rewind puts them back. A fact with a variable (`{{ P is ashe
+}}`) needs rules, and waits for milestone 22.
+
 ## Encounters
 
 An encounter is a fight, a chase, a standoff: an opponent who does

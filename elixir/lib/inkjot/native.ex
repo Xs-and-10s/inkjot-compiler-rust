@@ -18,6 +18,8 @@ defmodule Inkjot.Native do
   def meta(_inklink), do: err()
   def start(_inklink, _seed, _start), do: err()
   def view(_state), do: err()
+  def view_of(_state, _seat), do: err()
+  def seats(_state), do: err()
   def events(_state), do: err()
   def actions(_state), do: err()
   def seed(_state), do: err()

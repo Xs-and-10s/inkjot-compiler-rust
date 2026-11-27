@@ -30,7 +30,12 @@
 //! Each state also carries the [`Event`]s the action that made it caused,
 //! for the platform's log (see [`events`]).
 //!
-//! This is a solo engine. Cohort play (seats, shared acts) comes later.
+//! **A table.** A [`Start`] with `seats` seats a cohort, one Linker each
+//! (`guest`, a character `~ one per linker`, takes the next of its seats:
+//! `guest_1`, `guest_2`, …). Each seat has its own view
+//! ([`State::view_of`]); a Linker acts through [`Action::As`], and the
+//! state's [`State::view`] is then theirs. Real time ([`Action::Wait`]) is
+//! the table's.
 
 mod events;
 
@@ -161,6 +166,9 @@ pub struct Meta {
     /// Inquests a reading has: the `inquests` resource, when the Inklink
     /// declares it and hides at least one fork. `None`: no Inquests.
     pub inquests: Option<u32>,
+    /// `cohort: 5..=12`: how many may sit at a table, the most `None` for
+    /// no limit. `None` for an Inklink with no `cohort:`.
+    pub cohort: Option<(u32, Option<u32>)>,
 }
 
 /// A loaded IR. Cheap to clone: every state shares one.
@@ -205,6 +213,7 @@ impl Inklink {
                 tags: config_tags(ir),
                 engine: ENGINE_VERSION,
                 inquests: inquests(ir).filter(|_| story.has_forks()),
+                cohort: story.cohort_range(),
             };
             Ok(Inklink {
                 story: Arc::new(story),
@@ -244,6 +253,9 @@ impl Inklink {
                     ));
                 }
             }
+            if !start.seats.is_empty() {
+                return self.start_table(run, seed, start);
+            }
             if let Err(why) = run.start(start.nib.as_deref(), start.pov.as_deref()) {
                 return Err(classify(&run, why, RefusedKind::StoryError));
             }
@@ -262,7 +274,55 @@ impl Inklink {
                 events,
                 ending,
                 forks,
+                views: BTreeMap::new(),
             })
+        })
+    }
+
+    /// Seat a table: each seat must be someone a Linker may play, and the
+    /// table a size the Inklink's `cohort:` allows.
+    fn start_table(&self, mut run: Run, seed: u64, start: &Start) -> Result<State, Refused> {
+        for seat in &start.seats {
+            if !self.meta.selectable.contains(seat) && !self.story.povs().contains(seat) {
+                return Err(refused(
+                    RefusedKind::StoryError,
+                    format!("`{seat}` is not someone a Linker may play"),
+                ));
+            }
+        }
+        let n = start.seats.len() as u32;
+        if let Some((lo, hi)) = self.meta.cohort {
+            if n < lo || hi.is_some_and(|hi| n > hi) {
+                let most = hi.map_or(String::from(" or more"), |h| format!(" to {h}"));
+                return Err(refused(
+                    RefusedKind::StoryError,
+                    format!("a table of {n}; this Inklink seats {lo}{most}"),
+                ));
+            }
+        }
+        let who: Vec<&str> = start.seats.iter().map(String::as_str).collect();
+        if let Err(why) = run.start_cohort(start.nib.as_deref(), &who) {
+            return Err(classify(&run, why, RefusedKind::StoryError));
+        }
+        let first = run.seated()[0].clone();
+        let views = see_all(&mut run, &BTreeMap::new())
+            .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+        run.sit(&first)
+            .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+        let view = views[&first].clone();
+        let mut ending = None;
+        let events = events::events(&mut run, &view, &mut ending, Value::obj::<&str>([]));
+        Ok(State {
+            inklink: self.clone(),
+            seed,
+            start: start.clone(),
+            actions: Vec::new(),
+            run,
+            view,
+            events,
+            ending,
+            forks: BTreeMap::new(),
+            views,
         })
     }
 
@@ -361,6 +421,9 @@ pub struct Start {
     pub pov: Option<String>,
     /// The Linker wants hints offered (when the story has them).
     pub hints: bool,
+    /// A table: one entry per Linker, the character each plays (`guest`
+    /// for a character `~ one per linker`). Empty: one Linker, solo.
+    pub seats: Vec<String>,
 }
 
 impl Default for Start {
@@ -369,6 +432,7 @@ impl Default for Start {
             nib: None,
             pov: None,
             hints: true,
+            seats: Vec::new(),
         }
     }
 }
@@ -393,6 +457,8 @@ pub enum Action {
     /// Real time passes, in milliseconds, as the platform counts it: a
     /// Link timed `~ after 5m` is taken by itself when its time comes.
     Wait(u64),
+    /// At a table: the Linker in `seat` does `action`.
+    As { seat: String, action: Box<Action> },
 }
 
 /// A Link as the Linker sees it.
@@ -444,6 +510,8 @@ pub struct State {
     /// The forks behind each offered Link here, worked out with the view,
     /// so asking for them is a read. Never part of the view.
     forks: BTreeMap<String, Vec<Link>>,
+    /// At a table, each seat's view; `view` is the last to act's.
+    views: BTreeMap<String, View>,
 }
 
 impl std::fmt::Debug for State {
@@ -459,8 +527,29 @@ impl std::fmt::Debug for State {
 }
 
 impl State {
+    /// What the Linker sees: alone, the one Linker; at a table, the one who
+    /// acted last (at the start, the first seat).
     pub fn view(&self) -> &View {
         &self.view
+    }
+
+    /// The seats at a table, in the order they joined: `guest_1`, … Empty
+    /// for a solo reading.
+    pub fn seats(&self) -> &[String] {
+        self.run.seated()
+    }
+
+    /// What the Linker in `seat` sees. `None` for a seat not at the table.
+    pub fn view_of(&self, seat: &str) -> Option<&View> {
+        self.views.get(seat)
+    }
+
+    /// Do `action` as the Linker in `seat`.
+    pub fn act_as(&self, seat: &str, action: &Action) -> Result<State, Refused> {
+        self.act(&Action::As {
+            seat: seat.to_string(),
+            action: Box::new(action.clone()),
+        })
     }
 
     /// The engine's events from the action that made this state (or from
@@ -551,9 +640,43 @@ impl State {
     /// Do one thing, on a copy. `self` is never changed.
     pub fn act(&self, action: &Action) -> Result<State, Refused> {
         guarded(|| {
-            self.check(action)?;
+            let table = !self.views.is_empty();
+            // At a table, everything but real time is someone's to do.
+            let (seat, inner) = match action {
+                Action::As { seat, action } => (Some(seat.as_str()), action.as_ref()),
+                other => (None, other),
+            };
+            let view = match seat {
+                _ if matches!(inner, Action::As { .. }) => {
+                    return Err(refused(
+                        RefusedKind::BadAnswer,
+                        "`As` holds one action, not another `As`",
+                    ))
+                }
+                Some(s) if !table => {
+                    return Err(refused(
+                        RefusedKind::NotOffered,
+                        format!("`{s}`: this reading is not at a table"),
+                    ))
+                }
+                Some(s) => self.views.get(s).ok_or_else(|| {
+                    refused(RefusedKind::NotOffered, format!("nobody sits at `{s}`"))
+                })?,
+                None if table && !matches!(inner, Action::Wait(_)) => {
+                    return Err(refused(
+                        RefusedKind::NotOffered,
+                        "at a table, say who acts: `As { seat, action }`",
+                    ))
+                }
+                None => &self.view,
+            };
+            Self::check(view, inner, |link, from| self.forks(link, from))?;
             let mut run = self.run.clone();
-            let (done, otherwise) = match action {
+            if let Some(s) = seat {
+                run.sit(s)
+                    .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            }
+            let (done, otherwise) = match inner {
                 Action::TakeLink(id) => (run.choose(id), RefusedKind::StoryError),
                 Action::Answer(words) => (run.answer(words), RefusedKind::BadAnswer),
                 Action::Vote { who, how, proof } => {
@@ -564,13 +687,25 @@ impl State {
                     (run.choose_fork(fork, from), RefusedKind::StoryError)
                 }
                 Action::Wait(ms) => (run.wait(*ms), RefusedKind::StoryError),
+                Action::As { .. } => unreachable!("refused above"),
             };
             if let Err(why) = done {
                 return Err(classify(&run, why, otherwise));
             }
-            let view = see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
-            let forks = forks_of(&mut run, &view)
-                .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+            let (view, views, forks) = if table {
+                let views = see_all(&mut run, &self.views)
+                    .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+                let actor = seat.unwrap_or(&self.view.pov).to_string();
+                run.sit(&actor)
+                    .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+                (views[&actor].clone(), views, BTreeMap::new())
+            } else {
+                let view =
+                    see(&mut run).map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+                let forks = forks_of(&mut run, &view)
+                    .map_err(|why| classify(&run, why, RefusedKind::StoryError))?;
+                (view, BTreeMap::new(), forks)
+            };
             let mut ending = self.ending.clone();
             let changes = changes(&self.run.tracked(), &run.tracked());
             let events = events::events(&mut run, &view, &mut ending, changes);
@@ -586,24 +721,25 @@ impl State {
                 events,
                 ending,
                 forks,
+                views,
             })
         })
     }
 
     /// Refuse, before playing anything, what the view shows cannot be done.
-    fn check(&self, action: &Action) -> Result<(), Refused> {
-        let asks = |jury: bool| self.view.asks.iter().any(|a| (a.kind == "accuse") == jury);
+    fn check(
+        view: &View,
+        action: &Action,
+        forks: impl Fn(&str, Option<&str>) -> Result<Vec<Link>, Refused>,
+    ) -> Result<(), Refused> {
+        let asks = |jury: bool| view.asks.iter().any(|a| (a.kind == "accuse") == jury);
         match action {
-            Action::TakeLink(id) if !self.view.links.iter().any(|l| l.id == *id) => Err(refused(
+            Action::TakeLink(id) if !view.links.iter().any(|l| l.id == *id) => Err(refused(
                 RefusedKind::NotOffered,
                 format!("no Link `{id}` is offered here"),
             )),
             Action::TakeLink(id)
-                if self
-                    .view
-                    .links
-                    .iter()
-                    .any(|l| l.id == *id && l.due_in.is_some()) =>
+                if view.links.iter().any(|l| l.id == *id && l.due_in.is_some()) =>
             {
                 Err(refused(
                     RefusedKind::NotOffered,
@@ -619,10 +755,9 @@ impl State {
             }
             Action::TakeFork { fork, from } => {
                 let mut shown = false;
-                for link in &self.view.links {
+                for link in &view.links {
                     shown = shown
-                        || self
-                            .forks(&link.id, from.as_deref())?
+                        || forks(&link.id, from.as_deref())?
                             .iter()
                             .any(|f| f.id == *fork);
                 }
@@ -638,6 +773,27 @@ impl State {
             _ => Ok(()),
         }
     }
+}
+
+/// Every seat's view after an action, in seating order. A seat the action
+/// showed nothing new to, still at the same Nib, keeps the text it was
+/// reading.
+fn see_all(
+    run: &mut Run,
+    before: &BTreeMap<String, View>,
+) -> Result<BTreeMap<String, View>, String> {
+    let mut views = BTreeMap::new();
+    for seat in run.seated().to_vec() {
+        run.sit(&seat)?;
+        let mut view = see(run)?;
+        if let Some(old) = before.get(&seat) {
+            if view.text.is_empty() && old.nib == view.nib {
+                view.text = old.text.clone();
+            }
+        }
+        views.insert(seat, view);
+    }
+    Ok(views)
 }
 
 /// Look at the run after an action: the text it showed, and what is

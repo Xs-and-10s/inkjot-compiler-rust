@@ -825,3 +825,16 @@ do: "The vote is counted"
 do: "Night falls"
 expect at: town_wins
 expect events: ending_reached
+
+:: the_detectives_findings_are_hers_alone [test]
+start: night ~ as guest, guest, guest, guest, guest
+given: draw syndicate vampires
+given: set guest_1.role: detective
+given: set guest_2.team: mafia
+given: set guest_2.name: "Bea"
+as: guest_1
+do: "Look into Bea"
+expect text: "Yes."
+expect: count(guest_1.findings) == 1 and first(first(guest_1.findings)) == guest_2
+expect: count(guest_3.findings) == 0
+expect: finds == 1
