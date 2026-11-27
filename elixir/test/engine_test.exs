@@ -255,6 +255,32 @@ defmodule Inkjot.EngineTest do
     assert Engine.view(again).nib == "rung"
   end
 
+  test "a table: seats, a view each, actions as a seat, and a log that replays" do
+    {:ok, ir} = Engine.build(File.read!("examples/drafts/ex7-mafia.twee"))
+    {:ok, inklink} = Engine.load(ir)
+    assert %{cohort: {5, 12}} = Engine.meta(inklink)
+    start = %{seats: List.duplicate("guest", 5)}
+    assert {:error, {:story_error, _, _}} = Engine.start(inklink, 1, %{seats: ["guest"]})
+    {:ok, state} = Engine.start(inklink, 1, start)
+    assert Engine.seats(state) == ~w(guest_1 guest_2 guest_3 guest_4 guest_5)
+    {:ok, mine} = Engine.view(state, "guest_2")
+    assert mine.pov == "guest_2"
+    assert {:error, :no_seat} = Engine.view(state, "guest_9")
+    {:ok, named} = Engine.act(state, {:as, "guest_2", {:answer, ["Bea"]}})
+    draw = Enum.find(Engine.view(named).links, &(&1.label == "Draw the syndicate"))
+    assert {:error, {:not_offered, _, _}} = Engine.act(named, {:take_link, draw.id})
+    {:ok, drawn} = Engine.act(named, {:as, "guest_2", {:take_link, draw.id}})
+    for seat <- Engine.seats(drawn) do
+      assert {:ok, %{nib: "drawn"}} = Engine.view(drawn, seat)
+    end
+
+    assert [{:as, "guest_2", {:answer, ["Bea"]}}, {:as, "guest_2", {:take_link, _}}] =
+             Engine.actions(drawn)
+
+    {:ok, again} = Engine.replay(inklink, 1, start, Engine.actions(drawn))
+    assert Engine.view(again, "guest_4") == Engine.view(drawn, "guest_4")
+  end
+
   @round_and_round """
   :: StoryTitle
   Round and Round

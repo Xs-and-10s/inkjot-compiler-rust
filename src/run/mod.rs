@@ -14,6 +14,7 @@ mod encounter;
 mod events;
 mod hints;
 mod inputs;
+mod knowledge;
 mod limits;
 mod making;
 mod map;
@@ -103,6 +104,8 @@ pub struct Story {
     /// `state syndicate` that holds the row drawn.)
     rows: BTreeMap<String, (String, Vec<Value>)>,
     tables: BTreeMap<String, Value>,
+    /// `cohort: 5..=12`: the fewest and most at a table.
+    cohort: Option<(u32, Option<u32>)>,
 }
 
 /// `5m`, `30s`, `400ms`: a real time, in milliseconds.
@@ -246,6 +249,7 @@ impl Story {
             calendar: Calendar::default(),
             rows: BTreeMap::new(),
             tables: BTreeMap::new(),
+            cohort: None,
         };
         let config = ir
             .get("config")
@@ -273,6 +277,23 @@ impl Story {
             );
         }
         story.calendar = calendar(config)?;
+        story.cohort = config
+            .iter()
+            .find(|s| f(s, "setting").as_str() == Some("cohort"))
+            .and_then(|s| {
+                let v = f(s, "value");
+                let r = f(v, "range").as_arr()?;
+                let lo = r.first().and_then(Value::as_u64).unwrap_or(1) as u32;
+                let inclusive = f(v, "inclusive") == &Value::Bool(true);
+                let hi = r.get(1).and_then(Value::as_u64).map(|h| {
+                    if inclusive {
+                        h as u32
+                    } else {
+                        (h as u32).saturating_sub(1)
+                    }
+                });
+                Some((lo, hi))
+            });
         for t in config.iter().filter(|s| s.get("columns").is_some()) {
             let table = f(t, "id").as_str().unwrap_or("").to_string();
             story.tables.insert(table.clone(), t.clone());
@@ -622,6 +643,11 @@ impl Story {
         self.passages
             .values()
             .any(|p| p.body.iter().any(|n| n.get("inquest").is_some()))
+    }
+
+    /// `cohort: 5..=12`: the fewest and most a table seats, if it says.
+    pub fn cohort_range(&self) -> Option<(u32, Option<u32>)> {
+        self.cohort
     }
 
     /// The characters marked `~ selectable`, whom a lobby lets a Linker pick.
@@ -3411,6 +3437,8 @@ impl Run {
                 self.draw_row(&word(0), f(e, "where"))?
             }
             "roll" => self.roll_table(&word(0))?,
+            // `assert {{ target guilty }} in findings`: kept (`knowledge.rs`).
+            "assert" => self.assert_fact(f(e, "fact"), f(e, "in").as_str().unwrap_or(""))?,
             // `draw syndicate vampires`: that row, as if it had been drawn.
             "draw" => {
                 let table = f(e, "table").as_str().unwrap_or("").to_string();
@@ -3946,6 +3974,18 @@ impl Run {
                     V::List(l) => V::Num(l.len() as f64),
                     V::Null => V::Num(0.0),
                     _ => V::Num(1.0),
+                }
+            }
+            // `count(record)`: the facts a shared knowledge base holds.
+            "count"
+                if items
+                    .first()
+                    .and_then(Value::as_str)
+                    .is_some_and(|t| self.story.kind(t) == Some("knowledge")) =>
+            {
+                match self.eval(&items[0])? {
+                    V::List(l) => V::Num(l.len() as f64),
+                    _ => V::Num(0.0),
                 }
             }
             "count" | "one" | "all" => {

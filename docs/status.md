@@ -42,6 +42,7 @@ here.
 | 21b | Cards and seats: `one per linker`, decks, piles, `shuffle`, `deal`, `top of`, `my`, `move` to a pile, `~ for cohort`, `{present linker}`, `max`/`min`; Ex 7's role pile is `hand` and its killers' team `mafia` | #46 |
 | 21c | Time: `period`s and named clocks (`clock.phase`, ordered names, clocks in names, `once per hour`), `on … begins` / `ends`, `wait until`, `turn ends when` with `passed` and `spent`, Links timed in real time (`~ after 5m`, `Action::Wait`, `due_in`); Ex 7's night has its deadline | #47 |
 | 21d | Votes and seats: `~ for … where:`, `~ consensus`, `{ballot}`, the jury's `voters:` and `ties: draw`, seats in a ring, tables with named columns, lists of text, quantifiers, `first`/`last`/`possessive`, pronouns, settable `shown_as`, `{text input}`, `finale when:`. Ex 7 plays, but for its knowledge base | #48 |
+| 21e | The engine seats a table (`Start.seats`, `Action::As`, `view_of`); knowledge bases and `assert … in`, a store only. Ex 7 plays whole. Milestone 21 done | #49 |
 
 ## Next
 
@@ -97,9 +98,11 @@ The plan agreed on 20 Nov 2026, after the platform's first slice:
      (`{ballot}`, `voters:`, `ties: draw`, `~ consensus`, seating and
      `along seat`, settable `shown_as`, `finale when:`, text tables, the
      quantifiers Ex 7 uses, `first`, `last`, `possessive`); 21e, the
-     engine's cohort API, so the platform can seat a table (the engine is
-     solo today; the interpreter and `inkjot test` already seat cohorts).
-   - 22, **Inklog**: rules, `{{ }}`, knowledge bases, `assert` and
+     engine's cohort API, so the platform can seat a table, and a
+     store-only slice of knowledge bases (`knowledge`, `assert … in`),
+     decided 27 Nov 2026, so Ex 7 plays whole. Milestone 21 is done (#49).
+   - 22, **Inklog**: rules, `{{ }}`, knowledge bases (built on 21e's
+     store and its fact shape), `assert` and
      `retract`, quantifiers, facts at a time, `never`, `{note input}`. Done
      when Ex 6's public cut runs and Ex 5 is brought up to date.
    - 23, **encounters, generalized** (decided 26 Nov 2026): `encounter`

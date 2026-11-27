@@ -34,7 +34,8 @@ defmodule Inkjot.Engine do
   @type start :: %{
           optional(:nib) => String.t(),
           optional(:pov) => String.t(),
-          optional(:hints) => boolean()
+          optional(:hints) => boolean(),
+          optional(:seats) => [String.t()]
         }
   @type action ::
           {:take_link, String.t()}
@@ -42,6 +43,7 @@ defmodule Inkjot.Engine do
           | {:vote, who :: String.t(), how :: String.t(), proof :: [String.t()]}
           | {:take_fork, fork :: String.t(), from :: String.t() | nil}
           | {:wait, ms :: non_neg_integer()}
+          | {:as, seat :: String.t(), action()}
 
   @type code ::
           :bad_ir
@@ -133,13 +135,28 @@ defmodule Inkjot.Engine do
   @spec meta(inklink()) :: map()
   defdelegate meta(inklink), to: Native
 
-  @doc "Begin a reading. `start` may name a `:nib`, a `:pov`, and `hints: false`."
+  @doc """
+  Begin a reading. `start` may name a `:nib`, a `:pov`, and `hints: false`.
+  `seats: ["guest", "guest", …]` seats a table, one Linker each; then every
+  action but `{:wait, ms}` is someone's: `{:as, "guest_2", action}`.
+  """
   @spec start(inklink(), non_neg_integer(), start()) :: {:ok, state()} | refused()
   def start(inklink, seed, start \\ %{}), do: Native.start(inklink, seed, start)
 
-  @doc "What the Linker sees. Worked out once, when the state was made."
+  @doc """
+  What the Linker sees. Worked out once, when the state was made. At a
+  table, the one who acted last (at the start, the first seat).
+  """
   @spec view(state()) :: view()
   defdelegate view(state), to: Native
+
+  @doc "At a table, what the Linker in `seat` sees."
+  @spec view(state(), String.t()) :: {:ok, view()} | {:error, :no_seat}
+  def view(state, seat), do: Native.view_of(state, seat)
+
+  @doc "The seats at a table, in the order they joined (`guest_1`, …); `[]` alone."
+  @spec seats(state()) :: [String.t()]
+  defdelegate seats(state), to: Native
 
   @doc "The engine's events from the action that made this state, in order."
   @spec events(state()) :: [event()]

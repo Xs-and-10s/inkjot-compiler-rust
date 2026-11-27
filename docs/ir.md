@@ -382,6 +382,12 @@ Milestone 19, the page. Only fields were added, so version 3 stands:
   unary `{"top": expr}` (`top of x`); `my x` lowered as `me.x`; a `list`
   insert's `of_each` (`{list hand of each guest}`); the insert `present
   linker`; the functions `max` and `min`.
+- Milestone 21e: `knowledge` declarations (`per`, and the tags `learned`
+  or `manual`); the effect `{"do": "assert", "fact": {"subject", "verb",
+  "object", "at"}, "in": "base"}`. The fact's shape is the one Inklog
+  will use: `subject` and `object` are expressions (null when a fact has
+  two terms), or `{"var": "P"}` for a variable; `verb` is a word; `at` a
+  time, or null.
 - Milestone 21d: a Link's `for_where` (from `~ for guest where: …`) and
   `consensus` (how many each chooses); the `ballot` insert (`args`: `for`,
   `from`, `voters`, `ties`); the jury's `voters` and `ties`, and a `who`

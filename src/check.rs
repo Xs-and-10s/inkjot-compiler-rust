@@ -1716,6 +1716,48 @@ impl Checker {
         }
     }
 
+    /// `assert {{ s verb o }} in base`: two or three terms, the verb a word,
+    /// the base a declared `knowledge`. Variables are Inklog's (milestone 22).
+    fn assert_fact(&mut self, core: &str, line: usize, col: usize) {
+        let rest = core["assert".len()..].trim();
+        let shape = "`assert` is written `assert {{ subject verb }} in base`, or with an object: `{{ hale is ashe }}`";
+        let Some((fact, base)) = rest.rsplit_once(" in ") else {
+            return self.err(line, col, shape);
+        };
+        let Some(inner) = fact
+            .trim()
+            .strip_prefix("{{")
+            .and_then(|f| f.strip_suffix("}}"))
+        else {
+            return self.err(line, col, shape);
+        };
+        let inner = inner.split(" @ ").next().unwrap_or("").trim();
+        let terms: Vec<&str> = inner.split_whitespace().collect();
+        if !(2..=3).contains(&terms.len()) {
+            self.err(
+                line,
+                col,
+                "a fact has two terms or three: `{{ you curious }}`, `{{ hale is ashe }}`",
+            );
+        }
+        for (i, t) in terms.iter().enumerate() {
+            if i == 1 {
+                if !is_ident(t) {
+                    self.err(line, col, format!("`{t}`: a fact's verb is one word"));
+                }
+            } else if t.starts_with(|c: char| c.is_ascii_uppercase()) {
+                self.err(
+                    line,
+                    col,
+                    format!("`{t}` is an Inklog variable; facts with variables come with rules, in milestone 22"),
+                );
+            } else {
+                self.expr(t, line, col);
+            }
+        }
+        self.need(base.trim(), &["knowledge"], "knowledge base", line, col);
+    }
+
     /// `on phase begins night`: a declared period (or the turn), and one of
     /// its names, if any.
     fn period_event(&mut self, period: &str, words: &[&str], rest: &str, line: usize, col: usize) {
@@ -1802,6 +1844,8 @@ impl Checker {
             }
             // Cards: `shuffle roles`, `deal 1 from roles to each hand`.
             "shuffle" => self.need(arg(1), &["deck"], "deck", line, col + 8),
+            // `assert {{ target guilty }} in findings`: a fact, kept in a base.
+            "assert" => self.assert_fact(core, line, col),
             // `wait until night`: the clock moves on to the next night.
             "wait" => match core.strip_prefix("wait until ") {
                 Some(time) if self.calendar.is_time(time.trim()) => {}

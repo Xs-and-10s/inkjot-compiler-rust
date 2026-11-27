@@ -1,34 +1,11 @@
-//! Ex 7, played. The draft keeps the Detective's findings in a knowledge
-//! base (`knowledge findings`, `assert {{ target guilty }} in findings`),
-//! which is milestone 22's; nothing in the game reads them back. Until
-//! then this plays the draft with those lines set aside: it must check
-//! clean but for them, and its own tests must pass.
+//! Ex 7, played: its own tests, and random games, every one of which
+//! must end at a finale.
 
 use inkjot::run::test::run_all;
 
 fn draft() -> String {
     let dir = env!("CARGO_MANIFEST_DIR");
     std::fs::read_to_string(format!("{dir}/examples/drafts/ex7-mafia.twee")).unwrap()
-}
-
-/// The draft without its Inklog: the two `knowledge` lines, and the
-/// `assert` effects on the Detective's Link.
-fn playable() -> String {
-    draft()
-        .lines()
-        .filter(|l| !l.starts_with("knowledge "))
-        .map(|l| {
-            l.replace(
-                " ~ then assert {{ target guilty }} in findings when target.team != town",
-                "",
-            )
-            .replace(
-                " ~ then assert {{ target innocent }} in findings when target.team == town",
-                "",
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn errors(src: &str) -> Vec<String> {
@@ -41,24 +18,13 @@ fn errors(src: &str) -> Vec<String> {
 }
 
 #[test]
-fn only_inklog_is_left_to_build() {
-    let left: Vec<String> = errors(&draft())
-        .into_iter()
-        .filter(|e| {
-            !e.contains("`knowledge` is reserved") && !e.contains("`assert` is not an effect")
-        })
-        .collect();
-    assert_eq!(left, Vec::<String>::new());
-    assert!(
-        !playable().contains("assert {{"),
-        "the Inklog was not all set aside"
-    );
-    assert_eq!(errors(&playable()), Vec::<String>::new());
+fn it_checks_clean() {
+    assert_eq!(errors(&draft()), Vec::<String>::new());
 }
 
 #[test]
 fn ex7s_own_tests_pass() {
-    let src = playable();
+    let src = draft();
     let ir = inkjot::build(&src).unwrap_or_else(|r| panic!("{:#?}", r.diags));
     for o in run_all(&src, &ir).unwrap() {
         assert!(
@@ -79,7 +45,7 @@ use std::sync::Arc;
 /// choice. The passages the table reached, in order; `None` if it is still
 /// going after `limit` actions.
 fn random_game(n: usize, seed: u64, picks: &[u16], limit: usize) -> Result<String, String> {
-    let src = playable();
+    let src = draft();
     let ir = inkjot::build(&src).map_err(|r| format!("{:?}", r.diags))?;
     let mut run = Run::new(Arc::new(Story::new(&ir)?), seed);
     let who = vec!["guest"; n];

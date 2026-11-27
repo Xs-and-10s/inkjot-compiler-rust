@@ -1422,6 +1422,12 @@ pub(crate) fn effect(text: &str) -> Value {
             pairs.push(("args".into(), Value::Arr(vec![Value::str(table.trim())])));
             pairs.push(("where".into(), expression(cond.trim())));
         }
+        // `assert {{ target guilty }} in findings`.
+        "assert" => {
+            let (fact, base) = rest.rsplit_once(" in ").unwrap_or((rest, ""));
+            pairs.push(("fact".into(), fact_value(fact)));
+            pairs.push(("in".into(), Value::str(base.trim())));
+        }
         // `draw syndicate vampires`: a table's row, chosen (in tests).
         "draw" => {
             let mut w = rest.split_whitespace();
@@ -1449,6 +1455,38 @@ pub(crate) fn effect(text: &str) -> Value {
     }
     pairs.push(("when".into(), when.unwrap_or(Value::Null)));
     Value::Obj(pairs)
+}
+
+/// `{{ hale is ashe @ monday.evening }}` → `{"subject": "hale", "verb":
+/// "is", "object": "ashe", "at": "monday.evening"}`. The subject and object
+/// are expressions, worked out when the fact is kept (`{{ target guilty }}`
+/// keeps whom `target` names); a capitalised term, `P`, is an Inklog
+/// variable, `{"var": "P"}`. The verb is a word. A fact has two terms or
+/// three; `object` and `at` are null when it has none.
+pub(crate) fn fact_value(text: &str) -> Value {
+    let inner = text
+        .trim()
+        .trim_start_matches("{{")
+        .trim_end_matches("}}")
+        .trim();
+    let (terms, at) = match inner.split_once(" @ ") {
+        Some((t, a)) => (t, Value::str(a.trim())),
+        None => (inner, Value::Null),
+    };
+    let term = |t: &str| {
+        if t.starts_with(|c: char| c.is_ascii_uppercase()) {
+            Value::obj([("var", Value::str(t))])
+        } else {
+            expression(t)
+        }
+    };
+    let words: Vec<&str> = terms.split_whitespace().collect();
+    Value::obj([
+        ("subject", words.first().map_or(Value::Null, |t| term(t))),
+        ("verb", words.get(1).map_or(Value::Null, |v| Value::str(*v))),
+        ("object", words.get(2).map_or(Value::Null, |t| term(t))),
+        ("at", at),
+    ])
 }
 
 /// A `~` clause on a declaration or setting.

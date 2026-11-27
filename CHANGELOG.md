@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Milestone 21e: the table, through the engine; knowledge kept
+
+- The engine seats a table: `Start.seats`, `Action::As { seat, action }`,
+  `State::seats`, `State::view_of(seat)`, `Meta.cohort`; a table too
+  small or too large for `cohort:` is refused, and so is an action no one
+  does. In Elixir: `%{seats: [...]}`, `{:as, seat, action}`,
+  `view(state, seat)`, `seats(state)`.
+- `knowledge` bases and `assert {{ … }} in base`, a store only: Inklog's
+  rules and questions are milestone 22's, on the same fact shape.
+- Ex 7 checks clean, and plays whole, Detective included: its own tests,
+  random games that all end, and (through the engine) a table whose log
+  replays seat for seat. Milestone 21 is done.
+
 ### Milestone 21d: votes and seats
 
 - `~ for guest where: …`; `~ consensus` and `~ consensus 2`, settled as
