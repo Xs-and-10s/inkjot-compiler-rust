@@ -256,7 +256,8 @@ general words. Verdict in `docs/define.md`.
 ## Ex 11: The Meridian Key (`ex11-meridian-key.twee`)
 
 A JRPG-style `game`, one level and its boss, in an original setting: four
-scouts of the Lantern (a vanguard, an arcanist, a medic, a scout) steal
+scouts of the Lantern (Ress the vanguard, Ivo the arcanist, Tam the
+medic, Quill the scout) steal
 the Meridian Key from an Auric Dominion relay under a glacier. You look
 through the lead and give the other three one command each a round; the
 lead can change hands between fights. Two encounters: two hangar
@@ -271,7 +272,7 @@ What it asks of milestone 23:
 | Several opponents | `encounter sentry_a, sentry_b`, `~ at opponent here` |
 | One command per ally a round | `> [[Ivo: ion bolt at {target}->…]] ~ ion_bolt ~ by ivo`, `~ one command each`, `end round` |
 | Classes as archetypes | `:: vanguard [archetype]` with its `hp` and acts |
-| Kinds of harm | `wound target 3 ~ as ion`; `~ resists kinetic when self.armoured`, `~ weak to ion`, `~ immune to cold` |
+| Kinds of harm | `wound target 3 ~ as ion`; `~ resistance kinetic when self.armoured`, `~ weakness ion`, `~ immunity cold` |
 | Cooldowns | `~ cooldown 3 rounds`, `ivo.cooling(frostfall)` |
 | Pattern phases | `pattern drill: … ~ while orrel.hp > 15`, `pattern unbound: … ~ by weight`, `on pattern unbound begins` |
 | A threat from the world | `unleash klaxon`, as the Key leaves its pillar |

@@ -30,7 +30,7 @@ words it asks for (see `examples/drafts/README.md`):
 | `~ one command each` | Every able member of the party gives one command a round; the round goes on when each has (or the lead says `Hold`) |
 | `~ at opponent here` | One Link per opponent still standing, `{target}` in its label |
 | `wound target 3 ~ as ion` | Damage with a kind |
-| `~ resists kinetic`, `~ weak to ion`, `~ immune to cold` | Half, double, none, of damage of that kind; with `when`, only while it holds |
+| `~ resistance kinetic`, `~ weakness ion`, `~ immunity cold` | Half, double, none, of damage of that type; with `when`, only while it holds; a list for several |
 | `~ cooldown 3 rounds` | An act or threat that, once used, waits that many rounds; `x.cooling(act)` |
 | `pattern … ~ while …` | Pattern phases: the pattern in play is the first whose `while` holds; `on pattern unbound begins` when one takes over |
 | `pattern … ~ by weight` | The next move is the heaviest whose `when` holds and is not cooling |
@@ -43,13 +43,13 @@ kind: game
 tags: science fantasy ~ party ~ heist ~ boss fight
 ages: 10..
 mode: solo
-pov: ressa
+pov: ress
 start: hangar
 
-character ressa: "Ressa" ~ like vanguard ~ pronouns she ~ selectable
+character ress: "Ress" ~ like vanguard ~ pronouns he ~ selectable
 character ivo: "Ivo" ~ like arcanist ~ pronouns he ~ selectable
-character tamsin: "Tamsin" ~ like medic ~ pronouns she ~ selectable
-character quill: "Quill" ~ like scout ~ pronouns they ~ selectable
+character tam: "Tam" ~ like medic ~ pronouns he ~ selectable
+character quill: "Quill" ~ like scout ~ pronouns he ~ selectable
 
 place hangar: "the ice hangar"
 place gallery: "the long gallery"
@@ -70,7 +70,7 @@ fact vent_route: "Quill reads the coolant plans: the vents run to the back of th
 (((
 Kinds of harm. A tag on an archetype counts for everything like it.
 )))
-archetype sentry ~ resists kinetic ~ weak to ion ~ immune to cold
+archetype sentry ~ resistance kinetic ~ weakness ion ~ immunity cold
 npc sentry_a: "Sentry A" ~ like sentry ~ in hangar
 npc sentry_b: "Sentry B" ~ like sentry ~ in hangar
 npc orrel: "Prefect Orrel" ~ pronouns she ~ in lift
@@ -91,7 +91,7 @@ a command too. `hp` runs out: down, not dead, until revived.
 stat hp: 14
 act strike: cost 0 ~ "a hardlight blade" ~ at opponent here ~ then wound target 3 ~ as kinetic
 act shield_wall: cost 0 ~ "a wall of hardlight before the party" ~ cooldown 3 rounds ~ then cover pov.all
-act taunt: cost 0 ~ "draws the next blow to herself" ~ then block for pov.all
+act taunt: cost 0 ~ "draws the next blow to himself" ~ then block for pov.all
 
 :: arcanist [archetype]
 --
@@ -134,9 +134,9 @@ doesn't, and Orrel stops following the drill.
 --
 stat hp: 30
 state armoured: yes
-~ resists kinetic when self.armoured
-~ weak to ion when not self.armoured
-~ immune to cold when self.armoured
+~ resistance kinetic when self.armoured
+~ weakness ion when not self.armoured
+~ immunity cold when self.armoured
 
 pattern drill: lance, sweep_beam, lance, brace ~ repeat ~ one per round ~ while orrel.hp > 15
 pattern unbound: overload, call_sentries, lance, sweep_beam ~ by weight ~ one per round ~ while orrel.hp <= 15
@@ -178,12 +178,12 @@ A lamp narrows to a red point on one of you.
 
 [end]
 > ~ cost 0
-> [[Ressa: strike {target}->hangar:after]] ~ strike ~ by ressa
-> [[Ressa: shield wall->hangar:after]] ~ shield_wall ~ by ressa ~ when not ressa.cooling(shield_wall)
+> [[Ress: strike {target}->hangar:after]] ~ strike ~ by ress
+> [[Ress: shield wall->hangar:after]] ~ shield_wall ~ by ress ~ when not ress.cooling(shield_wall)
 > [[Ivo: ion bolt at {target}->hangar:after]] ~ ion_bolt ~ by ivo
 > [[Ivo: frostfall->hangar:after]] ~ frostfall ~ by ivo ~ when not ivo.cooling(frostfall)
-> [[Tamsin: mend {target}->hangar:after]] ~ mend ~ by tamsin
-> [[Tamsin: smoke screen->hangar:after]] ~ screen ~ by tamsin
+> [[Tam: mend {target}->hangar:after]] ~ mend ~ by tam
+> [[Tam: smoke screen->hangar:after]] ~ screen ~ by tam
 > [[Quill: snipe {target}->hangar:after]] ~ snipe ~ by quill
 > [[Hold->hangar:after]] ~ id hold ~ then end round
 
@@ -248,7 +248,7 @@ Prefect Orrel fills the lift: nine feet of brass frame with a woman’s face in 
 :: lift:round [round]
 let next: orrel.pattern.next
 hint: "The frame turns bullets while it’s whole. Break it with lightning, then shoot it." ~ when orrel.armoured
-hint: "Overload hits all of you, hard. Tamsin’s smoke stops it, if she’s ready." ~ when next == overload
+hint: "Overload hits all of you, hard. Tam’s smoke stops it, if he’s ready." ~ when next == overload
 --
 [if next == lance]
 The frame lowers a lance of white fire at one of you.
@@ -267,14 +267,14 @@ Her armour gleams, unscratched.
 
 [end]
 > ~ cost 0
-> [[Ressa: strike {target}->lift:after]] ~ strike ~ by ressa
-> [[Ressa: shield wall->lift:after]] ~ shield_wall ~ by ressa ~ when not ressa.cooling(shield_wall)
-> [[Ressa: taunt->lift:after]] ~ taunt ~ by ressa
+> [[Ress: strike {target}->lift:after]] ~ strike ~ by ress
+> [[Ress: shield wall->lift:after]] ~ shield_wall ~ by ress ~ when not ress.cooling(shield_wall)
+> [[Ress: taunt->lift:after]] ~ taunt ~ by ress
 > [[Ivo: ion bolt at {target}->lift:after]] ~ ion_bolt ~ by ivo
 > [[Ivo: frostfall->lift:after]] ~ frostfall ~ by ivo ~ when not ivo.cooling(frostfall)
-> [[Tamsin: mend {target}->lift:after]] ~ mend ~ by tamsin
-> [[Tamsin: revive {target}->lift:after]] ~ revive ~ by tamsin ~ when not tamsin.cooling(revive)
-> [[Tamsin: smoke screen->lift:after]] ~ screen ~ by tamsin
+> [[Tam: mend {target}->lift:after]] ~ mend ~ by tam
+> [[Tam: revive {target}->lift:after]] ~ revive ~ by tam ~ when not tam.cooling(revive)
+> [[Tam: smoke screen->lift:after]] ~ screen ~ by tam
 > [[Quill: snipe {target}->lift:after]] ~ snipe ~ by quill
 > [[Quill: deadeye on {target}->lift:after]] ~ deadeye ~ by quill ~ when not quill.cooling(deadeye)
 > [[Hold->lift:after]] ~ id hold_lift ~ then end round
@@ -285,7 +285,7 @@ Her armour gleams, unscratched.
 The lance takes {threat.target} full in the chest.
 
 [if threat.name == overload and threat.outcome == prevent]
-Tamsin’s smoke rolls through the lift, and the overload vents into nothing.
+Tam’s smoke rolls through the lift, and the overload vents into nothing.
 
 [if threat.name == overload and threat.outcome == landed]
 The overload throws all four of you against the lift wall.
@@ -294,7 +294,7 @@ The overload throws all four of you against the lift wall.
 The hardlight wall holds.
 
 [if threat.outcome == block]
-Ressa steps into it.
+Ress steps into it.
 
 [if orrel.hp == 0]
 The frame kneels, very slowly, like a camel. The furnace goes out.
@@ -315,7 +315,7 @@ All four of you walk up the ramp. Quill is laughing.
 You carry {plural(count(character, where: it.down), "one of your own", "two of your own")} up the ramp between you.
 
 [end]
-In Ressa’s pocket, the Meridian Key turns its slow stars.
+In Ress’s pocket, the Meridian Key turns its slow stars.
 
 :: captured [finale]
 --
@@ -327,7 +327,7 @@ do: "Fight"
 do: "Ivo: ion bolt at Sentry A"
 expect: sentry_a.hp == 0
 (((
-Weak to ion: 3, doubled, of 6.
+A weakness to ion: 3, doubled, of 6.
 )))
 
 :: bullets_glance_off_the_frame [test]
@@ -336,7 +336,7 @@ do: "Fight"
 do: "Quill: snipe Orrel"
 expect: orrel.hp == 28
 (((
-Resists kinetic while armoured: 4, halved.
+A resistance to kinetic while armoured: 4, halved.
 )))
 
 :: each_ally_one_command [test]
@@ -372,4 +372,4 @@ expect: pov == ivo
 :: the_alarm_rings_out_of_turn [test]
 start: vault
 do: "Take the Key"
-expect: ressa.hp == 13 and quill.hp == 9
+expect: ress.hp == 13 and quill.hp == 9
